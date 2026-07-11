@@ -54,4 +54,4 @@ data/
 .agents/
 .opencode/
 .expo/
-assets/csv/assets/csv/
+assets/csv/*
