@@ -1,6 +1,6 @@
 // ─── Shows Tab — React Query hooks ───
 
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useQuery, useMutation, useQueryClient, QueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import { getImageUrl } from '@/lib/tmdb'
 import type { Show, UserShow } from '@/types'
@@ -49,7 +49,7 @@ export const showKeys = {
 
 // ── Fetch all shows (with user data join) ──
 
-async function fetchShows(showArchived: boolean): Promise<ShowWithUserData[]> {
+async function fetchShows(showArchived: boolean, queryClient?: QueryClient): Promise<ShowWithUserData[]> {
   let query = supabase
     .from('shows')
     .select('*, user_shows(*)')
@@ -72,28 +72,145 @@ async function fetchShows(showArchived: boolean): Promise<ShowWithUserData[]> {
     result = result.filter((s) => !s.archived)
   }
 
+  // Filter: only show items that are in the user's library
+  result = result.filter((s) => s.is_watchlist)
+
+  // ── Batch sync episodes_seen ──
+  // Uses Math.max to NEVER decrease the counter:
+  //   - Imported shows (counter > 0, no user_episodes rows) → protected
+  //   - Toggled shows (counter = 0, user_episodes rows exist) → fixed
+  const showIds = result.map((s) => s.id)
+  if (showIds.length > 0) {
+    const { data: watchedEps } = await supabase
+      .from('user_episodes')
+      .select('show_id')
+      .eq('watched', true)
+      .in('show_id', showIds)
+
+    const counts = new Map<string, number>()
+    for (const row of watchedEps ?? []) {
+      counts.set(row.show_id, (counts.get(row.show_id) ?? 0) + 1)
+    }
+
+    const updates: Promise<{ error: any }>[] = []
+    for (const show of result) {
+      const actual = counts.get(show.id) ?? 0
+      const newCount = Math.max(show.episodes_seen, actual)
+      if (newCount !== show.episodes_seen) {
+        show.episodes_seen = newCount
+        updates.push(
+          supabase
+            .from('user_shows')
+            .upsert({ show_id: show.id, episodes_seen: newCount, is_following: true }, { onConflict: 'show_id' })
+        )
+      }
+    }
+    if (updates.length > 0) {
+      await Promise.all(updates)
+
+      // Also patch the continue-watching cache so the UI is consistent
+      if (queryClient) {
+        const cwCached = queryClient.getQueryData<ShowWithUserData[]>(showKeys.continueWatching)
+        if (cwCached) {
+          const cwMap = new Map(result.map((s) => [s.id, s.episodes_seen]))
+          let changed = false
+          const updated = cwCached.map((s) => {
+            const fixed = cwMap.get(s.id)
+            if (fixed !== undefined && fixed !== s.episodes_seen) {
+              changed = true
+              return { ...s, episodes_seen: fixed }
+            }
+            return s
+          })
+          if (changed) {
+            queryClient.setQueryData(showKeys.continueWatching, updated)
+          }
+        }
+      }
+    }
+  }
+
   // Sort: last watched first (by updated_at desc), then alphabetical
   return sortShows(result)
 }
 
 export function useShows(showArchived: boolean) {
+  const queryClient = useQueryClient()
+
   return useQuery({
     queryKey: showKeys.list(showArchived),
-    queryFn: () => fetchShows(showArchived),
+    queryFn: ({ queryKey }) => fetchShows(showArchived, queryClient),
     staleTime: 1000 * 60 * 2, // 2 min
   })
 }
 
 // ── Fetch single show by ID ──
 
-async function fetchShow(id: string): Promise<ShowWithUserData> {
-  const { data, error } = await supabase
+async function fetchShow(id: string, queryClient?: QueryClient): Promise<ShowWithUserData | null> {
+  // Support both UUID and TMDb ID lookups
+  const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)
+
+  let query = supabase
     .from('shows')
     .select('*, user_shows(*)')
-    .eq('id', id)
-    .single()
 
-  if (error) throw new Error(`Failed to fetch show: ${error.message}`)
+  if (isUuid) {
+    query = query.eq('id', id)
+  } else {
+    const numId = parseInt(id, 10)
+    if (isNaN(numId)) throw new Error(`Invalid show identifier: ${id}`)
+    query = query.eq('tmdb_id', numId)
+  }
+
+  const { data, error } = await query.single()
+
+  if (error) {
+    // PGRST116 = not found — return null for TMDB fallback
+    if (error.code === 'PGRST116') return null
+    throw new Error(`Failed to fetch show: ${error.message}`)
+  }
+
+  // ── Sync episodes_seen ──
+  // Uses Math.max to NEVER decrease the counter.
+  const { count: rawCount } = await supabase
+    .from('user_episodes')
+    .select('*', { count: 'exact', head: true })
+    .eq('show_id', data.id)
+    .eq('watched', true)
+
+  const count = rawCount ?? 0
+
+  if (data.user_shows) {
+    const newCount = Math.max(data.user_shows.episodes_seen ?? 0, count)
+    if (newCount !== data.user_shows.episodes_seen) {
+      await supabase
+        .from('user_shows')
+        .update({ episodes_seen: newCount })
+        .eq('show_id', data.id)
+      data.user_shows.episodes_seen = newCount
+
+      // Propagate the fix to all cached list copies
+      if (queryClient) {
+        for (const archived of [true, false]) {
+          const cached = queryClient.getQueryData<ShowWithUserData[]>(showKeys.list(archived))
+          if (cached) {
+            const updated = cached.map((s) =>
+              s.id === data.id ? { ...s, episodes_seen: newCount } : s
+            )
+            queryClient.setQueryData(showKeys.list(archived), updated)
+          }
+        }
+        const cwCached = queryClient.getQueryData<ShowWithUserData[]>(showKeys.continueWatching)
+        if (cwCached) {
+          const updated = cwCached.map((s) =>
+            s.id === data.id ? { ...s, episodes_seen: newCount } : s
+          )
+          queryClient.setQueryData(showKeys.continueWatching, updated)
+        }
+      }
+    }
+  }
+
   return mapRow(data)
 }
 
@@ -102,7 +219,7 @@ export function useShow(id: string) {
 
   return useQuery({
     queryKey: ['shows', 'detail', id],
-    queryFn: () => fetchShow(id),
+    queryFn: () => fetchShow(id, queryClient),
     staleTime: 1000 * 60 * 2,
     // Use placeholderData (not initialData) so the query stays in pending state
     // when no cache is available — avoids React Query v5 treating undefined
@@ -161,7 +278,37 @@ async function fetchContinueWatching(): Promise<ShowWithUserData[]> {
   if (error) throw new Error(`Failed to fetch continue watching: ${error.message}`)
   if (!data) return []
 
-  const result = data.map(mapRow)
+  let result = data.map(mapRow)
+
+  // Only include items still in the user's library
+  result = result.filter((s) => s.is_watchlist)
+
+  // Batch sync episodes_seen — Math.max protects imported data
+  const showIds = result.map((s) => s.id)
+  if (showIds.length > 0) {
+    const { data: watchedEps } = await supabase
+      .from('user_episodes')
+      .select('show_id')
+      .eq('watched', true)
+      .in('show_id', showIds)
+
+    const counts = new Map<string, number>()
+    for (const row of watchedEps ?? []) {
+      counts.set(row.show_id, (counts.get(row.show_id) ?? 0) + 1)
+    }
+
+    for (const show of result) {
+      const actual = counts.get(show.id) ?? 0
+      const newCount = Math.max(show.episodes_seen, actual)
+      if (newCount !== show.episodes_seen) {
+        show.episodes_seen = newCount
+        supabase
+          .from('user_shows')
+          .upsert({ show_id: show.id, episodes_seen: newCount, is_following: true }, { onConflict: 'show_id' })
+          .then() // fire-and-forget, no await
+      }
+    }
+  }
 
   // Sort by most recent last_watched_episode_data.updated_at
   result.sort((a, b) => {
@@ -223,7 +370,6 @@ async function markEpisodeWatched(showId: string): Promise<void> {
     episode_number: currentSeen + 1,
     watched: true,
     watched_at: new Date().toISOString(),
-    rewatch_count: 0,
   })
 
   if (insertError) {

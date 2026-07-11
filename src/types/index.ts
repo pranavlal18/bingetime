@@ -53,7 +53,6 @@ export interface UserEpisode {
   episode_number: number
   watched: boolean
   watched_at: string | null
-  rewatch_count: number
 }
 
 // ── Movies ──
@@ -64,6 +63,7 @@ export interface Movie {
   release_date: string | null
   runtime: number | null
   poster_path: string | null
+  genres: string[] | null
 }
 
 export interface UserMovie {
@@ -132,6 +132,7 @@ export interface TMDbMovieDetails {
   overview: string | null
   release_date: string | null
   runtime: number | null
+  genres?: Array<{ id: number; name: string }>
 }
 
 export interface TMDbSeasonDetails {

@@ -7,10 +7,11 @@ import { Swipeable } from 'react-native-gesture-handler'
 import { Ionicons } from '@expo/vector-icons'
 import { router } from 'expo-router'
 import { getImageUrl } from '@/lib/queries/movies'
+import { colors, typography, borderRadius, spacing } from '@/theme'
 import type { MovieWithUserData } from '@/lib/queries/movies'
 
 const SCREEN_WIDTH = Dimensions.get('window').width
-const CARD_WIDTH = (SCREEN_WIDTH - 24 - 12) / 2
+const CARD_WIDTH = (SCREEN_WIDTH - 40 - 16) / 2 // 40 outer margins, 16 gap = 2 cols
 const POSTER_ASPECT = 2 / 3
 
 interface MovieCardProps {
@@ -38,7 +39,7 @@ const MovieCard = memo(function MovieCard({ movie, onMarkWatched }: MovieCardPro
           swipeableRef.current?.close()
         }}
       >
-        <Ionicons name="checkmark" size={28} color="#FFF" />
+        <Ionicons name="checkmark" size={28} color={colors.onPrimary} />
         <Text style={styles.swipeLabel}>Watch</Text>
       </Pressable>
     )
@@ -63,14 +64,14 @@ const MovieCard = memo(function MovieCard({ movie, onMarkWatched }: MovieCardPro
             />
           ) : (
             <View style={styles.posterPlaceholder}>
-              <Ionicons name="film-outline" size={32} color="#555" />
+              <Ionicons name="film-outline" size={32} color={colors.outlineVariant} />
             </View>
           )}
 
           {/* Watched badge */}
           {movie.watched && (
             <View style={styles.watchedBadge}>
-              <Ionicons name="checkmark-circle" size={18} color="#4CAF50" />
+              <Ionicons name="checkmark-circle" size={18} color={colors.success} />
             </View>
           )}
 
@@ -88,13 +89,9 @@ const MovieCard = memo(function MovieCard({ movie, onMarkWatched }: MovieCardPro
         </Text>
 
         {/* Watched indicator */}
-        {movie.rewatch_count > 0 ? (
-          <Text style={styles.rewatchText}>
-            Watched {movie.rewatch_count + 1}x
-          </Text>
-        ) : movie.watched ? (
+        {movie.watched && (
           <Text style={styles.watchedText}>Watched</Text>
-        ) : null}
+        )}
       </Pressable>
     </Swipeable>
   )
@@ -108,10 +105,12 @@ const styles = StyleSheet.create({
   posterContainer: {
     width: CARD_WIDTH,
     height: CARD_WIDTH * 1.5,
-    borderRadius: 8,
+    borderRadius: 16,
     overflow: 'hidden',
-    backgroundColor: '#1A1A1A',
+    backgroundColor: colors.surfaceDim,
     position: 'relative',
+    borderWidth: 1,
+    borderColor: colors.outlineVariant,
   },
   poster: {
     width: '100%',
@@ -125,58 +124,52 @@ const styles = StyleSheet.create({
   },
   watchedBadge: {
     position: 'absolute',
-    top: 6,
-    right: 6,
+    top: 8,
+    right: 8,
     backgroundColor: 'rgba(0,0,0,0.7)',
     borderRadius: 12,
-    padding: 2,
+    padding: spacing.unit,
   },
   yearBadge: {
     position: 'absolute',
-    bottom: 6,
-    left: 6,
+    bottom: 8,
+    left: 8,
     backgroundColor: 'rgba(0,0,0,0.7)',
-    borderRadius: 6,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: spacing.unit,
   },
   yearText: {
     fontSize: 11,
-    color: '#FFF',
+    color: colors.onPrimary,
     fontWeight: '600',
   },
   title: {
-    fontSize: 13,
-    color: '#FFF',
+    fontSize: typography.bodyXs.fontSize,
+    color: colors.onSurface,
     fontWeight: '600',
-    marginTop: 6,
+    marginTop: 8,
     lineHeight: 18,
   },
   watchedText: {
-    fontSize: 11,
-    color: '#4CAF50',
-    marginTop: 2,
-    fontWeight: '500',
-  },
-  rewatchText: {
-    fontSize: 11,
-    color: '#FFA726',
-    marginTop: 2,
+    fontSize: typography.bodyXs.fontSize,
+    color: colors.success,
+    marginTop: spacing.unit,
     fontWeight: '500',
   },
   swipeAction: {
-    backgroundColor: '#4CAF50',
+    backgroundColor: colors.primary,
     justifyContent: 'center',
     alignItems: 'center',
     width: 72,
-    borderRadius: 8,
+    borderRadius: borderRadius.lg,
     marginLeft: 8,
   },
   swipeLabel: {
-    color: '#FFF',
-    fontSize: 11,
+    color: colors.onPrimary,
+    fontSize: typography.bodyXs.fontSize,
     fontWeight: '600',
-    marginTop: 2,
+    marginTop: spacing.unit,
   },
 })
 

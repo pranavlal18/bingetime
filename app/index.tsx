@@ -1,6 +1,9 @@
+// ─── Splash / Redirect ───
+
 import { useEffect } from 'react'
 import { View, ActivityIndicator, Text } from 'react-native'
 import { router } from 'expo-router'
+import { colors, typography } from '@/theme'
 
 export default function Index() {
   useEffect(() => {
@@ -8,9 +11,11 @@ export default function Index() {
   }, [])
 
   return (
-    <View className="flex-1 items-center justify-center bg-[#1a1a2e]">
-      <ActivityIndicator size="large" color="#e94560" />
-      <Text className="mt-4 text-lg text-[#9ca3af]">Loading BingeTime…</Text>
+    <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.surface }}>
+      <ActivityIndicator size="large" color={colors.primary} />
+      <Text style={{ marginTop: 16, fontSize: typography.bodyLg.fontSize, color: colors.onSurfaceVariant }}>
+        Loading BingeTime…
+      </Text>
     </View>
   )
 }

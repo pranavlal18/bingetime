@@ -1,6 +1,12 @@
 {
   "version": 1,
   "skills": {
+    "stitch::react-native": {
+      "source": "google-labs-code/stitch-skills",
+      "sourceType": "github",
+      "skillPath": "plugins/stitch-build/skills/react-native/SKILL.md",
+      "computedHash": "a63c862ea9df1f9173ec51bd8706550a65dd5784f8dc44ce2aafae7f21015aea"
+    },
     "supabase-postgres-best-practices": {
       "source": "supabase/agent-skills",
       "sourceType": "github",

@@ -50,19 +50,21 @@ async function enrichWithLibraryStatus(results: DiscoverResult[]): Promise<Disco
 
   const tmdbIds = results.map((r) => r.tmdbId)
 
-  // Check shows by tmdb_id
+  // Check shows by tmdb_id — only include items with is_watchlist: true
   const { data: existingShows } = await supabase
     .from('shows')
-    .select('id, tmdb_id')
+    .select('id, tmdb_id, user_shows!inner(is_watchlist)')
     .in('tmdb_id', tmdbIds)
     .not('tmdb_id', 'is', null)
+    .eq('user_shows.is_watchlist', true)
 
-  // Check movies by tmdb_id
+  // Check movies by tmdb_id — only include items with is_watchlist: true
   const { data: existingMovies } = await supabase
     .from('movies')
-    .select('id, tmdb_id')
+    .select('id, tmdb_id, user_movies!inner(is_watchlist)')
     .in('tmdb_id', tmdbIds)
     .not('tmdb_id', 'is', null)
+    .eq('user_movies.is_watchlist', true)
 
   // Build lookup maps
   const showMap = new Map<number, string>()
@@ -161,6 +163,42 @@ export function useAddToLibrary() {
       queryClient.invalidateQueries({ queryKey: ['profile'] })
     },
   })
+}
+
+export function useRemoveFromLibrary() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async (item: DiscoverResult) => {
+      if (!item.libraryId) return
+      if (item.mediaType === 'tv') {
+        return removeShowFromLibrary(item.libraryId)
+      }
+      return removeMovieFromLibrary(item.libraryId)
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: discoverKeys.all })
+      queryClient.invalidateQueries({ queryKey: ['movies'] })
+      queryClient.invalidateQueries({ queryKey: ['shows'] })
+      queryClient.invalidateQueries({ queryKey: ['profile'] })
+    },
+  })
+}
+
+async function removeShowFromLibrary(showId: string) {
+  const { error } = await supabase
+    .from('user_shows')
+    .update({ is_watchlist: false })
+    .eq('show_id', showId)
+  if (error) throw new Error(`Failed to remove show: ${error.message}`)
+}
+
+async function removeMovieFromLibrary(movieId: string) {
+  const { error } = await supabase
+    .from('user_movies')
+    .update({ is_watchlist: false })
+    .eq('movie_id', movieId)
+  if (error) throw new Error(`Failed to remove movie: ${error.message}`)
 }
 
 async function addShowToLibrary(item: DiscoverResult): Promise<string> {

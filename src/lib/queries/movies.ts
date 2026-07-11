@@ -12,7 +12,6 @@ export interface MovieWithUserData extends Movie {
   watched: boolean
   watched_at: string | null
   is_watchlist: boolean
-  rewatch_count: number
 }
 
 function mapRow(row: any): MovieWithUserData {
@@ -24,12 +23,12 @@ function mapRow(row: any): MovieWithUserData {
     release_date: row.release_date,
     runtime: row.runtime,
     poster_path: row.poster_path,
+    genres: row.genres ?? null,
     // User movie data
     user_movies: um,
     watched: um.watched ?? false,
     watched_at: um.watched_at ?? null,
     is_watchlist: um.is_watchlist ?? false,
-    rewatch_count: um.rewatch_count ?? 0,
   }
 }
 
@@ -63,7 +62,9 @@ async function fetchMovies(): Promise<MovieWithUserData[]> {
   if (error) throw new Error(`Failed to fetch movies: ${error.message}`)
   if (!data) return []
 
-  const result = data.map(mapRow)
+  let result = data.map(mapRow)
+  // Filter: only show items that are in the user's library
+  result = result.filter((m) => m.is_watchlist)
   return sortMovies(result)
 }
 
@@ -77,14 +78,30 @@ export function useMovies() {
 
 // ── Fetch single movie by ID ──
 
-async function fetchMovie(id: string): Promise<MovieWithUserData> {
-  const { data, error } = await supabase
+async function fetchMovie(id: string): Promise<MovieWithUserData | null> {
+  // Support both UUID and TMDb ID lookups
+  const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)
+
+  let query = supabase
     .from('movies')
     .select('*, user_movies(*)')
-    .eq('id', id)
-    .single()
 
-  if (error) throw new Error(`Failed to fetch movie: ${error.message}`)
+  if (isUuid) {
+    query = query.eq('id', id)
+  } else {
+    const numId = parseInt(id, 10)
+    if (isNaN(numId)) throw new Error(`Invalid movie identifier: ${id}`)
+    query = query.eq('tmdb_id', numId)
+  }
+
+  const { data, error } = await query.single()
+
+  if (error) {
+    // PGRST116 = not found — return null for TMDB fallback
+    if (error.code === 'PGRST116') return null
+    throw new Error(`Failed to fetch movie: ${error.message}`)
+  }
+
   return mapRow(data)
 }
 
@@ -111,30 +128,50 @@ export function useMovie(id: string) {
   })
 }
 
-// ── Mark movie as watched (increments rewatch_count on rewatches) ──
+// ── Mark movie as watched ──
 
 export function useMarkMovieWatched() {
   const queryClient = useQueryClient()
 
   return useMutation({
     mutationFn: async (movieId: string) => {
-      // 1. Fetch current state to detect rewatch
-      const { data: existing } = await supabase
-        .from('user_movies')
-        .select('watched, rewatch_count')
-        .eq('movie_id', movieId)
-        .single()
-
-      const wasAlreadyWatched = existing?.watched ?? false
-      const currentRewatchCount = existing?.rewatch_count ?? 0
-
-      // 2. If already watched, increment rewatch_count
       const { error } = await supabase.from('user_movies').upsert(
         {
           movie_id: movieId,
           watched: true,
           watched_at: new Date().toISOString(),
-          rewatch_count: wasAlreadyWatched ? currentRewatchCount + 1 : 0,
+        },
+        { onConflict: 'movie_id' }
+      )
+      if (error) throw new Error(error.message)
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: movieKeys.all })
+      queryClient.invalidateQueries({ queryKey: ['profile'] })
+    },
+  })
+}
+
+// ── Toggle watched status ──
+
+export function useToggleMovieWatched() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async (movieId: string) => {
+      const { data: existing } = await supabase
+        .from('user_movies')
+        .select('watched')
+        .eq('movie_id', movieId)
+        .single()
+
+      const newWatched = !(existing?.watched ?? false)
+
+      const { error } = await supabase.from('user_movies').upsert(
+        {
+          movie_id: movieId,
+          watched: newWatched,
+          watched_at: newWatched ? new Date().toISOString() : null,
         },
         { onConflict: 'movie_id' }
       )
@@ -249,3 +286,58 @@ export function useRefreshMoviePosters() {
 }
 
 export { getImageUrl }
+
+// ── Batch-fetch genres for movies missing them ──
+
+export function useRefreshMovieGenres() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async () => {
+      // 1. Fetch movies where genres is null
+      const { data: movies, error: fetchError } = await supabase
+        .from('movies')
+        .select('id, tmdb_id')
+        .is('genres', null)
+        .not('tmdb_id', 'is', null)
+
+      if (fetchError) throw new Error(`Failed to fetch movies: ${fetchError.message}`)
+      if (!movies || movies.length === 0) return { updated: 0 }
+
+      const BATCH_SIZE = 5
+      const updates: Array<{ id: string; genres: string[] }> = []
+
+      // 2. Fetch genres from TMDb for each movie
+      for (let i = 0; i < movies.length; i += BATCH_SIZE) {
+        const batch = movies.slice(i, i + BATCH_SIZE)
+        const results = await Promise.allSettled(
+          batch.map(async (movie) => {
+            const details = await getMovieDetails(movie.tmdb_id!)
+            const genres = (details.genres || []).map((g: { id: number; name: string }) => g.name)
+            return { id: movie.id, genres }
+          })
+        )
+
+        for (const result of results) {
+          if (result.status === 'fulfilled' && result.value.genres.length > 0) {
+            updates.push(result.value)
+          }
+        }
+      }
+
+      // 3. Batch update genres in database
+      if (updates.length > 0) {
+        const { error: updateError } = await supabase
+          .from('movies')
+          .upsert(updates, { onConflict: 'id' })
+
+        if (updateError) throw new Error(`Failed to update genres: ${updateError.message}`)
+      }
+
+      return { updated: updates.length }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: movieKeys.all })
+    },
+  })
+}

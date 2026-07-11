@@ -14,10 +14,11 @@ import { Ionicons } from '@expo/vector-icons'
 import { router } from 'expo-router'
 import { getImageUrl } from '@/lib/queries/shows'
 import ProgressBar from './ProgressBar'
+import { colors, typography, borderRadius, spacing } from '@/theme'
 import type { ShowWithUserData } from '@/lib/queries/shows'
 
 const SCREEN_WIDTH = Dimensions.get('window').width
-const CARD_WIDTH = (SCREEN_WIDTH - 24 - 12) / 2 // 24 padding, 12 gap = 2 cols
+const CARD_WIDTH = (SCREEN_WIDTH - 40 - 16) / 2 // 40 outer margins, 16 gap = 2 cols
 const POSTER_ASPECT = 2 / 3
 
 interface ShowCardProps {
@@ -36,15 +37,13 @@ export default function ShowCard({ show, onMarkWatched }: ShowCardProps) {
   const totalEps = show.total_episodes
   const seenEps = show.episodes_seen
 
-  // Show is complete if:
-  // 1. known total + seen >= total, OR
-  // 2. show ended/canceled and seen >= total, OR
-  // 3. show ended/canceled with no total but seen > 0 (user confirmed finished)
+  const allCaughtUp = totalEps !== null && totalEps > 0 && seenEps >= totalEps
+
   const isComplete =
-    (totalEps !== null && totalEps > 0 && seenEps >= totalEps) ||
-    ((show.status === 'Ended' || show.status === 'Canceled') &&
-      totalEps !== null &&
-      seenEps >= totalEps)
+    allCaughtUp &&
+    (show.status === 'Ended' || show.status === 'Canceled')
+
+  const isUpToDate = allCaughtUp && !isComplete
 
   const hasProgress = seenEps > 0 || (totalEps !== null && totalEps > 0)
 
@@ -59,7 +58,7 @@ export default function ShowCard({ show, onMarkWatched }: ShowCardProps) {
           swipeableRef.current?.close()
         }}
       >
-        <Ionicons name="checkmark" size={28} color="#FFF" />
+        <Ionicons name="checkmark" size={28} color={colors.onPrimary} />
         <Text style={styles.swipeLabel}>Watch</Text>
       </Pressable>
     )
@@ -84,24 +83,21 @@ export default function ShowCard({ show, onMarkWatched }: ShowCardProps) {
             />
           ) : (
             <View style={styles.posterPlaceholder}>
-              <Ionicons name="tv-outline" size={32} color="#555" />
+              <Ionicons name="tv-outline" size={32} color={colors.outlineVariant} />
             </View>
           )}
 
           {/* Complete badge */}
           {isComplete && (
             <View style={styles.completeBadge}>
-              <Ionicons name="checkmark-circle" size={18} color="#4CAF50" />
+              <Ionicons name="checkmark-circle" size={18} color={colors.statusFinished} />
             </View>
           )}
 
-          {/* Rewatch indicator — if episodes_seen > total, they're rewatching */}
-          {totalEps !== null && seenEps > totalEps && totalEps > 0 && (
-            <View style={styles.rewatchBadge}>
-              <Ionicons name="repeat" size={12} color="#FFF" />
-              <Text style={styles.rewatchText}>
-                +{seenEps - totalEps}
-              </Text>
+          {/* Up to date badge */}
+          {isUpToDate && (
+            <View style={styles.upToDateBadge}>
+              <Ionicons name="checkmark-circle" size={18} color={colors.statusUpToDate} />
             </View>
           )}
         </View>
@@ -123,7 +119,7 @@ export default function ShowCard({ show, onMarkWatched }: ShowCardProps) {
         {/* Episode count */}
         {seenEps > 0 && (
           <Text style={styles.episodeCount}>
-            {totalEps ? `${seenEps}/${totalEps}` : `${seenEps} eps`}
+            {totalEps ? `${Math.min(seenEps, totalEps)}/${totalEps}` : `${seenEps} eps`}
           </Text>
         )}
       </Pressable>
@@ -139,10 +135,12 @@ const styles = StyleSheet.create({
   posterContainer: {
     width: CARD_WIDTH,
     height: CARD_WIDTH * 1.5,
-    borderRadius: 8,
+    borderRadius: 16,
     overflow: 'hidden',
-    backgroundColor: '#1A1A1A',
+    backgroundColor: colors.surfaceDim,
     position: 'relative',
+    borderWidth: 1,
+    borderColor: colors.outlineVariant,
   },
   poster: {
     width: '100%',
@@ -156,53 +154,44 @@ const styles = StyleSheet.create({
   },
   completeBadge: {
     position: 'absolute',
-    top: 6,
-    right: 6,
+    top: 8,
+    right: 8,
     backgroundColor: 'rgba(0,0,0,0.7)',
     borderRadius: 12,
-    padding: 2,
+    padding: spacing.unit,
   },
-  rewatchBadge: {
+  upToDateBadge: {
     position: 'absolute',
-    top: 6,
-    left: 6,
-    backgroundColor: 'rgba(108,99,255,0.9)',
-    borderRadius: 10,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 3,
-  },
-  rewatchText: {
-    fontSize: 11,
-    color: '#FFF',
-    fontWeight: '700',
+    top: 8,
+    right: 8,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    borderRadius: 12,
+    padding: spacing.unit,
   },
   title: {
-    fontSize: 13,
-    color: '#FFF',
+    fontSize: typography.bodyXs.fontSize,
+    color: colors.onSurface,
     fontWeight: '600',
-    marginTop: 6,
+    marginTop: 8,
     lineHeight: 18,
   },
   episodeCount: {
-    fontSize: 11,
-    color: '#888',
-    marginTop: 2,
+    fontSize: typography.bodyXs.fontSize,
+    color: colors.onSurfaceVariant,
+    marginTop: spacing.unit,
   },
   swipeAction: {
-    backgroundColor: '#4CAF50',
+    backgroundColor: colors.primary,
     justifyContent: 'center',
     alignItems: 'center',
     width: 72,
-    borderRadius: 8,
+    borderRadius: borderRadius.lg,
     marginLeft: 8,
   },
   swipeLabel: {
-    color: '#FFF',
-    fontSize: 11,
+    color: colors.onPrimary,
+    fontSize: typography.bodyXs.fontSize,
     fontWeight: '600',
-    marginTop: 2,
+    marginTop: spacing.unit,
   },
 })

@@ -1,6 +1,6 @@
-// ─── Movie Detail Screen ───
+// ─── Movie Detail — Stitch-aligned ───
 
-import { useCallback } from 'react'
+import { useCallback, useRef } from 'react'
 import {
   View,
   Text,
@@ -8,66 +8,87 @@ import {
   Pressable,
   StyleSheet,
   ActivityIndicator,
+  Dimensions,
+  Animated,
+  Platform,
 } from 'react-native'
 import { useLocalSearchParams, router, Stack } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Image } from 'expo-image'
 import { Ionicons } from '@expo/vector-icons'
-import { useMovie, useMarkMovieWatched } from '@/lib/queries/movies'
+import { LinearGradient } from 'expo-linear-gradient'
+import { useMovie, useToggleMovieWatched } from '@/lib/queries/movies'
 import { getMovieDetails, getImageUrl } from '@/lib/tmdb'
 import { useQuery } from '@tanstack/react-query'
+import LibraryToggle from '@/components/ui/LibraryToggle'
+import { colors, typography, spacing, borderRadius } from '@/theme'
+
+const { width: SCREEN_WIDTH } = Dimensions.get('window')
+const BACKDROP_HEIGHT = 320
 
 export default function MovieDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>()
   const insets = useSafeAreaInsets()
+  const scrollY = useRef(new Animated.Value(0)).current
+
+  // Detect if the id param is a TMDb ID (numeric) vs a UUID
+  const isTmdbIdParam = /^\d+$/.test(id)
 
   const { data: movie, isLoading, error } = useMovie(id)
-  const markWatchedMutation = useMarkMovieWatched()
+  const toggleWatchedMutation = useToggleMovieWatched()
 
-  // Fetch TMDb details for overview + runtime
-  const { data: tmdbDetails } = useQuery({
-    queryKey: ['tmdb', 'movie-details', movie?.tmdb_id],
-    queryFn: () => getMovieDetails(movie!.tmdb_id!),
-    enabled: !!movie?.tmdb_id,
+  // Resolve TMDb ID — either from the DB record or directly from the param
+  const resolvedTmdbId = movie?.tmdb_id ?? (isTmdbIdParam ? parseInt(id, 10) : null)
+
+  const { data: tmdbDetails, isLoading: tmdbLoading } = useQuery({
+    queryKey: ['tmdb', 'movie-details', resolvedTmdbId],
+    queryFn: () => getMovieDetails(resolvedTmdbId!),
+    enabled: !!resolvedTmdbId,
     staleTime: 1000 * 60 * 60,
   })
 
-  const posterUrl = getImageUrl(movie?.poster_path, 'w500')
-  const tmdbPosterUrl = tmdbDetails ? getImageUrl(tmdbDetails.poster_path, 'w500') : null
+  const backdropUrl = tmdbDetails ? getImageUrl(tmdbDetails.backdrop_path, 'w780') : null
+  const posterUrl = getImageUrl(movie?.poster_path, 'w342')
+  const tmdbPosterUrl = tmdbDetails ? getImageUrl(tmdbDetails.poster_path, 'w342') : null
   const displayPoster = posterUrl || tmdbPosterUrl
 
-  const year = movie?.release_date?.slice(0, 4)
+  const year = movie?.release_date?.slice(0, 4) || tmdbDetails?.release_date?.slice(0, 4) || null
   const runtime = movie?.runtime || tmdbDetails?.runtime || null
   const runtimeDisplay = runtime ? `${Math.floor(runtime / 60)}h ${runtime % 60}m` : null
+  const genreList = movie?.genres ?? (tmdbDetails?.genres ? tmdbDetails.genres.map((g: { id: number; name: string }) => g.name) : null)
   const overview = tmdbDetails?.overview || 'No overview available.'
   const isWatched = movie?.watched ?? false
-  const rewatchCount = movie?.rewatch_count ?? 0
+  const displayTitle = movie?.title || tmdbDetails?.title || 'Unknown'
 
-  const handleMarkWatched = useCallback(() => {
-    if (movie) markWatchedMutation.mutate(movie.id)
-  }, [movie, markWatchedMutation])
+  const handleToggleWatched = useCallback(() => {
+    if (movie) toggleWatchedMutation.mutate(movie.id)
+  }, [movie, toggleWatchedMutation])
 
   const handleBack = useCallback(() => {
     router.back()
   }, [])
 
-  // Loading state
-  if (isLoading) {
+  // ── Loading ──
+  const isFallbackLoading = !movie && !isLoading && isTmdbIdParam && tmdbLoading
+  if (isLoading || isFallbackLoading) {
     return (
       <View style={[styles.container, styles.centered, { paddingTop: insets.top }]}>
-        <ActivityIndicator size="large" color="#6C63FF" />
+        <ActivityIndicator size="large" color={colors.primary} />
       </View>
     )
   }
 
-  // Error state
-  if (error || !movie) {
+  // ── Error ──
+  // UUID param failed in DB, or TMDB fallback also failed
+  const isRealDbError = error && !movie && !isTmdbIdParam
+  const isFallbackError = !movie && !tmdbDetails && isTmdbIdParam && !tmdbLoading
+  if (isRealDbError || isFallbackError) {
     return (
       <View style={[styles.container, styles.centered, { paddingTop: insets.top }]}>
-        <Ionicons name="alert-circle-outline" size={48} color="#555" />
+        <Ionicons name="alert-circle-outline" size={48} color={colors.onSurfaceVariant} />
         <Text style={styles.errorText}>Could not load movie details</Text>
-        <Pressable onPress={handleBack} style={styles.backButton}>
-          <Text style={styles.backButtonText}>Go back</Text>
+        <Pressable onPress={handleBack} style={styles.goBackButton}>
+          <Text style={styles.goBackText}>Go back</Text>
         </Pressable>
       </View>
     )
@@ -77,74 +98,121 @@ export default function MovieDetailScreen() {
     <View style={[styles.container, { paddingTop: insets.top }]}>
       <Stack.Screen options={{ headerShown: false }} />
 
-      <ScrollView
+      <Animated.ScrollView
         style={styles.scroll}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
+        onScroll={Animated.event(
+          [{ nativeEvent: { contentOffset: { y: scrollY } } }],
+          { useNativeDriver: true }
+        )}
+        scrollEventThrottle={16}
       >
-        {/* ── Poster ── */}
-        <View style={styles.posterContainer}>
-          {displayPoster ? (
+        {/* ── Backdrop Hero — Stitch design ── */}
+        <View style={styles.backdropContainer}>
+          {backdropUrl ? (
+            <Image
+              source={{ uri: backdropUrl }}
+              style={styles.backdrop}
+              contentFit="cover"
+              cachePolicy="memory-disk"
+            />
+          ) : displayPoster ? (
             <Image
               source={{ uri: displayPoster }}
-              style={styles.poster}
+              style={styles.backdrop}
               contentFit="cover"
               cachePolicy="memory-disk"
             />
           ) : (
-            <View style={styles.posterPlaceholder}>
-              <Ionicons name="film-outline" size={48} color="#444" />
-            </View>
+            <View style={styles.backdropPlaceholder} />
           )}
 
-          {/* Back button overlay */}
-          <Pressable onPress={handleBack} style={[styles.backOverlay, { top: insets.top + 8 }]}>
-            <Ionicons name="chevron-back" size={24} color="#FFF" />
+          {/* Gradient overlay */}
+          <LinearGradient
+            colors={['transparent', colors.surface]}
+            locations={[0.4, 1]}
+            style={styles.gradient}
+          />
+
+          {/* Back button */}
+          <Pressable onPress={handleBack} style={styles.backButton}>
+            <Ionicons name="chevron-back" size={24} color={colors.primary} />
           </Pressable>
+
+          {/* Library toggle — top-right */}
+          {resolvedTmdbId && (
+            <View style={[styles.libraryOverlay, { top: insets.top + 8 }]}>
+              <LibraryToggle
+                tmdbId={resolvedTmdbId}
+                mediaType="movie"
+                title={displayTitle}
+                posterPath={movie?.poster_path || tmdbDetails?.poster_path || null}
+                year={year}
+                inLibrary={movie?.is_watchlist ?? false}
+                libraryId={movie?.id}
+                size={28}
+              />
+            </View>
+          )}
         </View>
 
-        {/* ── Info ── */}
+        {/* ── Movie Info Section ── */}
         <View style={styles.infoSection}>
-          <Text style={styles.title}>{movie.title}</Text>
-
-          <View style={styles.metaRow}>
-            {year ? <Text style={styles.metaText}>{year}</Text> : null}
-            {runtimeDisplay ? (
-              <Text style={styles.metaText}>{runtimeDisplay}</Text>
-            ) : null}
-            {rewatchCount > 0 && (
-              <View style={styles.rewatchBadge}>
-                <Text style={styles.rewatchText}>
-                  Rewatched {rewatchCount}x
-                </Text>
+          {/* Poster + Title row */}
+          <View style={styles.titleRow}>
+            {displayPoster ? (
+              <Image
+                source={{ uri: displayPoster }}
+                style={styles.posterThumb}
+                contentFit="cover"
+                cachePolicy="memory-disk"
+              />
+            ) : (
+              <View style={[styles.posterThumb, styles.posterPlaceholder]}>
+                <Ionicons name="film-outline" size={28} color={colors.outlineVariant} />
               </View>
             )}
+            <View style={styles.titleMeta}>
+              <Text style={styles.title}>{displayTitle}</Text>
+              <View style={styles.metaRow}>
+                {year ? <Text style={styles.metaText}>{year}</Text> : null}
+                {runtimeDisplay ? (
+                  <>
+                    <View style={styles.metaDot} />
+                    <Text style={styles.metaText}>{runtimeDisplay}</Text>
+                  </>
+                ) : null}
+                {genreList && genreList.length > 0 ? (
+                  <>
+                    <View style={styles.metaDot} />
+                    <Text style={styles.metaText} numberOfLines={1}>
+                      {genreList.slice(0, 2).join(', ')}
+                    </Text>
+                  </>
+                ) : null}
+              </View>
+            </View>
           </View>
 
-          {/* ── Watched Button ── */}
-          {isWatched ? (
-            <View style={styles.watchedBanner}>
-              <Ionicons name="checkmark-circle" size={20} color="#4CAF50" />
-              <Text style={styles.watchedText}>Watched</Text>
-              <Pressable
-                style={styles.rewatchButton}
-                onPress={handleMarkWatched}
-              >
-                <Text style={styles.rewatchButtonText}>Watch again</Text>
-              </Pressable>
-            </View>
-          ) : (
+          {/* ── Watched Status (library items only) ── */}
+          {movie && isWatched ? (
             <Pressable
-              style={({ pressed }) => [
-                styles.watchButton,
-                pressed && styles.watchButtonPressed,
-              ]}
-              onPress={handleMarkWatched}
+              style={({ pressed }) => [styles.watchedButton, pressed && { opacity: 0.9 }]}
+              onPress={handleToggleWatched}
             >
-              <Ionicons name="checkmark" size={18} color="#FFF" />
+              <Ionicons name="checkmark-circle" size={18} color={colors.success} />
+              <Text style={styles.watchedText}>Watched</Text>
+            </Pressable>
+          ) : movie && !isWatched ? (
+            <Pressable
+              style={({ pressed }) => [styles.watchButton, pressed && styles.watchButtonPressed]}
+              onPress={handleToggleWatched}
+            >
+              <Ionicons name="checkmark" size={18} color={colors.onPrimary} />
               <Text style={styles.watchButtonText}>Mark as watched</Text>
             </Pressable>
-          )}
+          ) : null}
 
           {/* ── Overview ── */}
           <View style={styles.section}>
@@ -152,7 +220,7 @@ export default function MovieDetailScreen() {
             <Text style={styles.overviewText}>{overview}</Text>
           </View>
         </View>
-      </ScrollView>
+      </Animated.ScrollView>
     </View>
   )
 }
@@ -160,27 +228,29 @@ export default function MovieDetailScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0F0F0F',
+    backgroundColor: colors.surface,
   },
   centered: {
     justifyContent: 'center',
     alignItems: 'center',
   },
   errorText: {
-    fontSize: 16,
-    color: '#888',
+    fontSize: typography.bodyMd.fontSize,
+    color: colors.onSurfaceVariant,
     marginTop: 12,
     marginBottom: 16,
   },
-  backButton: {
+  goBackButton: {
     paddingHorizontal: 20,
     paddingVertical: 10,
-    backgroundColor: '#1A1A1A',
-    borderRadius: 8,
+    backgroundColor: colors.surfaceContainer,
+    borderRadius: borderRadius.md,
+    borderWidth: 1,
+    borderColor: colors.outlineVariant,
   },
-  backButtonText: {
-    color: '#6C63FF',
-    fontSize: 14,
+  goBackText: {
+    color: colors.primary,
+    fontSize: typography.bodySm.fontSize,
     fontWeight: '600',
   },
   scroll: {
@@ -190,132 +260,156 @@ const styles = StyleSheet.create({
     paddingBottom: 40,
   },
 
-  // Poster
-  posterContainer: {
-    width: '100%',
-    height: 420,
-    backgroundColor: '#1A1A1A',
+  // ── Backdrop ──
+  backdropContainer: {
+    width: SCREEN_WIDTH,
+    height: BACKDROP_HEIGHT,
+    position: 'relative',
   },
-  poster: {
-    width: '100%',
-    height: '100%',
-  },
-  posterPlaceholder: {
+  backdrop: {
     width: '100%',
     height: '100%',
-    justifyContent: 'center',
-    alignItems: 'center',
   },
-  backOverlay: {
+  backdropPlaceholder: {
+    width: '100%',
+    height: '100%',
+    backgroundColor: colors.surfaceContainer,
+  },
+  gradient: {
     position: 'absolute',
-    left: 8,
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 160,
+  },
+  backButton: {
+    position: 'absolute',
+    top: 8,
+    left: spacing.marginMobile,
+    width: 44,
+    height: 44,
+    borderRadius: borderRadius.full,
     backgroundColor: 'rgba(0,0,0,0.5)',
     justifyContent: 'center',
     alignItems: 'center',
+    zIndex: 10,
+  },
+  libraryOverlay: {
+    position: 'absolute',
+    right: spacing.marginMobile,
+    zIndex: 10,
   },
 
-  // Info
+  // ── Info ──
   infoSection: {
-    paddingHorizontal: 16,
-    paddingTop: 16,
+    marginTop: -40,
+    paddingHorizontal: spacing.marginMobile,
+  },
+  titleRow: {
+    flexDirection: 'row',
+    gap: 16,
+    marginBottom: 16,
+  },
+  posterThumb: {
+    width: 90,
+    height: 135,
+    borderRadius: borderRadius.lg,
+    backgroundColor: colors.surfaceContainer,
+  },
+  posterPlaceholder: {
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  titleMeta: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    paddingBottom: 4,
   },
   title: {
-    fontSize: 24,
-    fontWeight: '800',
-    color: '#FFF',
-    marginBottom: 8,
-    lineHeight: 30,
+    fontSize: typography.headlineSm.fontSize,
+    fontWeight: '700',
+    color: colors.onSurface,
+    lineHeight: typography.headlineSm.lineHeight,
+    marginBottom: 6,
   },
   metaRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
-    marginBottom: 16,
+    gap: 6,
     flexWrap: 'wrap',
   },
   metaText: {
-    fontSize: 13,
-    color: '#888',
+    fontSize: typography.labelMd.fontSize,
     fontWeight: '500',
+    letterSpacing: typography.labelMd.letterSpacing,
+    color: colors.onSurfaceVariant,
   },
-  rewatchBadge: {
-    backgroundColor: 'rgba(255,167,38,0.15)',
-    borderRadius: 6,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-  },
-  rewatchText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#FFA726',
+  metaDot: {
+    width: 3,
+    height: 3,
+    borderRadius: borderRadius.full,
+    backgroundColor: colors.onSurfaceVariant,
+    opacity: 0.5,
   },
 
-  // Watch button
+  // ── Watch / Watched ──
   watchButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    backgroundColor: '#4CAF50',
-    borderRadius: 10,
+    backgroundColor: colors.primary,
+    borderRadius: borderRadius.full,
     paddingVertical: 14,
+    paddingHorizontal: 24,
     marginBottom: 24,
+    shadowColor: colors.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 4,
   },
   watchButtonPressed: {
-    backgroundColor: '#388E3C',
-    opacity: 0.9,
+    transform: [{ scale: 0.98 }],
   },
   watchButtonText: {
-    fontSize: 15,
+    fontSize: typography.bodyMd.fontSize,
     fontWeight: '700',
-    color: '#FFF',
+    color: colors.onPrimary,
   },
-
-  // Watched banner
-  watchedBanner: {
+  watchedButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    backgroundColor: 'rgba(76,175,80,0.1)',
-    borderRadius: 10,
-    paddingVertical: 12,
+    backgroundColor: 'rgba(76, 175, 80, 0.1)',
+    borderRadius: borderRadius.full,
+    paddingVertical: 14,
+    paddingHorizontal: 24,
     marginBottom: 24,
+    borderWidth: 1,
+    borderColor: 'rgba(76, 175, 80, 0.3)',
   },
   watchedText: {
-    fontSize: 14,
+    fontSize: typography.labelMd.fontSize,
     fontWeight: '600',
-    color: '#4CAF50',
-  },
-  rewatchButton: {
-    marginLeft: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    backgroundColor: 'rgba(76,175,80,0.2)',
-    borderRadius: 6,
-  },
-  rewatchButtonText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#4CAF50',
+    letterSpacing: typography.labelMd.letterSpacing,
+    color: colors.success,
   },
 
-  // Section
+  // ── Section ──
   section: {
     marginBottom: 24,
   },
   sectionTitle: {
-    fontSize: 18,
+    fontSize: typography.bodyLg.fontSize,
     fontWeight: '700',
-    color: '#FFF',
+    color: colors.onSurface,
     marginBottom: 12,
   },
   overviewText: {
-    fontSize: 14,
-    color: '#AAA',
-    lineHeight: 22,
+    fontSize: typography.bodyMd.fontSize,
+    color: colors.onSurfaceVariant,
+    lineHeight: typography.bodyMd.lineHeight,
   },
 })

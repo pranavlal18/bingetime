@@ -300,10 +300,11 @@ async function importShows(
         return {
           show_id: showUuid,
           is_following: true,
+          is_watchlist: true,
           archived: row.archived === '1',
         }
       })
-      .filter(Boolean) as Array<{ show_id: string; is_following: boolean; archived: boolean }>
+      .filter(Boolean) as Array<{ show_id: string; is_following: boolean; is_watchlist: boolean; archived: boolean }>
 
     if (userShowInserts.length > 0) {
       const { error: usError } = await supabase
@@ -388,9 +389,10 @@ async function reconcileShowData(
           episodes_seen: parseInt(row.nb_episodes_seen, 10) || 0,
           is_favorited: row.is_favorited === '1',
           is_following: row.is_followed !== '0',
+          is_watchlist: true,
         }
       })
-      .filter(Boolean) as Array<{ show_id: string; episodes_seen: number; is_favorited: boolean; is_following: boolean }>
+      .filter(Boolean) as Array<{ show_id: string; episodes_seen: number; is_favorited: boolean; is_following: boolean; is_watchlist: boolean }>
 
     if (userShowInserts.length > 0) {
       const { error: usError } = await supabase
@@ -466,7 +468,6 @@ async function importEpisodeWatches(
 
         const seasonNumber = parseInt(row.season_number || row.s_no, 10)
         const episodeNumber = parseInt(row.episode_number || row.ep_no, 10)
-        const rewatchCount = parseInt(row.rewatch_count, 10) || 0
         const watchedAt = row.created_at || null
 
         return {
@@ -475,7 +476,6 @@ async function importEpisodeWatches(
           episode_number: episodeNumber,
           watched: true,
           watched_at: watchedAt,
-          rewatch_count: Math.max(rewatchCount, 0),
         }
       })
       .filter(Boolean) as Array<{
@@ -484,7 +484,6 @@ async function importEpisodeWatches(
         episode_number: number
         watched: boolean
         watched_at: string | null
-        rewatch_count: number
       }>
 
     if (episodeInserts.length > 0) {
@@ -708,7 +707,7 @@ async function importMovies(
               movie_id: movieId,
               watched,
               watched_at: watched ? watchedAt : null,
-              is_watchlist: type === 'towatch',
+              is_watchlist: true,
             }]
           })
           .filter(Boolean) as Array<[string, { movie_id: string; watched: boolean; watched_at: string | null; is_watchlist: boolean }]>

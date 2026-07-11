@@ -8,6 +8,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { runImport, IMPORT_STEPS } from '@/lib/import/pipeline'
 import type { ImportStep } from '@/lib/import/types'
 import { useAppStore } from '@/stores/appStore'
+import { colors, typography, spacing, borderRadius } from '@/theme'
 
 type Phase = 'welcome' | 'importing' | 'complete' | 'error'
 
@@ -55,7 +56,6 @@ export default function ImportScreen() {
         setCurrentStepIndex(stepIndex)
       }
 
-      // Auto-scroll to bottom on status change
       setTimeout(() => {
         scrollRef.current?.scrollToEnd({ animated: true })
       }, 100)
@@ -104,16 +104,11 @@ export default function ImportScreen() {
       <View style={styles.header}>
         <Text style={styles.logo}>BingeTime</Text>
         {phase === 'importing' && (
-          <Text style={styles.headerSubtitle}>
-            Importing your data...
-          </Text>
+          <Text style={styles.headerSubtitle}>Importing your data...</Text>
         )}
       </View>
 
-      {phase === 'welcome' && (
-        <WelcomeContent onStart={handleStartImport} />
-      )}
-
+      {phase === 'welcome' && <WelcomeContent onStart={handleStartImport} />}
       {phase === 'importing' && (
         <ImportingContent
           steps={steps}
@@ -123,11 +118,7 @@ export default function ImportScreen() {
           scrollRef={scrollRef}
         />
       )}
-
-      {phase === 'complete' && (
-        <CompleteContent warnings={warnings} onContinue={handleContinue} />
-      )}
-
+      {phase === 'complete' && <CompleteContent warnings={warnings} onContinue={handleContinue} />}
       {phase === 'error' && (
         <ErrorContent
           error={errorMessage}
@@ -148,7 +139,7 @@ function WelcomeContent({ onStart }: { onStart: () => void }) {
   return (
     <View style={[styles.content, { paddingBottom: insets.bottom + 16 }]}>
       <View style={styles.welcomeIcon}>
-        <Ionicons name="cloud-upload-outline" size={64} color="#6C63FF" />
+        <Ionicons name="cloud-upload-outline" size={64} color={colors.primary} />
       </View>
       <Text style={styles.welcomeTitle}>Welcome to BingeTime</Text>
       <Text style={styles.welcomeText}>
@@ -194,7 +185,6 @@ function ImportingContent({
 
   return (
     <View style={[styles.content, { paddingBottom: insets.bottom + 16 }]}>
-      {/* Overall progress bar */}
       <View style={styles.progressBarContainer}>
         <Animated.View
           style={[
@@ -208,11 +198,8 @@ function ImportingContent({
           ]}
         />
       </View>
-      <Text style={styles.progressPercent}>
-        {Math.round(overallProgress * 100)}%
-      </Text>
+      <Text style={styles.progressPercent}>{Math.round(overallProgress * 100)}%</Text>
 
-      {/* Step list */}
       <ScrollView ref={scrollRef} style={styles.stepList}>
         {steps.map((step, index) => {
           const isActive = index === currentStepIndex && step.status === 'processing'
@@ -221,12 +208,12 @@ function ImportingContent({
           const isSkipped = step.status === 'skipped'
 
           let icon: keyof typeof Ionicons.glyphMap = 'ellipse-outline'
-          let iconColor = '#555'
+          let iconColor = colors.onSurfaceVariant
 
-          if (isDone) { icon = 'checkmark-circle'; iconColor = '#4CAF50' }
-          if (isError) { icon = 'alert-circle'; iconColor = '#F44336' }
-          if (isActive) { icon = 'sync-circle'; iconColor = '#6C63FF' }
-          if (isSkipped) { icon = 'remove-circle-outline'; iconColor = '#666' }
+          if (isDone) { icon = 'checkmark-circle'; iconColor = colors.success }
+          if (isError) { icon = 'alert-circle'; iconColor = colors.error }
+          if (isActive) { icon = 'sync-circle'; iconColor = colors.primary }
+          if (isSkipped) { icon = 'remove-circle-outline'; iconColor = colors.onSurfaceVariant }
 
           return (
             <View key={step.id} style={[styles.stepItem, isActive && styles.stepItemActive]}>
@@ -257,7 +244,7 @@ function CompleteContent({ warnings, onContinue }: { warnings: string[]; onConti
 
   return (
     <View style={[styles.content, styles.centerContent, { paddingBottom: insets.bottom + 16 }]}>
-      <Ionicons name="checkmark-circle" size={80} color="#4CAF50" />
+      <Ionicons name="checkmark-circle" size={80} color={colors.success} />
       <Text style={styles.completeTitle}>Import Complete!</Text>
       <Text style={styles.completeText}>
         Your TV Time data has been imported successfully. You can now start tracking
@@ -305,11 +292,9 @@ function ErrorContent({
 
   return (
     <View style={[styles.content, styles.centerContent, { paddingBottom: insets.bottom + 16 }]}>
-      <Ionicons name="alert-circle" size={80} color="#F44336" />
+      <Ionicons name="alert-circle" size={80} color={colors.error} />
       <Text style={styles.errorTitle}>Import Failed</Text>
-      {error && (
-        <Text style={styles.errorText}>{error}</Text>
-      )}
+      {error && <Text style={styles.errorText}>{error}</Text>}
 
       {warnings.length > 0 && (
         <View style={styles.warningsBox}>
@@ -338,7 +323,7 @@ function ErrorContent({
 function StatRow({ icon, label, value }: { icon: keyof typeof Ionicons.glyphMap; label: string; value: string }) {
   return (
     <View style={styles.statRow}>
-      <Ionicons name={icon} size={18} color="#999" />
+      <Ionicons name={icon} size={18} color={colors.onSurfaceVariant} />
       <Text style={styles.statLabel}>{label}</Text>
       <Text style={styles.statValue}>{value}</Text>
     </View>
@@ -350,26 +335,26 @@ function StatRow({ icon, label, value }: { icon: keyof typeof Ionicons.glyphMap;
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0F0F0F',
+    backgroundColor: colors.surface,
   },
   header: {
     alignItems: 'center',
     paddingVertical: 24,
   },
   logo: {
-    fontSize: 32,
+    fontSize: typography.headlineLg.fontSize,
     fontWeight: '800',
-    color: '#FFFFFF',
+    color: colors.onSurface,
     letterSpacing: 1,
   },
   headerSubtitle: {
-    fontSize: 14,
-    color: '#888',
+    fontSize: typography.bodySm.fontSize,
+    color: colors.onSurfaceVariant,
     marginTop: 4,
   },
   content: {
     flex: 1,
-    paddingHorizontal: 24,
+    paddingHorizontal: spacing.marginMobile,
   },
   centerContent: {
     alignItems: 'center',
@@ -383,30 +368,32 @@ const styles = StyleSheet.create({
     marginTop: 16,
   },
   welcomeTitle: {
-    fontSize: 26,
+    fontSize: typography.headlineMd.fontSize,
     fontWeight: '700',
-    color: '#FFFFFF',
+    color: colors.onSurface,
     textAlign: 'center',
     marginBottom: 12,
   },
   welcomeText: {
-    fontSize: 15,
-    color: '#AAA',
+    fontSize: typography.bodyMd.fontSize,
+    color: colors.onSurfaceVariant,
     textAlign: 'center',
-    lineHeight: 22,
+    lineHeight: typography.bodyMd.lineHeight,
     marginBottom: 24,
   },
   statsBox: {
-    backgroundColor: '#1A1A1A',
-    borderRadius: 12,
+    backgroundColor: colors.surfaceContainer,
+    borderRadius: borderRadius.lg,
     padding: 16,
     marginBottom: 24,
     width: '100%',
+    borderWidth: 1,
+    borderColor: colors.outlineVariant,
   },
   statsTitle: {
-    fontSize: 14,
+    fontSize: typography.labelMd.fontSize,
     fontWeight: '600',
-    color: '#CCC',
+    color: colors.onSurface,
     marginBottom: 12,
   },
   statRow: {
@@ -415,34 +402,34 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
   },
   statLabel: {
-    fontSize: 14,
-    color: '#999',
+    fontSize: typography.bodySm.fontSize,
+    color: colors.onSurfaceVariant,
     marginLeft: 10,
     flex: 1,
   },
   statValue: {
-    fontSize: 14,
-    color: '#FFF',
+    fontSize: typography.bodySm.fontSize,
+    color: colors.onSurface,
     fontWeight: '600',
   },
   startButton: {
-    backgroundColor: '#6C63FF',
+    backgroundColor: colors.primary,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 16,
-    borderRadius: 12,
+    borderRadius: borderRadius.lg,
     gap: 8,
     width: '100%',
   },
   startButtonText: {
-    fontSize: 17,
+    fontSize: typography.bodyLg.fontSize,
     fontWeight: '700',
-    color: '#FFFFFF',
+    color: colors.onPrimary,
   },
   disclaimer: {
-    fontSize: 12,
-    color: '#666',
+    fontSize: typography.bodyXs.fontSize,
+    color: colors.onSurfaceVariant,
     textAlign: 'center',
     marginTop: 16,
   },
@@ -450,19 +437,19 @@ const styles = StyleSheet.create({
   // Importing
   progressBarContainer: {
     height: 6,
-    backgroundColor: '#333',
-    borderRadius: 3,
+    backgroundColor: colors.surfaceContainerHighest,
+    borderRadius: borderRadius.full,
     overflow: 'hidden',
     marginBottom: 8,
   },
   progressBarFill: {
     height: '100%',
-    backgroundColor: '#6C63FF',
-    borderRadius: 3,
+    backgroundColor: colors.primary,
+    borderRadius: borderRadius.full,
   },
   progressPercent: {
-    fontSize: 13,
-    color: '#888',
+    fontSize: typography.bodyXs.fontSize,
+    color: colors.onSurfaceVariant,
     textAlign: 'right',
     marginBottom: 16,
   },
@@ -474,101 +461,103 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 12,
     paddingHorizontal: 12,
-    borderRadius: 8,
+    borderRadius: borderRadius.md,
     marginBottom: 4,
   },
   stepItemActive: {
-    backgroundColor: '#1A1A2E',
+    backgroundColor: colors.surfaceContainer,
   },
   stepInfo: {
     marginLeft: 12,
     flex: 1,
   },
   stepLabel: {
-    fontSize: 14,
-    color: '#AAA',
+    fontSize: typography.bodySm.fontSize,
+    color: colors.onSurfaceVariant,
   },
   stepLabelActive: {
-    color: '#FFFFFF',
+    color: colors.onSurface,
     fontWeight: '600',
   },
   stepProgress: {
-    fontSize: 12,
-    color: '#888',
-    marginTop: 2,
+    fontSize: typography.bodyXs.fontSize,
+    color: colors.onSurfaceVariant,
+    marginTop: spacing.unit,
   },
   stepError: {
-    fontSize: 12,
-    color: '#F44336',
-    marginTop: 2,
+    fontSize: typography.bodyXs.fontSize,
+    color: colors.error,
+    marginTop: spacing.unit,
   },
 
   // Complete
   completeTitle: {
-    fontSize: 26,
+    fontSize: typography.headlineMd.fontSize,
     fontWeight: '700',
-    color: '#FFFFFF',
+    color: colors.onSurface,
     marginTop: 16,
     marginBottom: 8,
   },
   completeText: {
-    fontSize: 15,
-    color: '#AAA',
+    fontSize: typography.bodyMd.fontSize,
+    color: colors.onSurfaceVariant,
     textAlign: 'center',
-    lineHeight: 22,
+    lineHeight: typography.bodyMd.lineHeight,
     marginBottom: 24,
   },
   warningsBox: {
-    backgroundColor: '#1A1A1A',
-    borderRadius: 12,
+    backgroundColor: colors.surfaceContainer,
+    borderRadius: borderRadius.lg,
     padding: 16,
     marginBottom: 24,
     width: '100%',
     maxHeight: 200,
+    borderWidth: 1,
+    borderColor: colors.outlineVariant,
   },
   warningsTitle: {
-    fontSize: 14,
+    fontSize: typography.labelMd.fontSize,
     fontWeight: '600',
-    color: '#FFA726',
+    color: colors.warning,
     marginBottom: 8,
   },
   warningsList: {
     maxHeight: 140,
   },
   warningText: {
-    fontSize: 12,
-    color: '#888',
+    fontSize: typography.bodyXs.fontSize,
+    color: colors.onSurfaceVariant,
     lineHeight: 18,
   },
   continueButton: {
-    backgroundColor: '#6C63FF',
+    backgroundColor: colors.primary,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 16,
-    borderRadius: 12,
+    borderRadius: borderRadius.lg,
     gap: 8,
     width: '100%',
   },
   continueButtonText: {
-    fontSize: 17,
+    fontSize: typography.bodyLg.fontSize,
     fontWeight: '700',
-    color: '#FFFFFF',
+    color: colors.onPrimary,
   },
 
   // Error
   errorTitle: {
-    fontSize: 26,
+    fontSize: typography.headlineMd.fontSize,
     fontWeight: '700',
-    color: '#FFFFFF',
+    color: colors.onSurface,
     marginTop: 16,
     marginBottom: 8,
   },
   errorText: {
-    fontSize: 15,
-    color: '#F44336',
+    fontSize: typography.bodyMd.fontSize,
+    color: colors.error,
     textAlign: 'center',
-    lineHeight: 22,
+    lineHeight: typography.bodyMd.lineHeight,
     marginBottom: 24,
   },
   errorActions: {
@@ -577,31 +566,33 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   retryButton: {
-    backgroundColor: '#6C63FF',
+    backgroundColor: colors.primary,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 14,
-    borderRadius: 12,
+    borderRadius: borderRadius.lg,
     gap: 6,
     flex: 1,
   },
   retryButtonText: {
-    fontSize: 15,
+    fontSize: typography.bodyMd.fontSize,
     fontWeight: '700',
-    color: '#FFFFFF',
+    color: colors.onPrimary,
   },
   skipButton: {
-    backgroundColor: '#333',
+    backgroundColor: colors.surfaceContainerHighest,
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 14,
-    borderRadius: 12,
+    borderRadius: borderRadius.lg,
     flex: 1,
+    borderWidth: 1,
+    borderColor: colors.outlineVariant,
   },
   skipButtonText: {
-    fontSize: 15,
+    fontSize: typography.bodyMd.fontSize,
     fontWeight: '600',
-    color: '#888',
+    color: colors.onSurfaceVariant,
   },
 })

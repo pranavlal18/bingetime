@@ -13,6 +13,7 @@ import { Ionicons } from '@expo/vector-icons'
 import { router } from 'expo-router'
 import { getImageUrl } from '@/lib/queries/shows'
 import ProgressBar from './ProgressBar'
+import { colors, typography, borderRadius, spacing } from '@/theme'
 import type { ShowWithUserData } from '@/lib/queries/shows'
 
 interface ShowListItemProps {
@@ -31,14 +32,13 @@ export default function ShowListItem({ show, onMarkWatched }: ShowListItemProps)
   const totalEps = show.total_episodes
   const seenEps = show.episodes_seen
 
-  // Show is complete if:
-  // 1. known total + seen >= total, OR
-  // 2. show ended/canceled and seen >= total
+  const allCaughtUp = totalEps !== null && totalEps > 0 && seenEps >= totalEps
+
   const isComplete =
-    (totalEps !== null && totalEps > 0 && seenEps >= totalEps) ||
-    ((show.status === 'Ended' || show.status === 'Canceled') &&
-      totalEps !== null &&
-      seenEps >= totalEps)
+    allCaughtUp &&
+    (show.status === 'Ended' || show.status === 'Canceled')
+
+  const isUpToDate = allCaughtUp && !isComplete
 
   const hasProgress = seenEps > 0 || (totalEps !== null && totalEps > 0)
 
@@ -63,7 +63,7 @@ export default function ShowListItem({ show, onMarkWatched }: ShowListItemProps)
           swipeableRef.current?.close()
         }}
       >
-        <Ionicons name="checkmark" size={24} color="#FFF" />
+        <Ionicons name="checkmark" size={24} color={colors.onPrimary} />
         <Text style={styles.swipeLabel}>Watch</Text>
       </Pressable>
     )
@@ -88,7 +88,7 @@ export default function ShowListItem({ show, onMarkWatched }: ShowListItemProps)
             />
           ) : (
             <View style={styles.thumbnailPlaceholder}>
-              <Ionicons name="tv-outline" size={20} color="#555" />
+              <Ionicons name="tv-outline" size={20} color={colors.outlineVariant} />
             </View>
           )}
         </View>
@@ -115,7 +115,7 @@ export default function ShowListItem({ show, onMarkWatched }: ShowListItemProps)
                 />
               </View>
               <Text style={styles.count}>
-                {totalEps ? `${seenEps}/${totalEps}` : `${seenEps} eps`}
+                {totalEps ? `${Math.min(seenEps, totalEps)}/${totalEps}` : `${seenEps} eps`}
               </Text>
             </View>
           )}
@@ -127,10 +127,15 @@ export default function ShowListItem({ show, onMarkWatched }: ShowListItemProps)
           )}
         </View>
 
-        {/* Complete check */}
-        {isComplete && (
-          <Ionicons name="checkmark-circle" size={20} color="#4CAF50" style={styles.completeIcon} />
-        )}
+        {/* Right actions */}
+        <View style={styles.rightActions}>
+          {isComplete && (
+            <Ionicons name="checkmark-circle" size={20} color={colors.statusFinished} />
+          )}
+          {isUpToDate && (
+            <Ionicons name="checkmark-circle" size={20} color={colors.statusUpToDate} />
+          )}
+        </View>
       </Pressable>
     </Swipeable>
   )
@@ -140,17 +145,19 @@ const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#1A1A1A',
-    borderRadius: 10,
-    padding: 10,
+    backgroundColor: colors.surfaceContainer,
+    borderRadius: borderRadius.lg,
+    padding: 12,
     marginBottom: 8,
+    borderWidth: 1,
+    borderColor: colors.outlineVariant,
   },
   thumbnailContainer: {
     width: 48,
     height: 72,
-    borderRadius: 6,
+    borderRadius: 8,
     overflow: 'hidden',
-    backgroundColor: '#2A2A2A',
+    backgroundColor: colors.surfaceDim,
   },
   thumbnail: {
     width: '100%',
@@ -167,15 +174,15 @@ const styles = StyleSheet.create({
     marginLeft: 12,
   },
   title: {
-    fontSize: 15,
+    fontSize: typography.bodyMd.fontSize,
     fontWeight: '600',
-    color: '#FFF',
-    marginBottom: 2,
+    color: colors.onSurface,
+    marginBottom: spacing.unit,
   },
   episodeInfo: {
-    fontSize: 12,
-    color: '#888',
-    marginBottom: 4,
+    fontSize: typography.bodyXs.fontSize,
+    color: colors.onSurfaceVariant,
+    marginBottom: spacing.unit,
   },
   progressRow: {
     flexDirection: 'row',
@@ -184,30 +191,36 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   count: {
-    fontSize: 11,
-    color: '#888',
+    fontSize: typography.bodyXs.fontSize,
+    color: colors.onSurfaceVariant,
     minWidth: 40,
     textAlign: 'right',
   },
   completeIcon: {
     marginLeft: 8,
   },
+  rightActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginLeft: 8,
+  },
   progressBarWrapper: {
     flex: 1,
   },
   swipeAction: {
-    backgroundColor: '#4CAF50',
+    backgroundColor: colors.primary,
     justifyContent: 'center',
     alignItems: 'center',
     width: 64,
-    borderRadius: 10,
+    borderRadius: borderRadius.lg,
     marginLeft: 8,
     marginBottom: 8,
   },
   swipeLabel: {
-    color: '#FFF',
-    fontSize: 11,
+    color: colors.onPrimary,
+    fontSize: typography.bodyXs.fontSize,
     fontWeight: '600',
-    marginTop: 2,
+    marginTop: spacing.unit,
   },
 })

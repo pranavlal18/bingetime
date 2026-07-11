@@ -12,6 +12,7 @@ export interface ProfileStats {
   totalShows: number
   totalMovies: number
   totalEpisodes: number
+  totalHours: number
   favoritedShows: number
   watchlistShows: number
   watchlistMovies: number
@@ -57,13 +58,18 @@ async function fetchStats(): Promise<ProfileStats> {
   const favoritedShows = showsResult.data.filter((s) => s.is_favorited).length
   const watchlistShows = showsResult.data.filter((s) => s.is_watchlist).length
   const totalMovies = moviesResult.data.length
+  const watchedMovies = moviesResult.data.filter((m) => m.watched).length
   const watchlistMovies = moviesResult.data.filter((m) => m.is_watchlist).length
   const customLists = listsResult.count ?? 0
+
+  // Estimate watched hours: episodes avg 25min (0.42h) + movies avg 2h
+  const totalHours = Math.round(totalEpisodes * 0.42 + watchedMovies * 2)
 
   return {
     totalShows,
     totalMovies,
     totalEpisodes,
+    totalHours,
     favoritedShows,
     watchlistShows,
     watchlistMovies,

@@ -8,6 +8,7 @@ import Animated, {
   useAnimatedStyle,
   interpolate,
 } from 'react-native-reanimated'
+import { colors } from '@/theme'
 
 interface ProgressBarProps {
   episodesSeen: number
@@ -21,8 +22,8 @@ export default function ProgressBar({
   episodesSeen,
   totalEpisodes,
   height = 3,
-  color = '#6C63FF',
-  backgroundColor = '#333',
+  color = colors.primary,
+  backgroundColor = colors.surfaceContainerHighest,
 }: ProgressBarProps) {
   const animatedWidth = useSharedValue(0)
 
@@ -57,7 +58,7 @@ export default function ProgressBar({
           animatedStyle,
           {
             height,
-            backgroundColor: isComplete ? '#4CAF50' : color,
+            backgroundColor: isComplete ? colors.success : color,
             borderRadius: height / 2,
           },
         ]}

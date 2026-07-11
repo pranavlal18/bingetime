@@ -1,27 +1,23 @@
 import { Tabs } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
-import { useColorScheme } from 'react-native'
+import { colors } from '@/theme'
 
 export default function TabLayout() {
-  const colorScheme = useColorScheme()
-  const isDark = colorScheme === 'dark'
-
-  const tintColor = isDark ? '#FFFFFF' : '#0F0F0F'
-  const inactiveColor = isDark ? '#555' : '#999'
-  const bgColor = isDark ? '#1A1A1A' : '#FFFFFF'
+  // Cinematic Precision: dark-first design
 
   return (
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: tintColor,
-        tabBarInactiveTintColor: inactiveColor,
+        tabBarActiveTintColor: colors.primary,
+        tabBarInactiveTintColor: colors.outlineVariant,
         tabBarStyle: {
-          backgroundColor: bgColor,
-          borderTopColor: isDark ? '#333' : '#E5E5E5',
-          borderTopWidth: 0.5,
+          backgroundColor: colors.surfaceContainer,
+          borderTopColor: colors.outlineVariant,
+          borderTopWidth: 1,
           paddingBottom: 4,
           paddingTop: 4,
+          height: 64,
         },
       }}
     >

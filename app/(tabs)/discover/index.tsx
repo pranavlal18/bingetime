@@ -1,6 +1,7 @@
-// ─── Discover Tab — search, trending, add-to-library ───
+// ─── Discover Tab — Stitch "Discover Content" design ───
+// Sections: Trending Now (large posters) + Recommended for You (small posters)
 
-import { useState, useCallback, useEffect, useRef } from 'react'
+import { useState, useCallback, useEffect, useRef, useMemo } from 'react'
 import {
   View,
   Text,
@@ -9,37 +10,43 @@ import {
   StyleSheet,
   ActivityIndicator,
   RefreshControl,
+  ScrollView,
   Keyboard,
 } from 'react-native'
 import { FlashList } from '@shopify/flash-list'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import { Image } from 'expo-image'
 import { Ionicons } from '@expo/vector-icons'
+import { router } from 'expo-router'
 import {
   useTrending,
   useSearch,
   useAddToLibrary,
+  useRemoveFromLibrary,
 } from '@/lib/queries/discover'
+import { getImageUrl } from '@/lib/tmdb'
 import DiscoverCard from '@/components/discover/DiscoverCard'
+import TrendingSection from '@/components/discover/TrendingSection'
+import RecommendedSection from '@/components/discover/RecommendedSection'
+import { colors, typography, spacing, borderRadius } from '@/theme'
 import type { DiscoverResult, MediaFilter } from '@/lib/queries/discover'
 
-const FILTERS: { label: string; value: MediaFilter }[] = [
-  { label: 'All', value: 'all' },
-  { label: 'TV', value: 'tv' },
-  { label: 'Movies', value: 'movie' },
-]
+// ── Genre chips from Stitch design ──
+const GENRES = ['For You', 'Sci-Fi', 'Drama', 'Comedy', 'Horror', 'Thriller', 'Animation']
+
+// ── Main Screen ──
 
 export default function DiscoverScreen() {
   const insets = useSafeAreaInsets()
-
-  // ── Search state ──
   const [searchText, setSearchText] = useState('')
   const [debouncedQuery, setDebouncedQuery] = useState('')
-  const [filter, setFilter] = useState<MediaFilter>('all')
+  const [activeGenre, setActiveGenre] = useState('For You')
   const [addingIds, setAddingIds] = useState<Set<number>>(new Set())
+  const [removingIds, setRemovingIds] = useState<Set<number>>(new Set())
   const inputRef = useRef<TextInput>(null)
   const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  // Debounce search input (300ms)
+  // Debounce search
   useEffect(() => {
     if (debounceTimer.current) clearTimeout(debounceTimer.current)
     debounceTimer.current = setTimeout(() => {
@@ -50,39 +57,29 @@ export default function DiscoverScreen() {
     }
   }, [searchText])
 
-  // ── Queries ──
   const isSearching = debouncedQuery.length > 0
 
-  const {
-    data: trending,
-    isLoading: trendingLoading,
-    isRefetching: trendingRefetching,
-    refetch: refetchTrending,
-  } = useTrending(isSearching ? 'all' : filter)
-
-  const {
-    data: searchResults,
-    isLoading: searchLoading,
-    isRefetching: searchRefetching,
-    refetch: refetchSearch,
-  } = useSearch(debouncedQuery, filter)
-
+  const { data: trending, isLoading: trendingLoading, isRefetching, refetch } = useTrending('all')
+  const { data: searchResults, isLoading: searchLoading } = useSearch(
+    isSearching ? debouncedQuery : '',
+    'all'
+  )
   const addMutation = useAddToLibrary()
+  const removeMutation = useRemoveFromLibrary()
 
-  // ── Current data ──
-  const data = isSearching ? searchResults : trending
-  const isLoading = isSearching ? searchLoading : trendingLoading
-  const isRefetching = isSearching ? searchRefetching : trendingRefetching
-  const refetch = useCallback(() => {
-    if (isSearching) return refetchSearch()
-    return refetchTrending()
-  }, [isSearching, refetchSearch, refetchTrending])
+  // Split trending into two sets for visual variety
+  const trendingForYou = useMemo(() => {
+    if (!trending) return []
+    return trending.slice(0, Math.ceil(trending.length / 2))
+  }, [trending])
 
-  // ── Add to library handler ──
+  const recommended = useMemo(() => {
+    if (!trending) return []
+    return trending.slice(Math.ceil(trending.length / 2))
+  }, [trending])
+
   const handleAdd = useCallback(
     (item: DiscoverResult) => {
-      if (addingIds.has(item.tmdbId)) return
-
       setAddingIds((prev) => new Set(prev).add(item.tmdbId))
       addMutation.mutate(item, {
         onSettled: () => {
@@ -94,27 +91,25 @@ export default function DiscoverScreen() {
         },
       })
     },
-    [addMutation, addingIds]
+    [addMutation]
   )
 
-  // ── Render item ──
-  const renderItem = useCallback(
-    ({ item }: { item: DiscoverResult }) => (
-      <DiscoverCard
-        item={item}
-        onAdd={handleAdd}
-        isAdding={addingIds.has(item.tmdbId)}
-      />
-    ),
-    [handleAdd, addingIds]
+  const handleRemove = useCallback(
+    (item: DiscoverResult) => {
+      setRemovingIds((prev) => new Set(prev).add(item.tmdbId))
+      removeMutation.mutate(item, {
+        onSettled: () => {
+          setRemovingIds((prev) => {
+            const next = new Set(prev)
+            next.delete(item.tmdbId)
+            return next
+          })
+        },
+      })
+    },
+    [removeMutation]
   )
 
-  const keyExtractor = useCallback(
-    (item: DiscoverResult) => `${item.mediaType}-${item.tmdbId}`,
-    []
-  )
-
-  // ── Clear search ──
   const clearSearch = useCallback(() => {
     setSearchText('')
     setDebouncedQuery('')
@@ -122,177 +117,212 @@ export default function DiscoverScreen() {
     Keyboard.dismiss()
   }, [])
 
-  // ── Empty state ──
-  const emptyState = (
-    <View style={styles.emptyState}>
-      <Ionicons
-        name={isSearching ? 'search-outline' : 'compass-outline'}
-        size={48}
-        color="#444"
+  // ── Search results render ──
+
+  const renderSearchItem = useCallback(
+    ({ item }: { item: DiscoverResult }) => (
+      <DiscoverCard 
+        item={item} 
+        onAdd={handleAdd} 
+        onRemove={handleRemove}
+        isAdding={addingIds.has(item.tmdbId)} 
+        isRemoving={removingIds.has(item.tmdbId)}
       />
-      <Text style={styles.emptyTitle}>
-        {isSearching ? 'No results found' : 'Discover new shows & movies'}
-      </Text>
-      <Text style={styles.emptySubtitle}>
-        {isSearching
-          ? 'Try a different search term or filter'
-          : 'Search for your favorite titles or browse trending content'}
-      </Text>
-    </View>
+    ),
+    [handleAdd, handleRemove, addingIds, removingIds]
   )
+
+  const searchKeyExtractor = useCallback((item: DiscoverResult) => item.tmdbId.toString(), [])
+
+  // ── Loading state ──
+
+  if (trendingLoading && !isSearching) {
+    return (
+      <View style={[styles.container, styles.centered, { paddingTop: insets.top }]}>
+        <ActivityIndicator size="large" color={colors.primary} />
+        <Text style={styles.loadingText}>Discovering content...</Text>
+      </View>
+    )
+  }
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
-      {/* Header */}
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Discover</Text>
-      </View>
-
-      {/* Search bar */}
-      <View style={styles.searchContainer}>
-        <View style={styles.searchBar}>
-          <Ionicons name="search" size={18} color="#666" />
-          <TextInput
-            ref={inputRef}
-            style={styles.searchInput}
-            placeholder="Search shows & movies..."
-            placeholderTextColor="#666"
-            value={searchText}
-            onChangeText={setSearchText}
-            returnKeyType="search"
-            autoCapitalize="none"
-            autoCorrect={false}
-          />
-          {searchText.length > 0 && (
-            <Pressable onPress={clearSearch} style={styles.clearButton}>
-              <Ionicons name="close-circle" size={18} color="#666" />
-            </Pressable>
-          )}
-        </View>
-      </View>
-
-      {/* Filters */}
-      <View style={styles.filtersRow}>
-        {FILTERS.map((f) => (
-          <Pressable
-            key={f.value}
-            style={[
-              styles.filterChip,
-              filter === f.value && styles.filterChipActive,
-            ]}
-            onPress={() => setFilter(f.value)}
-          >
-            <Text
-              style={[
-                styles.filterChipText,
-                filter === f.value && styles.filterChipTextActive,
-              ]}
-            >
-              {f.label}
-            </Text>
+      {/* TopAppBar — matches HTML reference */}
+      <View style={styles.topAppBar}>
+        <View style={styles.topAppBarLeft}>
+          <Pressable style={styles.iconButton}>
+            <Ionicons name="menu" size={24} color={colors.primary} />
           </Pressable>
-        ))}
+          <Text style={styles.topAppBarTitle}>BingeTime</Text>
+        </View>
+        <Pressable style={styles.iconButton}>
+          <Ionicons name="search" size={24} color={colors.primary} />
+        </Pressable>
       </View>
 
-      {/* Results */}
-      {isLoading ? (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#6C63FF" />
-          <Text style={styles.loadingText}>
-            {isSearching ? 'Searching...' : 'Loading trending...'}
-          </Text>
-        </View>
-      ) : (
-        <FlashList
-          data={data || []}
-          keyExtractor={keyExtractor}
-          renderItem={renderItem}
-          estimatedItemSize={92}
-          contentContainerStyle={[
-            styles.listContent,
-            (data?.length ?? 0) === 0 && styles.listContentEmpty,
-          ]}
-          ListEmptyComponent={emptyState}
-          refreshControl={
-            <RefreshControl
-              refreshing={isRefetching}
-              onRefresh={refetch}
-              tintColor="#6C63FF"
-              colors={['#6C63FF']}
+      <ScrollView showsVerticalScrollIndicator={false}>
+        {/* Pinned Search Bar — refactored to align with HTML */}
+        <View style={styles.searchContainer}>
+          <View style={styles.glassSearch}>
+            <Ionicons name="search" size={18} color={colors.outline} />
+            <TextInput
+              ref={inputRef}
+              style={styles.searchInput}
+              placeholder="Movies, shows and more..."
+              placeholderTextColor={colors.outline}
+              value={searchText}
+              onChangeText={setSearchText}
             />
-          }
-          showsVerticalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled"
-        />
-      )}
+            <Ionicons name="mic" size={18} color={colors.outline} />
+          </View>
+        </View>
+
+        {/* Genre Chips */}
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.genreChipsContainer}
+        >
+          {GENRES.map((genre) => {
+            const isActive = activeGenre === genre
+            return (
+              <Pressable
+                key={genre}
+                style={[styles.genreChip, isActive && styles.genreChipActive]}
+                onPress={() => setActiveGenre(genre)}
+              >
+                <Text style={[styles.genreChipText, isActive && styles.genreChipTextActive]}>
+                  {genre}
+                </Text>
+              </Pressable>
+            )
+          })}
+        </ScrollView>
+
+        {/* ── Content ── */}
+        {isSearching ? (
+          searchLoading ? (
+            <ActivityIndicator size="large" color={colors.primary} style={styles.loadingContainer} />
+          ) : (
+            <FlashList
+              data={searchResults || []}
+              keyExtractor={searchKeyExtractor}
+              renderItem={renderSearchItem}
+              estimatedItemSize={92}
+              contentContainerStyle={styles.listContent}
+            />
+          )
+        ) : (
+          <View>
+            <TrendingSection
+              data={trendingForYou}
+              onAdd={handleAdd}
+              onRemove={handleRemove}
+              addingIds={addingIds}
+              removingIds={removingIds}
+            />
+            <RecommendedSection
+              data={recommended}
+              onAdd={handleAdd}
+              onRemove={handleRemove}
+              addingIds={addingIds}
+              removingIds={removingIds}
+            />
+            <View style={{ height: 32 }} />
+          </View>
+        )}
+      </ScrollView>
     </View>
   )
 }
 
+// ── Styles ──
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0F0F0F',
+    backgroundColor: colors.background,
+  },
+  centered: {
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 
-  // Header
-  header: {
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+  // TopAppBar
+  topAppBar: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: spacing.marginMobile,
+    height: 64,
+    backgroundColor: 'rgba(21,18,27,0.8)',
   },
-  headerTitle: {
-    fontSize: 28,
-    fontWeight: '800',
-    color: '#FFF',
-  },
-
-  // Search bar
-  searchContainer: {
-    paddingHorizontal: 16,
-    marginBottom: 12,
-  },
-  searchBar: {
+  topAppBarLeft: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#1A1A1A',
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    height: 44,
-    gap: 8,
+    gap: 16,
+  },
+  topAppBarTitle: {
+    fontFamily: 'Inter',
+    fontSize: 24,
+    fontWeight: '700',
+    color: colors.primary,
+  },
+  iconButton: {
+    padding: 8,
+    borderRadius: borderRadius.full,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  searchContainer: {
+    paddingHorizontal: spacing.marginMobile,
+    paddingVertical: spacing.stackSm,
+  },
+  glassSearch: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: borderRadius.lg,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+    backgroundColor: 'rgba(26,29,36,0.8)',
+    gap: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
   },
   searchInput: {
     flex: 1,
-    fontSize: 15,
-    color: '#FFF',
-    height: '100%',
+    fontSize: 16,
+    color: colors.onSurface,
   },
-  clearButton: {
-    padding: 4,
+  genreChipsContainer: {
+    paddingHorizontal: spacing.marginMobile,
+    gap: 12,
+    paddingBottom: spacing.stackMd,
   },
-
-  // Filters
-  filtersRow: {
-    flexDirection: 'row',
-    gap: 8,
-    paddingHorizontal: 16,
-    marginBottom: 12,
+  genreChip: {
+    paddingHorizontal: 20,
+    paddingVertical: 8,
+    borderRadius: borderRadius.full,
+    backgroundColor: colors.surfaceContainer,
+    borderWidth: 1,
+    borderColor: 'rgba(148,142,160,0.3)',
   },
-  filterChip: {
-    paddingHorizontal: 14,
-    paddingVertical: 6,
-    borderRadius: 16,
-    backgroundColor: '#1A1A1A',
+  genreChipActive: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
   },
-  filterChipActive: {
-    backgroundColor: '#6C63FF',
-  },
-  filterChipText: {
-    fontSize: 13,
+  genreChipText: {
+    fontSize: 14,
     fontWeight: '600',
-    color: '#888',
+    color: colors.onSurfaceVariant,
   },
-  filterChipTextActive: {
-    color: '#FFF',
+  genreChipTextActive: {
+    color: colors.onPrimary,
   },
 
   // Loading
@@ -303,13 +333,13 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     fontSize: 14,
-    color: '#888',
-    marginTop: 12,
+    color: colors.outline,
+    marginTop: spacing.stackSm,
   },
 
-  // List
+  // Search list
   listContent: {
-    paddingHorizontal: 16,
+    paddingHorizontal: spacing.marginMobile,
     paddingBottom: 24,
   },
   listContentEmpty: {
@@ -321,18 +351,19 @@ const styles = StyleSheet.create({
   emptyState: {
     alignItems: 'center',
     paddingHorizontal: 40,
+    paddingTop: 60,
   },
   emptyTitle: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#FFF',
+    color: colors.onSurface,
     marginTop: 16,
     marginBottom: 8,
     textAlign: 'center',
   },
   emptySubtitle: {
     fontSize: 14,
-    color: '#888',
+    color: colors.outline,
     textAlign: 'center',
     lineHeight: 20,
   },

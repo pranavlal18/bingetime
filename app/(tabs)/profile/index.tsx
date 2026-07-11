@@ -1,6 +1,6 @@
-// ─── Profile Tab — stats, favorites, watchlist, custom lists, settings ───
+// ─── Profile Tab — TV Time style: user + horizontal carousels ───
 
-import { useCallback, memo, useState } from 'react'
+import { memo, useState, useMemo } from 'react'
 import {
   View,
   Text,
@@ -8,196 +8,113 @@ import {
   Pressable,
   StyleSheet,
   ActivityIndicator,
+  Switch,
+  Dimensions,
 } from 'react-native'
 import { Image } from 'expo-image'
-import { FlashList } from '@shopify/flash-list'
 import { Ionicons } from '@expo/vector-icons'
 import { router } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useAppStore } from '@/stores/appStore'
 import { getImageUrl } from '@/lib/tmdb'
+import { useShows } from '@/lib/queries/shows'
+import { useMovies } from '@/lib/queries/movies'
 import {
   useProfileStats,
-  useFavorites,
-  useWatchlist,
-  useCustomLists,
-  useMarkWatched,
 } from '@/lib/queries/profile'
-import type {
-  ProfileStats,
-  FavoriteShow,
-  WatchlistShow,
-  WatchlistMovie,
-} from '@/lib/queries/profile'
-import type { List } from '@/types'
+import { colors, typography, spacing, borderRadius } from '@/theme'
+import type { ShowWithUserData } from '@/lib/queries/shows'
+import type { MovieWithUserData } from '@/lib/queries/movies'
 
-// ── Stat Card ──
+const SCREEN_WIDTH = Dimensions.get('window').width
+// 2-column bento grid: (screen width - 2 × margin - 1 × gap) / 2
+const STAT_CARD_WIDTH = (SCREEN_WIDTH - spacing.marginMobile * 2 - spacing.gutter) / 2
+const POSTER_W = 100
+const POSTER_H = POSTER_W * 1.5
+const SIDE_OFFSET = 20
 
-interface StatCardProps {
-  icon: keyof typeof Ionicons.glyphMap
-  label: string
-  value: number
-  color: string
+// ── Helpers ──
+
+function formatNumber(n: number): string {
+  return n.toLocaleString('en-US')
 }
 
-const StatCard = memo(function StatCard({ icon, label, value, color }: StatCardProps) {
+// ── Stat Card (Bento style) ──
+
+interface StatCardProps {
+  label: string
+  value: string
+}
+
+const StatCard = memo(function StatCard({ label, value }: StatCardProps) {
   return (
-    <View style={[styles.statCard, { borderLeftColor: color, borderLeftWidth: 3 }]}>
-      <Ionicons name={icon} size={22} color={color} />
+    <View style={styles.statCard}>
       <Text style={styles.statValue}>{value}</Text>
       <Text style={styles.statLabel}>{label}</Text>
     </View>
   )
 })
 
-// ── Favorite Show Card (horizontal item) ──
+// ── Section Header ──
 
-interface FavoriteCardProps {
-  show: FavoriteShow
+interface SectionHeaderProps {
+  title: string
+  icon?: keyof typeof Ionicons.glyphMap
+  iconColor?: string
+  count?: number
+  onPress?: () => void
 }
 
-const FavoriteCard = memo(function FavoriteCard({ show }: FavoriteCardProps) {
-  const posterUrl = getImageUrl(show.poster_path, 'w185')
+const SectionHeader = memo(function SectionHeader({
+  title,
+  icon,
+  iconColor,
+  count,
+  onPress,
+}: SectionHeaderProps) {
   return (
-    <Pressable
-      style={styles.horizontalCard}
-      onPress={() => router.push(`/show/${show.id}`)}
-    >
-      <View style={styles.horizontalPosterContainer}>
+    <Pressable style={styles.sectionHeader} onPress={onPress}>
+      <View style={styles.sectionHeaderLeft}>
+        {icon && <Ionicons name={icon} size={18} color={iconColor ?? colors.primary} />}
+        <Text style={styles.sectionTitle}>{title}</Text>
+        {count !== undefined && (
+          <Text style={styles.sectionCount}>{count}</Text>
+        )}
+      </View>
+      <Ionicons name="chevron-forward" size={16} color={colors.outlineVariant} />
+    </Pressable>
+  )
+})
+
+// ── Poster Carousel Item ──
+
+interface PosterItemProps {
+  posterPath: string | null
+  title: string
+  onPress: () => void
+}
+
+const PosterItem = memo(function PosterItem({ posterPath, title, onPress }: PosterItemProps) {
+  const posterUrl = getImageUrl(posterPath, 'w185')
+
+  return (
+    <Pressable style={styles.posterItem} onPress={onPress}>
+      <View style={styles.posterContainer}>
         {posterUrl ? (
           <Image
             source={{ uri: posterUrl }}
-            style={styles.horizontalPoster}
+            style={styles.posterImage}
             contentFit="cover"
             cachePolicy="memory-disk"
           />
         ) : (
           <View style={styles.posterPlaceholder}>
-            <Ionicons name="tv-outline" size={20} color="#555" />
+            <Ionicons name="film-outline" size={24} color={colors.outlineVariant} />
           </View>
         )}
       </View>
-      <Text style={styles.horizontalTitle} numberOfLines={2}>
-        {show.name}
-      </Text>
-      <Text style={styles.horizontalSubtitle}>
-        {show.episodes_seen} eps
-      </Text>
+      <Text style={styles.posterTitle} numberOfLines={2}>{title}</Text>
     </Pressable>
-  )
-})
-
-// ── Watchlist Show Card (horizontal item) ──
-
-interface WatchlistShowCardProps {
-  show: WatchlistShow
-}
-
-const WatchlistShowCard = memo(function WatchlistShowCard({
-  show,
-}: WatchlistShowCardProps) {
-  const posterUrl = getImageUrl(show.poster_path, 'w185')
-  return (
-    <Pressable
-      style={styles.horizontalCard}
-      onPress={() => router.push(`/show/${show.id}`)}
-    >
-      <View style={styles.horizontalPosterContainer}>
-        {posterUrl ? (
-          <Image
-            source={{ uri: posterUrl }}
-            style={styles.horizontalPoster}
-            contentFit="cover"
-            cachePolicy="memory-disk"
-          />
-        ) : (
-          <View style={styles.posterPlaceholder}>
-            <Ionicons name="tv-outline" size={20} color="#555" />
-          </View>
-        )}
-        <View style={styles.watchlistBadge}>
-          <Ionicons name="time-outline" size={12} color="#FFA726" />
-        </View>
-      </View>
-      <Text style={styles.horizontalTitle} numberOfLines={2}>
-        {show.name}
-      </Text>
-      <Text style={styles.horizontalSubtitle}>
-        {show.episodes_seen > 0 ? `${show.episodes_seen} eps seen` : 'Not started'}
-      </Text>
-    </Pressable>
-  )
-})
-
-// ── Watchlist Movie Card (horizontal item) ──
-
-interface WatchlistMovieCardProps {
-  movie: WatchlistMovie
-}
-
-const WatchlistMovieCard = memo(function WatchlistMovieCard({
-  movie,
-}: WatchlistMovieCardProps) {
-  const posterUrl = getImageUrl(movie.poster_path, 'w185')
-  const year = movie.release_date ? movie.release_date.slice(0, 4) : null
-  return (
-    <Pressable
-      style={styles.horizontalCard}
-      onPress={() => router.push(`/movie/${movie.id}`)}
-    >
-      <View style={styles.horizontalPosterContainer}>
-        {posterUrl ? (
-          <Image
-            source={{ uri: posterUrl }}
-            style={styles.horizontalPoster}
-            contentFit="cover"
-            cachePolicy="memory-disk"
-          />
-        ) : (
-          <View style={styles.posterPlaceholder}>
-            <Ionicons name="film-outline" size={20} color="#555" />
-          </View>
-        )}
-        <View style={styles.watchlistBadge}>
-          <Ionicons name="time-outline" size={12} color="#FFA726" />
-        </View>
-      </View>
-      <Text style={styles.horizontalTitle} numberOfLines={2}>
-        {movie.title}
-      </Text>
-      {year ? (
-        <Text style={styles.horizontalSubtitle}>{year}</Text>
-      ) : null}
-    </Pressable>
-  )
-})
-
-// ── Custom List Row ──
-
-interface ListRowProps {
-  list: List
-}
-
-const ListRow = memo(function ListRow({ list }: ListRowProps) {
-  const itemCount = list.item_ids?.length ?? 0
-  return (
-    <View style={styles.listRow}>
-      <View style={styles.listIcon}>
-        <Ionicons name="list-outline" size={20} color="#6C63FF" />
-      </View>
-      <View style={styles.listInfo}>
-        <Text style={styles.listName} numberOfLines={1}>
-          {list.name}
-        </Text>
-        {list.description ? (
-          <Text style={styles.listDescription} numberOfLines={1}>
-            {list.description}
-          </Text>
-        ) : null}
-      </View>
-      <Text style={styles.listCount}>{itemCount} items</Text>
-      <Ionicons name="chevron-forward" size={16} color="#555" />
-    </View>
   )
 })
 
@@ -206,31 +123,71 @@ const ListRow = memo(function ListRow({ list }: ListRowProps) {
 interface SettingsRowProps {
   icon: keyof typeof Ionicons.glyphMap
   label: string
-  subtitle?: string
-  right?: React.ReactNode
+  rightLabel?: string
+  showChevron?: boolean
   onPress?: () => void
 }
 
 const SettingsRow = memo(function SettingsRow({
   icon,
   label,
-  subtitle,
-  right,
+  rightLabel,
+  showChevron = true,
   onPress,
 }: SettingsRowProps) {
+  const [pressed, setPressed] = useState(false)
+
   return (
-    <Pressable style={styles.settingsRow} onPress={onPress}>
-      <Ionicons name={icon} size={20} color="#888" />
-      <View style={styles.settingsInfo}>
+    <Pressable
+      style={[styles.settingsRow, pressed && styles.settingsRowPressed]}
+      onPress={onPress}
+      onPressIn={() => setPressed(true)}
+      onPressOut={() => setPressed(false)}
+    >
+      <View style={styles.settingsRowLeft}>
+        <Ionicons name={icon} size={20} color={colors.secondary} />
         <Text style={styles.settingsLabel}>{label}</Text>
-        {subtitle ? (
-          <Text style={styles.settingsSubtitle}>{subtitle}</Text>
-        ) : null}
       </View>
-      {right ?? (
-        <Ionicons name="chevron-forward" size={16} color="#555" />
-      )}
+      <View style={styles.settingsRowRight}>
+        {rightLabel && (
+          <Text style={styles.settingsRightLabel}>{rightLabel}</Text>
+        )}
+        {showChevron && (
+          <Ionicons name="chevron-forward" size={16} color={colors.outlineVariant} />
+        )}
+      </View>
     </Pressable>
+  )
+})
+
+// ── Settings Toggle Row ──
+
+interface SettingsToggleProps {
+  icon: keyof typeof Ionicons.glyphMap
+  label: string
+  value: boolean
+  onValueChange: (value: boolean) => void
+}
+
+const SettingsToggle = memo(function SettingsToggle({
+  icon,
+  label,
+  value,
+  onValueChange,
+}: SettingsToggleProps) {
+  return (
+    <View style={styles.settingsRow}>
+      <View style={styles.settingsRowLeft}>
+        <Ionicons name={icon} size={20} color={colors.secondary} />
+        <Text style={styles.settingsLabel}>{label}</Text>
+      </View>
+      <Switch
+        value={value}
+        onValueChange={onValueChange}
+        trackColor={{ false: colors.surfaceContainerHighest, true: colors.primary }}
+        thumbColor="#FFF"
+      />
+    </View>
   )
 })
 
@@ -245,77 +202,31 @@ export default function ProfileScreen() {
   const setImportComplete = useAppStore((s) => s.setImportComplete)
 
   const { data: stats, isLoading: statsLoading } = useProfileStats()
-  const { data: favorites, isLoading: favLoading } = useFavorites()
-  const { data: watchlist, isLoading: wlLoading } = useWatchlist()
-  const { data: lists, isLoading: listsLoading } = useCustomLists()
+  const { data: shows, isLoading: showsLoading } = useShows(showArchived)
+  const { data: movies, isLoading: moviesLoading } = useMovies()
 
-  const [showWatchlist, setShowWatchlist] = useState<'shows' | 'movies' | 'all'>('all')
-
-  // ── Renderers ──
-
-  const renderFavorite = useCallback(
-    ({ item }: { item: FavoriteShow }) => <FavoriteCard show={item} />,
-    []
-  )
-
-  const renderWatchlistShow = useCallback(
-    ({ item }: { item: WatchlistShow }) => <WatchlistShowCard show={item} />,
-    []
-  )
-
-  const renderWatchlistMovie = useCallback(
-    ({ item }: { item: WatchlistMovie }) => <WatchlistMovieCard movie={item} />,
-    []
-  )
-
-  const renderList = useCallback(
-    ({ item }: { item: List }) => <ListRow list={item} />,
-    []
-  )
-
-  const keyExtractor = useCallback((item: { id: string }) => item.id, [])
-
-  const cycleTheme = useCallback(() => {
-    const themes: Array<'system' | 'light' | 'dark'> = ['system', 'dark', 'light']
-    const idx = themes.indexOf(theme)
-    setTheme(themes[(idx + 1) % themes.length])
-  }, [theme, setTheme])
-
-  const handleReImport = useCallback(() => {
-    setImportComplete(false)
-  }, [setImportComplete])
-
-  // ── Filtered watchlist ──
-
-  const watchlistShows = watchlist?.shows ?? []
-  const watchlistMovies = watchlist?.movies ?? []
-  const displayWatchlistShows =
-    showWatchlist === 'all' || showWatchlist === 'shows'
-      ? watchlistShows
-      : []
-  const displayWatchlistMovies =
-    showWatchlist === 'all' || showWatchlist === 'movies'
-      ? watchlistMovies
-      : []
-
-  // ── Theme label ──
-
+  // Theme label
   const themeLabel =
-    theme === 'system' ? 'System' : theme === 'dark' ? 'Dark' : 'Light'
+    theme === 'dark' ? 'Deep Dark' : theme === 'light' ? 'Light' : 'System'
 
-  const themeIcon =
-    theme === 'system'
-      ? 'settings-outline'
-      : theme === 'dark'
-        ? 'moon-outline'
-        : 'sunny-outline'
+  // Derived sections — only active shows (started) and watched movies
+  const activeShows = useMemo(() => {
+    if (!shows) return []
+    return shows.filter((s) => s.episodes_seen > 0)
+  }, [shows])
+
+  const watchedMoviesList = useMemo(() => {
+    if (!movies) return []
+    return movies.filter((m) => m.watched)
+  }, [movies])
+
+  const isLoading_ = statsLoading || showsLoading || moviesLoading
 
   // ── Loading ──
-
-  if (statsLoading) {
+  if (isLoading_) {
     return (
       <View style={[styles.container, styles.centered, { paddingTop: insets.top }]}>
-        <ActivityIndicator size="large" color="#6C63FF" />
+        <ActivityIndicator size="large" color={colors.primary} />
       </View>
     )
   }
@@ -326,337 +237,263 @@ export default function ProfileScreen() {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* Header */}
-        <View style={styles.header}>
-          <View style={styles.avatar}>
-            <Ionicons name="person-circle-outline" size={48} color="#6C63FF" />
+        {/* ── User Header ── */}
+        <View style={styles.userHeader}>
+          <View style={styles.avatarRing}>
+            <View style={styles.avatarContainer}>
+              <Text style={styles.avatarInitials}>AT</Text>
+            </View>
           </View>
-          <Text style={styles.headerTitle}>Your Library</Text>
+          <Text style={styles.userName}>Alex Thorne</Text>
+          <Text style={styles.userBadge}>Premium Member</Text>
         </View>
 
-        {/* Stats Grid */}
-        {stats ? (
+        {/* ── Bento Stats Grid ── */}
+        {stats && (
           <View style={styles.statsGrid}>
-            <StatCard
-              icon="tv-outline"
-              label="Shows"
-              value={stats.totalShows}
-              color="#6C63FF"
-            />
-            <StatCard
-              icon="film-outline"
-              label="Movies"
-              value={stats.totalMovies}
-              color="#4CAF50"
-            />
-            <StatCard
-              icon="play-circle-outline"
-              label="Episodes"
-              value={stats.totalEpisodes}
-              color="#FFA726"
-            />
-            <StatCard
-              icon="list-outline"
-              label="Lists"
-              value={stats.customLists}
-              color="#E040FB"
-            />
+            <StatCard label="SHOWS" value={formatNumber(stats.totalShows)} />
+            <StatCard label="MOVIES" value={formatNumber(stats.totalMovies)} />
+            <StatCard label="EPISODES" value={formatNumber(stats.totalEpisodes)} />
+            <StatCard label="WATCHED" value={`${formatNumber(stats.totalHours)}h`} />
           </View>
-        ) : null}
+        )}
 
-        {/* Favorites Section */}
-        {favorites && favorites.length > 0 ? (
-          <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <Ionicons name="heart" size={18} color="#E040FB" />
-              <Text style={styles.sectionTitle}>Favorites</Text>
-              <Text style={styles.sectionCount}>{favorites.length}</Text>
-            </View>
-            <FlashList
-              data={favorites}
-              renderItem={renderFavorite}
-              keyExtractor={keyExtractor}
+        {/* ── Shows Carousel (started/active shows) ── */}
+        {activeShows.length > 0 && (
+          <View style={styles.carouselSection}>
+            <SectionHeader
+              title="Shows"
+              count={activeShows.length}
+            />
+            <ScrollView
               horizontal
               showsHorizontalScrollIndicator={false}
-              estimatedItemSize={100}
-              contentContainerStyle={styles.horizontalListContent}
+              contentContainerStyle={styles.carouselContent}
+            >
+              {activeShows.map((show) => (
+                <PosterItem
+                  key={show.id}
+                  posterPath={show.poster_path}
+                  title={show.name}
+                  onPress={() => router.push(`/show/${show.id}`)}
+                />
+              ))}
+            </ScrollView>
+          </View>
+        )}
+
+        {/* ── Movies Carousel (watched movies) ── */}
+        {watchedMoviesList.length > 0 && (
+          <View style={styles.carouselSection}>
+            <SectionHeader
+              title="Movies"
+              count={watchedMoviesList.length}
             />
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.carouselContent}
+            >
+              {watchedMoviesList.map((movie) => (
+                <PosterItem
+                  key={movie.id}
+                  posterPath={movie.poster_path}
+                  title={movie.title}
+                  onPress={() => router.push(`/movie/${movie.id}`)}
+                />
+              ))}
+            </ScrollView>
           </View>
-        ) : !favLoading ? (
-          <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <Ionicons name="heart-outline" size={18} color="#888" />
-              <Text style={styles.sectionTitle}>Favorites</Text>
-            </View>
-            <Text style={styles.emptyText}>No favorites yet</Text>
-          </View>
-        ) : null}
+        )}
 
-        {/* Watchlist Section */}
-        {watchlistShows.length + watchlistMovies.length > 0 ? (
-          <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <Ionicons name="time-outline" size={18} color="#FFA726" />
-              <Text style={styles.sectionTitle}>Watchlist</Text>
-              <Text style={styles.sectionCount}>
-                {watchlistShows.length + watchlistMovies.length}
-              </Text>
-            </View>
-
-            {/* Filter tabs */}
-            <View style={styles.filterRow}>
-              <Pressable
-                style={[
-                  styles.filterChip,
-                  showWatchlist === 'all' && styles.filterChipActive,
-                ]}
-                onPress={() => setShowWatchlist('all')}
-              >
-                <Text
-                  style={[
-                    styles.filterChipText,
-                    showWatchlist === 'all' && styles.filterChipTextActive,
-                  ]}
-                >
-                  All
-                </Text>
-              </Pressable>
-              <Pressable
-                style={[
-                  styles.filterChip,
-                  showWatchlist === 'shows' && styles.filterChipActive,
-                ]}
-                onPress={() => setShowWatchlist('shows')}
-              >
-                <Text
-                  style={[
-                    styles.filterChipText,
-                    showWatchlist === 'shows' && styles.filterChipTextActive,
-                  ]}
-                >
-                  Shows
-                </Text>
-              </Pressable>
-              <Pressable
-                style={[
-                  styles.filterChip,
-                  showWatchlist === 'movies' && styles.filterChipActive,
-                ]}
-                onPress={() => setShowWatchlist('movies')}
-              >
-                <Text
-                  style={[
-                    styles.filterChipText,
-                    showWatchlist === 'movies' && styles.filterChipTextActive,
-                  ]}
-                >
-                  Movies
-                </Text>
-              </Pressable>
-            </View>
-
-            {displayWatchlistShows.length > 0 ? (
-              <FlashList
-                data={displayWatchlistShows}
-                renderItem={renderWatchlistShow}
-                keyExtractor={keyExtractor}
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                estimatedItemSize={100}
-                contentContainerStyle={styles.horizontalListContent}
-              />
-            ) : null}
-
-            {displayWatchlistMovies.length > 0 ? (
-              <FlashList
-                data={displayWatchlistMovies}
-                renderItem={renderWatchlistMovie}
-                keyExtractor={keyExtractor}
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                estimatedItemSize={100}
-                contentContainerStyle={styles.horizontalListContent}
-              />
-            ) : null}
-          </View>
-        ) : !wlLoading ? (
-          <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <Ionicons name="time-outline" size={18} color="#888" />
-              <Text style={styles.sectionTitle}>Watchlist</Text>
-            </View>
-            <Text style={styles.emptyText}>Watchlist is empty</Text>
-          </View>
-        ) : null}
-
-        {/* Custom Lists Section */}
-        {lists && lists.length > 0 ? (
-          <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <Ionicons name="list-outline" size={18} color="#6C63FF" />
-              <Text style={styles.sectionTitle}>Custom Lists</Text>
-              <Text style={styles.sectionCount}>{lists.length}</Text>
-            </View>
-            <View style={styles.listsContainer}>
-              <FlashList
-                data={lists}
-                renderItem={renderList}
-                keyExtractor={keyExtractor}
-                scrollEnabled={false}
-                estimatedItemSize={56}
-              />
-            </View>
-          </View>
-        ) : !listsLoading ? (
-          <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <Ionicons name="list-outline" size={18} color="#888" />
-              <Text style={styles.sectionTitle}>Custom Lists</Text>
-            </View>
-            <Text style={styles.emptyText}>No custom lists</Text>
-          </View>
-        ) : null}
-
-        {/* Settings Section */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Ionicons name="settings-outline" size={18} color="#888" />
-            <Text style={styles.sectionTitle}>Settings</Text>
-          </View>
-          <View style={styles.settingsContainer}>
-            <SettingsRow
-              icon={themeIcon}
-              label="Theme"
-              subtitle={themeLabel}
-              onPress={cycleTheme}
-            />
-            <SettingsRow
-              icon={showArchived ? 'archive' : 'archive-outline'}
-              label="Show Archived"
-              subtitle={showArchived ? 'Visible' : 'Hidden'}
-              onPress={toggleShowArchived}
-            />
-            <SettingsRow
-              icon="refresh-outline"
-              label="Re-import Data"
-              subtitle="Import TV Time data again"
-              onPress={handleReImport}
-            />
-          </View>
+        {/* ── Settings List ── */}
+        <View style={styles.settingsContainer}>
+          <SettingsRow
+            icon="color-palette-outline"
+            label="Theme"
+            rightLabel={themeLabel}
+            onPress={() => {
+              const themes: Array<'system' | 'light' | 'dark'> = ['system', 'dark', 'light']
+              const idx = themes.indexOf(theme)
+              setTheme(themes[(idx + 1) % themes.length])
+            }}
+          />
+          <SettingsRow
+            icon="notifications-outline"
+            label="Notifications"
+          />
+          <SettingsRow
+            icon="sync-outline"
+            label="Import/Export"
+            onPress={() => setImportComplete(false)}
+          />
+          <SettingsToggle
+            icon="archive-outline"
+            label="Archived Shows"
+            value={showArchived}
+            onValueChange={toggleShowArchived}
+          />
         </View>
 
-        {/* Bottom spacer for tab bar */}
-        <View style={{ height: 24 }} />
+        {/* Bottom spacing for tab bar */}
+        <View style={{ height: 32 }} />
       </ScrollView>
     </View>
   )
 }
 
-// ── Styles ──
-
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0F0F0F',
+    backgroundColor: colors.background,
   },
   centered: {
     justifyContent: 'center',
     alignItems: 'center',
   },
   scrollContent: {
-    paddingBottom: 24,
+    paddingBottom: spacing.stackLg,
   },
 
-  // Header
-  header: {
-    flexDirection: 'row',
+  // User Header
+  userHeader: {
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 16,
-    gap: 12,
+    paddingVertical: spacing.stackLg,
+    paddingHorizontal: spacing.marginMobile,
   },
-  avatar: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: '#1A1A1A',
+  avatarRing: {
+    width: 96,
+    height: 96,
+    borderRadius: borderRadius.full,
+    borderWidth: 2,
+    borderColor: 'rgba(208,188,255,0.2)',
+    padding: 4,
+    marginBottom: 16,
+  },
+  avatarContainer: {
+    width: '100%',
+    height: '100%',
+    borderRadius: borderRadius.full,
+    overflow: 'hidden',
+    backgroundColor: colors.surfaceContainerHigh,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
     justifyContent: 'center',
     alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
   },
-  headerTitle: {
-    fontSize: 24,
-    fontWeight: '800',
-    color: '#FFF',
+  avatarInitials: {
+    fontFamily: 'Inter',
+    fontSize: 28,
+    fontWeight: '700',
+    color: colors.onSurface,
+    opacity: 0.8,
+  },
+  userName: {
+    fontFamily: 'Inter',
+    fontSize: typography.headlineMd.fontSize,
+    fontWeight: '600',
+    lineHeight: typography.headlineMd.lineHeight,
+    color: colors.onSurface,
+    marginBottom: 4,
+  },
+  userBadge: {
+    fontFamily: 'Inter',
+    fontSize: typography.labelMd.fontSize,
+    fontWeight: '600',
+    lineHeight: typography.labelMd.lineHeight,
+    letterSpacing: typography.labelMd.letterSpacing,
+    color: colors.onSurfaceVariant,
   },
 
-  // Stats
+  // Bento Stats Grid
   statsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    paddingHorizontal: 12,
-    gap: 8,
-    marginBottom: 8,
+    paddingHorizontal: spacing.marginMobile,
+    gap: spacing.gutter,
+    marginBottom: spacing.stackLg,
   },
   statCard: {
-    width: (16 - 12) / 2, // Will be overridden by flex
-    flex: 1,
-    minWidth: (16 - 12) / 2,
-    backgroundColor: '#1A1A1A',
-    borderRadius: 12,
-    padding: 14,
-    gap: 4,
-    borderCurve: 'continuous',
+    width: STAT_CARD_WIDTH,
+    backgroundColor: colors.surfaceContainer,
+    borderRadius: borderRadius.lg,
+    paddingVertical: 20,
+    paddingHorizontal: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.05)',
   },
   statValue: {
-    fontSize: 22,
-    fontWeight: '800',
-    color: '#FFF',
+    fontFamily: 'Inter',
+    fontSize: typography.headlineMd.fontSize,
+    fontWeight: '600',
+    lineHeight: typography.headlineMd.lineHeight,
+    color: colors.primary,
   },
   statLabel: {
-    fontSize: 12,
-    color: '#888',
+    fontFamily: 'Inter',
+    fontSize: typography.labelSm.fontSize,
+    fontWeight: '500',
+    lineHeight: typography.labelSm.lineHeight,
+    letterSpacing: 0.08,
+    textTransform: 'uppercase',
+    color: colors.secondary,
+    marginTop: 4,
   },
 
-  // Sections
-  section: {
-    marginTop: 16,
-    paddingHorizontal: 16,
+  // Carousel Section
+  carouselSection: {
+    marginBottom: spacing.stackMd,
   },
   sectionHeader: {
     flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    gap: 8,
+    paddingHorizontal: SIDE_OFFSET,
     marginBottom: 12,
   },
+  sectionHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
   sectionTitle: {
-    fontSize: 17,
+    fontFamily: 'Inter',
+    fontSize: 20,
     fontWeight: '700',
-    color: '#FFF',
-    flex: 1,
+    color: colors.onSurface,
+    letterSpacing: -0.01,
   },
   sectionCount: {
-    fontSize: 13,
-    color: '#888',
-    fontWeight: '600',
+    fontFamily: 'Inter',
+    fontSize: 14,
+    fontWeight: '500',
+    color: colors.outlineVariant,
   },
-
-  // Horizontal lists
-  horizontalListContent: {
-    paddingRight: 24,
+  carouselContent: {
+    paddingLeft: SIDE_OFFSET,
+    paddingRight: 8,
+    gap: 12,
   },
-  horizontalCard: {
-    width: 100,
-    marginRight: 10,
+  posterItem: {
+    width: POSTER_W,
   },
-  horizontalPosterContainer: {
-    width: 100,
-    height: 150,
-    borderRadius: 8,
+  posterContainer: {
+    width: POSTER_W,
+    height: POSTER_H,
+    borderRadius: 12,
     overflow: 'hidden',
-    backgroundColor: '#1A1A1A',
-    position: 'relative',
+    backgroundColor: colors.surfaceDim,
+    borderWidth: 1,
+    borderColor: colors.outlineVariant,
   },
-  horizontalPoster: {
+  posterImage: {
     width: '100%',
     height: '100%',
   },
@@ -666,129 +503,60 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  horizontalTitle: {
-    fontSize: 12,
-    color: '#FFF',
-    fontWeight: '600',
-    marginTop: 4,
-    lineHeight: 16,
-  },
-  horizontalSubtitle: {
+  posterTitle: {
+    fontFamily: 'Inter',
     fontSize: 11,
-    color: '#888',
-    marginTop: 1,
-  },
-  watchlistBadge: {
-    position: 'absolute',
-    top: 4,
-    right: 4,
-    backgroundColor: 'rgba(0,0,0,0.7)',
-    borderRadius: 10,
-    padding: 2,
-  },
-
-  // Filter chips
-  filterRow: {
-    flexDirection: 'row',
-    gap: 8,
-    marginBottom: 12,
-  },
-  filterChip: {
-    paddingHorizontal: 14,
-    paddingVertical: 6,
-    borderRadius: 16,
-    backgroundColor: '#1A1A1A',
-    borderCurve: 'continuous',
-  },
-  filterChipActive: {
-    backgroundColor: 'rgba(108,99,255,0.2)',
-  },
-  filterChipText: {
-    fontSize: 13,
-    color: '#888',
     fontWeight: '600',
-  },
-  filterChipTextActive: {
-    color: '#6C63FF',
-  },
-
-  // Custom lists
-  listsContainer: {
-    backgroundColor: '#1A1A1A',
-    borderRadius: 12,
-    overflow: 'hidden',
-    borderCurve: 'continuous',
-  },
-  listRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 14,
-    paddingVertical: 14,
-    gap: 12,
-    borderBottomWidth: 0.5,
-    borderBottomColor: '#2A2A2A',
-  },
-  listIcon: {
-    width: 32,
-    height: 32,
-    borderRadius: 8,
-    backgroundColor: 'rgba(108,99,255,0.1)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  listInfo: {
-    flex: 1,
-  },
-  listName: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#FFF',
-  },
-  listDescription: {
-    fontSize: 12,
-    color: '#888',
-    marginTop: 2,
-  },
-  listCount: {
-    fontSize: 12,
-    color: '#888',
+    color: colors.onSurface,
+    marginTop: 6,
+    lineHeight: 14,
   },
 
-  // Settings
+  // Settings List
   settingsContainer: {
-    backgroundColor: '#1A1A1A',
-    borderRadius: 12,
+    marginHorizontal: spacing.marginMobile,
+    marginTop: spacing.stackSm,
+    backgroundColor: colors.surfaceContainer,
+    borderRadius: borderRadius.lg,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.05)',
     overflow: 'hidden',
-    borderCurve: 'continuous',
   },
   settingsRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 14,
-    paddingVertical: 14,
-    gap: 12,
-    borderBottomWidth: 0.5,
-    borderBottomColor: '#2A2A2A',
+    justifyContent: 'space-between',
+    paddingHorizontal: spacing.marginMobile,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.05)',
   },
-  settingsInfo: {
-    flex: 1,
+  settingsRowPressed: {
+    backgroundColor: 'rgba(255,255,255,0.05)',
+  },
+  settingsRowLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
   },
   settingsLabel: {
-    fontSize: 14,
+    fontFamily: 'Inter',
+    fontSize: typography.bodyMd.fontSize,
+    fontWeight: '400',
+    lineHeight: typography.bodyMd.lineHeight,
+    color: colors.onSurface,
+  },
+  settingsRowRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  settingsRightLabel: {
+    fontFamily: 'Inter',
+    fontSize: typography.labelMd.fontSize,
     fontWeight: '600',
-    color: '#FFF',
-  },
-  settingsSubtitle: {
-    fontSize: 12,
-    color: '#888',
-    marginTop: 2,
-  },
-
-  // Empty
-  emptyText: {
-    fontSize: 13,
-    color: '#555',
-    fontStyle: 'italic',
-    marginBottom: 4,
+    lineHeight: typography.labelMd.lineHeight,
+    letterSpacing: typography.labelMd.letterSpacing,
+    color: colors.onSurfaceVariant,
   },
 })

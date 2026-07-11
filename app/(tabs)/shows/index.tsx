@@ -1,6 +1,6 @@
-// ─── Shows Tab — poster grid / thumbnail list with Continue Watching ───
+// ─── Shows Tab — Stitch "Shows Home" design ───
 
-import { useCallback, useMemo } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   View,
   Text,
@@ -8,16 +8,36 @@ import {
   StyleSheet,
   ActivityIndicator,
   RefreshControl,
+  ScrollView,
 } from 'react-native'
 import { FlashList } from '@shopify/flash-list'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import { usePathname } from 'expo-router'
+import { Image } from 'expo-image'
 import { Ionicons } from '@expo/vector-icons'
 import { useShows, useContinueWatching, useMarkWatched } from '@/lib/queries/shows'
 import { useAppStore } from '@/stores/appStore'
+import { getImageUrl } from '@/lib/tmdb'
+import { colors, typography, spacing, borderRadius } from '@/theme'
 import ShowCard from '@/components/shows/ShowCard'
 import ShowListItem from '@/components/shows/ShowListItem'
 import ContinueWatchingSection from '@/components/shows/ContinueWatchingSection'
 import type { ShowWithUserData } from '@/lib/queries/shows'
+import type { Show } from '@/types'
+
+// ── Filter chips from Stitch design ──
+
+type FilterKey = 'all' | 'watching' | 'up-to-date' | 'finished' | 'stopped'
+
+const FILTERS: { key: FilterKey; label: string }[] = [
+  { key: 'all', label: 'All' },
+  { key: 'watching', label: 'Watching' },
+  { key: 'up-to-date', label: 'Up to Date' },
+  { key: 'finished', label: 'Finished' },
+  { key: 'stopped', label: 'Stopped' },
+]
+
+// ── Screen ──
 
 export default function ShowsScreen() {
   const insets = useSafeAreaInsets()
@@ -25,10 +45,24 @@ export default function ShowsScreen() {
   const setViewMode = useAppStore((s) => s.setViewMode)
   const showArchived = useAppStore((s) => s.showArchived)
   const toggleShowArchived = useAppStore((s) => s.toggleShowArchived)
+  const [activeFilter, setActiveFilter] = useState<FilterKey>('all')
 
   const { data: shows, isLoading, isRefetching, refetch } = useShows(showArchived)
-  const { data: continueWatching, isLoading: cwLoading } = useContinueWatching()
+  const { data: continueWatching, isLoading: cwLoading, refetch: refetchCW } = useContinueWatching()
   const markWatchedMutation = useMarkWatched()
+
+  // Refetch when navigating back to the shows tab — syncs counters across all shows
+  const pathname = usePathname()
+  const prevPathname = useRef(pathname)
+  useEffect(() => {
+    if (prevPathname.current !== pathname) {
+      prevPathname.current = pathname
+      if (pathname === '/(tabs)/shows') {
+        refetch()
+        refetchCW()
+      }
+    }
+  }, [pathname, refetch, refetchCW])
 
   const isGrid = viewMode === 'poster-grid'
 
@@ -57,21 +91,56 @@ export default function ShowsScreen() {
 
   const hasContinueWatching = continueWatching && continueWatching.length > 0
 
+  // ── Filter chips + Continue Watching as ListHeader ──
   const ListHeader = useMemo(() => {
-    if (!hasContinueWatching) return null
     return (
-      <ContinueWatchingSection
-        shows={continueWatching!}
-        isLoading={cwLoading}
-      />
+      <View>
+        {hasContinueWatching && (
+          <ContinueWatchingSection
+            shows={continueWatching!}
+            isLoading={cwLoading}
+          />
+        )}
+
+        {/* Filter Chips — matching Stitch design */}
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.filterChipsContainer}
+          style={styles.filterChipsScroll}
+        >
+          {FILTERS.map((f) => {
+            const isActive = activeFilter === f.key
+            return (
+              <Pressable
+                key={f.key}
+                style={[
+                  styles.filterChip,
+                  isActive && styles.filterChipActive,
+                ]}
+                onPress={() => setActiveFilter(f.key)}
+              >
+                <Text
+                  style={[
+                    styles.filterChipText,
+                    isActive && styles.filterChipTextActive,
+                  ]}
+                >
+                  {f.label}
+                </Text>
+              </Pressable>
+            )
+          })}
+        </ScrollView>
+      </View>
     )
-  }, [hasContinueWatching, continueWatching, cwLoading])
+  }, [hasContinueWatching, continueWatching, cwLoading, activeFilter])
 
   const emptyState = useMemo(() => {
     if (isLoading) return null
     return (
       <View style={styles.emptyState}>
-        <Ionicons name="tv-outline" size={48} color="#444" />
+        <Ionicons name="tv-outline" size={48} color={colors.outline} />
         <Text style={styles.emptyTitle}>No shows yet</Text>
         <Text style={styles.emptySubtitle}>
           Import your TV Time data or start adding shows from Discover
@@ -84,7 +153,7 @@ export default function ShowsScreen() {
   if (isLoading) {
     return (
       <View style={[styles.container, styles.centered, { paddingTop: insets.top }]}>
-        <ActivityIndicator size="large" color="#6C63FF" />
+        <ActivityIndicator size="large" color={colors.primary} />
         <Text style={styles.loadingText}>Loading your shows...</Text>
       </View>
     )
@@ -92,32 +161,25 @@ export default function ShowsScreen() {
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
-      {/* Header */}
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Shows</Text>
-        <View style={styles.headerActions}>
-          {/* Archived toggle */}
-          <Pressable
-            onPress={toggleShowArchived}
-            style={[styles.headerButton, showArchived && styles.headerButtonActive]}
-          >
-            <Ionicons
-              name={showArchived ? 'archive' : 'archive-outline'}
-              size={20}
-              color={showArchived ? '#6C63FF' : '#888'}
-            />
-          </Pressable>
-
-          {/* View mode toggle */}
+      {/* TopAppBar — matches Stitch design */}
+      <View style={styles.topAppBar}>
+        <View style={styles.topAppBarLeft}>
+          <Ionicons name="menu" size={24} color={colors.primary} />
+          <Text style={styles.topAppBarTitle}>BingeTime</Text>
+        </View>
+        <View style={styles.topAppBarRight}>
           <Pressable
             onPress={toggleViewMode}
-            style={styles.headerButton}
+            style={styles.topAppBarButton}
           >
             <Ionicons
-              name={isGrid ? 'list-outline' : 'grid-outline'}
+              name={isGrid ? 'grid-outline' : 'list-outline'}
               size={20}
-              color="#888"
+              color={colors.onSurfaceVariant}
             />
+          </Pressable>
+          <Pressable style={styles.topAppBarButton}>
+            <Ionicons name="search-outline" size={20} color={colors.onSurfaceVariant} />
           </Pressable>
         </View>
       </View>
@@ -128,7 +190,7 @@ export default function ShowsScreen() {
         keyExtractor={keyExtractor}
         renderItem={renderItem}
         numColumns={isGrid ? 2 : 1}
-        key={isGrid ? 'grid' : 'list'} // Force re-mount on view change to reset numColumns
+        key={isGrid ? 'grid' : 'list'}
         estimatedItemSize={isGrid ? 280 : 100}
         contentContainerStyle={[
           styles.listContent,
@@ -140,8 +202,8 @@ export default function ShowsScreen() {
           <RefreshControl
             refreshing={isRefetching}
             onRefresh={refetch}
-            tintColor="#6C63FF"
-            colors={['#6C63FF']}
+            tintColor={colors.primary}
+            colors={[colors.primary]}
           />
         }
         showsVerticalScrollIndicator={false}
@@ -150,10 +212,12 @@ export default function ShowsScreen() {
   )
 }
 
+// ── Styles ──
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0F0F0F',
+    backgroundColor: colors.surface,
   },
   centered: {
     justifyContent: 'center',
@@ -161,42 +225,77 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     fontSize: 14,
-    color: '#888',
-    marginTop: 12,
+    color: colors.outline,
+    marginTop: spacing.stackSm,
   },
 
-  // Header
-  header: {
+  // TopAppBar — fixed header matching Stitch
+  topAppBar: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingHorizontal: spacing.marginMobile,
+    height: 64,
+    backgroundColor: 'rgba(21,18,27,0.8)',
   },
-  headerTitle: {
-    fontSize: 28,
-    fontWeight: '800',
-    color: '#FFF',
-  },
-  headerActions: {
+  topAppBarLeft: {
     flexDirection: 'row',
+    alignItems: 'center',
     gap: 8,
   },
-  headerButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 8,
-    backgroundColor: '#1A1A1A',
+  topAppBarTitle: {
+    fontFamily: 'Inter',
+    fontSize: typography.headlineMd.fontSize,
+    fontWeight: '700',
+    color: colors.primary,
+    letterSpacing: -0.01,
+  },
+  topAppBarRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  topAppBarButton: {
+    width: 44,
+    height: 44,
+    borderRadius: borderRadius.full,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  headerButtonActive: {
-    backgroundColor: 'rgba(108,99,255,0.15)',
+
+  // Filter Chips
+  filterChipsScroll: {
+    marginTop: spacing.stackSm,
+    marginBottom: spacing.stackSm,
+  },
+  filterChipsContainer: {
+    paddingHorizontal: spacing.marginMobile,
+    gap: spacing.stackSm,
+  },
+  filterChip: {
+    paddingHorizontal: 20,
+    paddingVertical: 8,
+    borderRadius: borderRadius.full,
+    backgroundColor: colors.surfaceContainerHigh,
+  },
+  filterChipActive: {
+    backgroundColor: colors.primary,
+  },
+  filterChipText: {
+    fontFamily: 'Inter',
+    fontSize: typography.labelMd.fontSize,
+    fontWeight: '600',
+    lineHeight: typography.labelMd.lineHeight,
+    letterSpacing: typography.labelMd.letterSpacing,
+    color: colors.onSurfaceVariant,
+  },
+  filterChipTextActive: {
+    color: colors.onPrimary,
   },
 
   // List
   listContent: {
-    paddingHorizontal: 16,
+    paddingHorizontal: spacing.marginMobile,
     paddingBottom: 24,
   },
   listContentEmpty: {
@@ -212,13 +311,13 @@ const styles = StyleSheet.create({
   emptyTitle: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#FFF',
+    color: colors.onSurface,
     marginTop: 16,
     marginBottom: 8,
   },
   emptySubtitle: {
     fontSize: 14,
-    color: '#888',
+    color: colors.outline,
     textAlign: 'center',
     lineHeight: 20,
   },

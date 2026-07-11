@@ -7,6 +7,7 @@ import { Swipeable } from 'react-native-gesture-handler'
 import { Ionicons } from '@expo/vector-icons'
 import { router } from 'expo-router'
 import { getImageUrl } from '@/lib/queries/movies'
+import { colors, typography, borderRadius, spacing } from '@/theme'
 import type { MovieWithUserData } from '@/lib/queries/movies'
 
 interface MovieListItemProps {
@@ -37,7 +38,7 @@ const MovieListItem = memo(function MovieListItem({
           swipeableRef.current?.close()
         }}
       >
-        <Ionicons name="checkmark" size={24} color="#FFF" />
+        <Ionicons name="checkmark" size={24} color={colors.onPrimary} />
         <Text style={styles.swipeLabel}>Watch</Text>
       </Pressable>
     )
@@ -62,7 +63,7 @@ const MovieListItem = memo(function MovieListItem({
             />
           ) : (
             <View style={styles.thumbnailPlaceholder}>
-              <Ionicons name="film-outline" size={20} color="#555" />
+              <Ionicons name="film-outline" size={20} color={colors.outlineVariant} />
             </View>
           )}
         </View>
@@ -77,24 +78,21 @@ const MovieListItem = memo(function MovieListItem({
             <Text style={styles.yearText}>{year}</Text>
           ) : null}
 
-          <Text style={[styles.statusText, { color: movie.watched ? '#4CAF50' : '#666' }]}>
-            {movie.rewatch_count > 0
-              ? `Watched ${movie.rewatch_count + 1}x`
-              : movie.watched
-                ? 'Watched'
-                : 'Not watched'}
+          <Text style={[styles.statusText, { color: movie.watched ? colors.success : colors.onSurfaceVariant }]}>
+            {movie.watched ? 'Watched' : 'Not watched'}
           </Text>
         </View>
 
-        {/* Watched check */}
-        {movie.watched && (
-          <Ionicons
-            name="checkmark-circle"
-            size={20}
-            color="#4CAF50"
-            style={styles.completeIcon}
-          />
-        )}
+        {/* Right actions */}
+        <View style={styles.rightActions}>
+          {movie.watched && (
+            <Ionicons
+              name="checkmark-circle"
+              size={20}
+              color={colors.success}
+            />
+          )}
+        </View>
       </Pressable>
     </Swipeable>
   )
@@ -104,17 +102,19 @@ const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#1A1A1A',
-    borderRadius: 10,
-    padding: 10,
+    backgroundColor: colors.surfaceContainer,
+    borderRadius: borderRadius.lg,
+    padding: 12,
     marginBottom: 8,
+    borderWidth: 1,
+    borderColor: colors.outlineVariant,
   },
   thumbnailContainer: {
     width: 48,
     height: 72,
-    borderRadius: 6,
+    borderRadius: 8,
     overflow: 'hidden',
-    backgroundColor: '#2A2A2A',
+    backgroundColor: colors.surfaceDim,
   },
   thumbnail: {
     width: '100%',
@@ -131,15 +131,15 @@ const styles = StyleSheet.create({
     marginLeft: 12,
   },
   title: {
-    fontSize: 15,
+    fontSize: typography.bodyMd.fontSize,
     fontWeight: '600',
-    color: '#FFF',
-    marginBottom: 2,
+    color: colors.onSurface,
+    marginBottom: spacing.unit,
   },
   yearText: {
-    fontSize: 12,
-    color: '#888',
-    marginBottom: 2,
+    fontSize: typography.bodyXs.fontSize,
+    color: colors.onSurfaceVariant,
+    marginBottom: spacing.unit,
   },
   statusText: {
     fontSize: 12,
@@ -148,20 +148,26 @@ const styles = StyleSheet.create({
   completeIcon: {
     marginLeft: 8,
   },
+  rightActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginLeft: 8,
+  },
   swipeAction: {
-    backgroundColor: '#4CAF50',
+    backgroundColor: colors.primary,
     justifyContent: 'center',
     alignItems: 'center',
     width: 64,
-    borderRadius: 10,
+    borderRadius: borderRadius.lg,
     marginLeft: 8,
     marginBottom: 8,
   },
   swipeLabel: {
-    color: '#FFF',
-    fontSize: 11,
+    color: colors.onPrimary,
+    fontSize: typography.bodyXs.fontSize,
     fontWeight: '600',
-    marginTop: 2,
+    marginTop: spacing.unit,
   },
 })
 

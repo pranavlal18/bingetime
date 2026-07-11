@@ -1,4 +1,4 @@
-// ─── ContinueWatchingSection — horizontal scroll row at top of Shows tab ───
+// ─── ContinueWatchingSection — Stitch-aligned horizontal scroll ───
 
 import { useCallback } from 'react'
 import { View, Text, StyleSheet, Pressable } from 'react-native'
@@ -8,9 +8,10 @@ import { Ionicons } from '@expo/vector-icons'
 import { router } from 'expo-router'
 import { getImageUrl } from '@/lib/queries/shows'
 import ProgressBar from './ProgressBar'
+import { colors, typography, spacing, borderRadius } from '@/theme'
 import type { ShowWithUserData } from '@/lib/queries/shows'
 
-const ITEM_WIDTH = 120
+const ITEM_WIDTH = 110
 const ITEM_HEIGHT = ITEM_WIDTH * 1.5
 
 interface ContinueWatchingSectionProps {
@@ -29,6 +30,10 @@ export default function ContinueWatchingSection({
       const seenEps = item.episodes_seen
       const hasProgress = totalEps !== null && totalEps > 0
 
+      const allCaughtUp = totalEps !== null && totalEps > 0 && seenEps >= totalEps
+      const isComplete = allCaughtUp && (item.status === 'Ended' || item.status === 'Canceled')
+      const isUpToDate = allCaughtUp && !isComplete
+
       return (
         <Pressable style={styles.card} onPress={() => router.push(`/show/${item.id}`)}>
           {/* Poster */}
@@ -42,18 +47,23 @@ export default function ContinueWatchingSection({
               />
             ) : (
               <View style={styles.posterPlaceholder}>
-                <Ionicons name="tv-outline" size={24} color="#555" />
+                <Ionicons name="tv-outline" size={24} color={colors.outlineVariant} />
               </View>
             )}
 
-            {/* Play indicator */}
-            <View style={styles.playOverlay}>
-              <Ionicons
-                name="play-circle"
-                size={22}
-                color="rgba(255,255,255,0.9)"
-              />
-            </View>
+            {/* Poster only — no decorative play icon (misleading) */}
+
+            {/* Status badge */}
+            {isComplete && (
+              <View style={styles.completeBadge}>
+                <Ionicons name="checkmark-circle" size={14} color={colors.statusFinished} />
+              </View>
+            )}
+            {isUpToDate && (
+              <View style={styles.completeBadge}>
+                <Ionicons name="checkmark-circle" size={14} color={colors.statusUpToDate} />
+              </View>
+            )}
           </View>
 
           {/* Progress bar */}
@@ -62,7 +72,7 @@ export default function ContinueWatchingSection({
               episodesSeen={seenEps}
               totalEpisodes={totalEps}
               height={3}
-              color="#6C63FF"
+              color={colors.primary}
             />
           )}
 
@@ -74,7 +84,7 @@ export default function ContinueWatchingSection({
           {/* Episode count */}
           {hasProgress && (
             <Text style={styles.episodeCount}>
-              {seenEps}/{totalEps}
+              {Math.min(seenEps, totalEps!)}/{totalEps}
             </Text>
           )}
         </Pressable>
@@ -124,26 +134,28 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   sectionTitle: {
-    fontSize: 18,
+    fontSize: typography.bodyLg.fontSize,
     fontWeight: '700',
-    color: '#FFF',
+    color: colors.onSurface,
     marginBottom: 12,
-    paddingHorizontal: 2,
+    paddingHorizontal: spacing.unit,
   },
   scrollContent: {
-    paddingRight: 24,
+    paddingRight: spacing.marginMobile,
   },
   card: {
     width: ITEM_WIDTH,
-    marginRight: 12,
+    marginRight: 10,
   },
   posterContainer: {
     width: ITEM_WIDTH,
     height: ITEM_HEIGHT,
-    borderRadius: 8,
+    borderRadius: borderRadius.lg,
     overflow: 'hidden',
-    backgroundColor: '#1A1A1A',
+    backgroundColor: colors.surfaceContainer,
     position: 'relative',
+    borderWidth: 1,
+    borderColor: colors.outlineVariant,
   },
   poster: {
     width: '100%',
@@ -155,22 +167,25 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  playOverlay: {
+  completeBadge: {
     position: 'absolute',
-    top: 6,
-    left: 6,
+    top: 4,
+    right: 4,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    borderRadius: 10,
+    padding: spacing.unit,
   },
   title: {
-    fontSize: 12,
-    color: '#FFF',
+    fontSize: typography.bodyXs.fontSize,
+    color: colors.onSurface,
     fontWeight: '600',
     marginTop: 6,
     lineHeight: 16,
   },
   episodeCount: {
-    fontSize: 11,
-    color: '#888',
-    marginTop: 2,
+    fontSize: typography.bodyXs.fontSize,
+    color: colors.onSurfaceVariant,
+    marginTop: spacing.unit,
   },
   loadingRow: {
     flexDirection: 'row',
@@ -182,14 +197,14 @@ const styles = StyleSheet.create({
   skeletonPoster: {
     width: '100%',
     height: ITEM_HEIGHT,
-    borderRadius: 8,
-    backgroundColor: '#2A2A2A',
+    borderRadius: borderRadius.md,
+    backgroundColor: colors.surfaceContainerHighest,
   },
   skeletonText: {
     width: '60%',
     height: 12,
-    borderRadius: 4,
-    backgroundColor: '#2A2A2A',
+    borderRadius: borderRadius.full,
+    backgroundColor: colors.surfaceContainerHighest,
     marginTop: 8,
   },
 })

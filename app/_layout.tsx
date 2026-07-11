@@ -26,17 +26,13 @@ export default function RootLayout() {
   return (
     <GestureHandlerRootView style={styles.root}>
       <QueryClientProvider client={queryClient}>
-        <StatusBar style="auto" />
+        <StatusBar style="light" />
         <Stack screenOptions={{ headerShown: false }}>
           <Stack.Screen name="index" />
           <Stack.Screen name="import" />
           <Stack.Screen name="(tabs)" />
           <Stack.Screen
             name="show/[id]"
-            options={{ animation: 'slide_from_right' }}
-          />
-          <Stack.Screen
-            name="show/[id]/season/[seasonNumber]"
             options={{ animation: 'slide_from_right' }}
           />
           <Stack.Screen
