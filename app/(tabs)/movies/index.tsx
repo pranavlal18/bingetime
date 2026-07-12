@@ -141,7 +141,7 @@ function MovieCardGrid({ movie }: MovieCardGridProps) {
 
 export default function MoviesScreen() {
   const insets = useSafeAreaInsets()
-  const [activeSegment, setActiveSegment] = useState<SegmentKey>('watched')
+  const [activeSegment, setActiveSegment] = useState<SegmentKey>('watch-later')
   const viewMode = useAppStore((s) => s.viewMode)
   const setViewMode = useAppStore((s) => s.setViewMode)
 

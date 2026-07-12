@@ -3,6 +3,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import { getImageUrl, getMovieDetails, searchMovie } from '@/lib/tmdb'
+import { useAuth } from '@/contexts/AuthContext'
 import type { Movie, UserMovie } from '@/types'
 
 // ── Types for joined query result ──
@@ -15,7 +16,9 @@ export interface MovieWithUserData extends Movie {
 }
 
 function mapRow(row: any): MovieWithUserData {
-  const um = row.user_movies || {}
+  // PostgREST returns to-many relationships as arrays, even with !inner
+  const umRaw = row.user_movies
+  const um = Array.isArray(umRaw) ? (umRaw[0] ?? {}) : (umRaw ?? {})
   return {
     id: row.id,
     tmdb_id: row.tmdb_id,
@@ -36,7 +39,8 @@ function mapRow(row: any): MovieWithUserData {
 
 export const movieKeys = {
   all: ['movies'] as const,
-  list: ['movies', 'list'] as const,
+  list: (userId: string) => ['movies', 'list', userId] as const,
+  detail: (id: string) => ['movies', 'detail', id] as const,
 }
 
 // ── Sorting ──
@@ -54,37 +58,48 @@ function sortMovies(movies: MovieWithUserData[]): MovieWithUserData[] {
 
 // ── Fetch all movies (with user data join) ──
 
-async function fetchMovies(): Promise<MovieWithUserData[]> {
+async function fetchMovies(userId: string): Promise<MovieWithUserData[]> {
   const { data, error } = await supabase
     .from('movies')
-    .select('*, user_movies(*)')
+    .select('*, user_movies!inner(*)')
+    .eq('user_movies.user_id', userId)
+
+  console.log('🔍 [fetchMovies] Query result:', { dataLength: data?.length, error: error?.message })
 
   if (error) throw new Error(`Failed to fetch movies: ${error.message}`)
   if (!data) return []
 
   let result = data.map(mapRow)
+  console.log('🔍 [fetchMovies] After mapping:', { count: result.length, watchlist: result.filter(m => m.is_watchlist).length, watched: result.filter(m => m.watched).length })
   // Filter: only show items that are in the user's library
   result = result.filter((m) => m.is_watchlist)
   return sortMovies(result)
 }
 
 export function useMovies() {
+  const { user } = useAuth()
+
   return useQuery({
-    queryKey: movieKeys.list,
-    queryFn: fetchMovies,
+    queryKey: movieKeys.list(user?.id ?? ''),
+    queryFn: () => fetchMovies(user?.id ?? ''),
     staleTime: 1000 * 60 * 5,
+    enabled: !!user,
   })
 }
 
 // ── Fetch single movie by ID ──
 
-async function fetchMovie(id: string): Promise<MovieWithUserData | null> {
+async function fetchMovie(
+  id: string,
+  userId: string
+): Promise<MovieWithUserData | null> {
   // Support both UUID and TMDb ID lookups
   const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)
 
   let query = supabase
     .from('movies')
-    .select('*, user_movies(*)')
+    .select('*, user_movies!inner(*)')
+    .eq('user_movies.user_id', userId)
 
   if (isUuid) {
     query = query.eq('id', id)
@@ -106,19 +121,17 @@ async function fetchMovie(id: string): Promise<MovieWithUserData | null> {
 }
 
 export function useMovie(id: string) {
+  const { user } = useAuth()
   const queryClient = useQueryClient()
 
   return useQuery({
-    queryKey: ['movies', 'detail', id],
-    queryFn: () => fetchMovie(id),
+    queryKey: movieKeys.detail(id),
+    queryFn: () => fetchMovie(id, user?.id ?? ''),
     staleTime: 1000 * 60 * 5,
-    // Use placeholderData (not initialData) so the query stays in pending state
-    // when no cache is available — avoids React Query v5 treating undefined
-    // initialData as a "success" state with no data.
+    enabled: !!user,
     placeholderData: () => {
-      const cached = queryClient.getQueryData<MovieWithUserData[]>(
-        movieKeys.list
-      )
+      if (!user) return undefined
+      const cached = queryClient.getQueryData<MovieWithUserData[]>(movieKeys.list(user.id))
       if (cached) {
         const found = cached.find((m) => m.id === id)
         if (found) return found
@@ -131,17 +144,20 @@ export function useMovie(id: string) {
 // ── Mark movie as watched ──
 
 export function useMarkMovieWatched() {
+  const { user } = useAuth()
   const queryClient = useQueryClient()
 
   return useMutation({
     mutationFn: async (movieId: string) => {
+      if (!user) throw new Error('Not authenticated')
       const { error } = await supabase.from('user_movies').upsert(
         {
           movie_id: movieId,
+          user_id: user.id,
           watched: true,
           watched_at: new Date().toISOString(),
         },
-        { onConflict: 'movie_id' }
+        { onConflict: 'movie_id,user_id' }
       )
       if (error) throw new Error(error.message)
     },
@@ -155,14 +171,17 @@ export function useMarkMovieWatched() {
 // ── Toggle watched status ──
 
 export function useToggleMovieWatched() {
+  const { user } = useAuth()
   const queryClient = useQueryClient()
 
   return useMutation({
     mutationFn: async (movieId: string) => {
+      if (!user) throw new Error('Not authenticated')
       const { data: existing } = await supabase
         .from('user_movies')
         .select('watched')
         .eq('movie_id', movieId)
+        .eq('user_id', user.id)
         .single()
 
       const newWatched = !(existing?.watched ?? false)
@@ -170,10 +189,11 @@ export function useToggleMovieWatched() {
       const { error } = await supabase.from('user_movies').upsert(
         {
           movie_id: movieId,
+          user_id: user.id,
           watched: newWatched,
           watched_at: newWatched ? new Date().toISOString() : null,
         },
-        { onConflict: 'movie_id' }
+        { onConflict: 'movie_id,user_id' }
       )
       if (error) throw new Error(error.message)
     },
@@ -187,16 +207,19 @@ export function useToggleMovieWatched() {
 // ── Toggle watchlist ──
 
 export function useToggleMovieWatchlist() {
+  const { user } = useAuth()
   const queryClient = useQueryClient()
 
   return useMutation({
     mutationFn: async ({ movieId, isWatchlist }: { movieId: string; isWatchlist: boolean }) => {
+      if (!user) throw new Error('Not authenticated')
       const { error } = await supabase.from('user_movies').upsert(
         {
           movie_id: movieId,
+          user_id: user.id,
           is_watchlist: isWatchlist,
         },
-        { onConflict: 'movie_id' }
+        { onConflict: 'movie_id,user_id' }
       )
       if (error) throw new Error(error.message)
     },
@@ -210,10 +233,12 @@ export function useToggleMovieWatchlist() {
 // ── Refresh missing poster_path for existing movies ──
 
 export function useRefreshMoviePosters() {
+  const { user } = useAuth()
   const queryClient = useQueryClient()
 
   return useMutation({
     mutationFn: async () => {
+      if (!user) throw new Error('Not authenticated')
       // 1. Fetch movies where poster_path is null
       const { data: movies, error: fetchError } = await supabase
         .from('movies')
@@ -285,15 +310,15 @@ export function useRefreshMoviePosters() {
   })
 }
 
-export { getImageUrl }
-
 // ── Batch-fetch genres for movies missing them ──
 
 export function useRefreshMovieGenres() {
+  const { user } = useAuth()
   const queryClient = useQueryClient()
 
   return useMutation({
     mutationFn: async () => {
+      if (!user) throw new Error('Not authenticated')
       // 1. Fetch movies where genres is null
       const { data: movies, error: fetchError } = await supabase
         .from('movies')
@@ -341,3 +366,5 @@ export function useRefreshMovieGenres() {
     },
   })
 }
+
+export { getImageUrl }

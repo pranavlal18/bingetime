@@ -3,6 +3,7 @@
 import { useQuery, useMutation, useQueryClient, QueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import { getImageUrl } from '@/lib/tmdb'
+import { useAuth } from '@/contexts/AuthContext'
 import type { Show, UserShow } from '@/types'
 
 // ── Types for joined query result ──
@@ -18,7 +19,9 @@ export interface ShowWithUserData extends Show {
 }
 
 function mapRow(row: any): ShowWithUserData {
-  const us = row.user_shows || {}
+  // PostgREST returns to-many relationships as arrays, even with !inner
+  const usRaw = row.user_shows
+  const us = Array.isArray(usRaw) ? (usRaw[0] ?? {}) : (usRaw ?? {})
   return {
     id: row.id,
     tmdb_id: row.tmdb_id,
@@ -43,29 +46,39 @@ function mapRow(row: any): ShowWithUserData {
 
 export const showKeys = {
   all: ['shows'] as const,
-  list: (showArchived: boolean) => ['shows', 'list', { showArchived }] as const,
-  continueWatching: ['shows', 'continue-watching'] as const,
+  list: (showArchived: boolean, userId: string) => ['shows', 'list', { showArchived, userId }] as const,
+  continueWatching: (userId: string) => ['shows', 'continue-watching', userId] as const,
+  detail: (id: string) => ['shows', 'detail', id] as const,
 }
 
 // ── Fetch all shows (with user data join) ──
 
-async function fetchShows(showArchived: boolean, queryClient?: QueryClient): Promise<ShowWithUserData[]> {
+async function fetchShows(
+  showArchived: boolean,
+  userId: string,
+  queryClient?: QueryClient
+): Promise<ShowWithUserData[]> {
+  // Use inner join to only get shows that have user_shows for this user
   let query = supabase
     .from('shows')
-    .select('*, user_shows(*)')
+    .select('*, user_shows!inner(*)')
+    .eq('user_shows.user_id', userId)
 
   if (!showArchived) {
     // Only show non-archived shows
     query = query.not('user_shows.archived', 'eq', true)
-    // Also include shows without user_shows entry (archived defaults to false)
   }
 
   const { data, error } = await query
+
+  console.log('🔍 [fetchShows] Query result:', { dataLength: data?.length, error: error?.message })
 
   if (error) throw new Error(`Failed to fetch shows: ${error.message}`)
   if (!data) return []
 
   let result = data.map(mapRow)
+
+  console.log('🔍 [fetchShows] After mapping:', { count: result.length, watchlist: result.filter(s => s.is_watchlist).length })
 
   // Filter: if not showing archived, exclude archived
   if (!showArchived) {
@@ -85,6 +98,7 @@ async function fetchShows(showArchived: boolean, queryClient?: QueryClient): Pro
       .from('user_episodes')
       .select('show_id')
       .eq('watched', true)
+      .eq('user_id', userId)
       .in('show_id', showIds)
 
     const counts = new Map<string, number>()
@@ -98,10 +112,13 @@ async function fetchShows(showArchived: boolean, queryClient?: QueryClient): Pro
       const newCount = Math.max(show.episodes_seen, actual)
       if (newCount !== show.episodes_seen) {
         show.episodes_seen = newCount
+        // Wrap in Promise.resolve to handle PromiseLike from Postgrest
         updates.push(
-          supabase
-            .from('user_shows')
-            .upsert({ show_id: show.id, episodes_seen: newCount, is_following: true }, { onConflict: 'show_id' })
+          Promise.resolve(
+            supabase
+              .from('user_shows')
+              .upsert({ show_id: show.id, episodes_seen: newCount, is_following: true, user_id: userId }, { onConflict: 'show_id,user_id' })
+          ).then((r) => ({ error: r.error }))
         )
       }
     }
@@ -110,7 +127,7 @@ async function fetchShows(showArchived: boolean, queryClient?: QueryClient): Pro
 
       // Also patch the continue-watching cache so the UI is consistent
       if (queryClient) {
-        const cwCached = queryClient.getQueryData<ShowWithUserData[]>(showKeys.continueWatching)
+        const cwCached = queryClient.getQueryData<ShowWithUserData[]>(showKeys.continueWatching(userId))
         if (cwCached) {
           const cwMap = new Map(result.map((s) => [s.id, s.episodes_seen]))
           let changed = false
@@ -123,7 +140,7 @@ async function fetchShows(showArchived: boolean, queryClient?: QueryClient): Pro
             return s
           })
           if (changed) {
-            queryClient.setQueryData(showKeys.continueWatching, updated)
+            queryClient.setQueryData(showKeys.continueWatching(userId), updated)
           }
         }
       }
@@ -135,24 +152,34 @@ async function fetchShows(showArchived: boolean, queryClient?: QueryClient): Pro
 }
 
 export function useShows(showArchived: boolean) {
+  const { user } = useAuth()
   const queryClient = useQueryClient()
 
   return useQuery({
-    queryKey: showKeys.list(showArchived),
-    queryFn: ({ queryKey }) => fetchShows(showArchived, queryClient),
+    queryKey: showKeys.list(showArchived, user?.id ?? ''),
+    queryFn: ({ queryKey }) => {
+      const [, , { showArchived: archived }] = queryKey as unknown as [string, string, { showArchived: boolean; userId: string }]
+      return fetchShows(archived, user?.id ?? '', queryClient)
+    },
     staleTime: 1000 * 60 * 2, // 2 min
+    enabled: !!user,
   })
 }
 
 // ── Fetch single show by ID ──
 
-async function fetchShow(id: string, queryClient?: QueryClient): Promise<ShowWithUserData | null> {
+async function fetchShow(
+  id: string,
+  userId: string,
+  queryClient?: QueryClient
+): Promise<ShowWithUserData | null> {
   // Support both UUID and TMDb ID lookups
   const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)
 
   let query = supabase
     .from('shows')
-    .select('*, user_shows(*)')
+    .select('*, user_shows!inner(*)')
+    .eq('user_shows.user_id', userId)
 
   if (isUuid) {
     query = query.eq('id', id)
@@ -176,36 +203,40 @@ async function fetchShow(id: string, queryClient?: QueryClient): Promise<ShowWit
     .from('user_episodes')
     .select('*', { count: 'exact', head: true })
     .eq('show_id', data.id)
+    .eq('user_id', userId)
     .eq('watched', true)
 
   const count = rawCount ?? 0
 
-  if (data.user_shows) {
-    const newCount = Math.max(data.user_shows.episodes_seen ?? 0, count)
-    if (newCount !== data.user_shows.episodes_seen) {
+  const usDetail = Array.isArray(data.user_shows) ? (data.user_shows[0] ?? {}) : (data.user_shows ?? {})
+  if (usDetail) {
+    const newCount = Math.max(usDetail.episodes_seen ?? 0, count)
+    if (newCount !== usDetail.episodes_seen) {
       await supabase
         .from('user_shows')
         .update({ episodes_seen: newCount })
         .eq('show_id', data.id)
-      data.user_shows.episodes_seen = newCount
+        .eq('user_id', userId)
+      usDetail.episodes_seen = newCount
+      data.user_shows = usDetail
 
       // Propagate the fix to all cached list copies
       if (queryClient) {
         for (const archived of [true, false]) {
-          const cached = queryClient.getQueryData<ShowWithUserData[]>(showKeys.list(archived))
+          const cached = queryClient.getQueryData<ShowWithUserData[]>(showKeys.list(archived, userId))
           if (cached) {
             const updated = cached.map((s) =>
               s.id === data.id ? { ...s, episodes_seen: newCount } : s
             )
-            queryClient.setQueryData(showKeys.list(archived), updated)
+            queryClient.setQueryData(showKeys.list(archived, userId), updated)
           }
         }
-        const cwCached = queryClient.getQueryData<ShowWithUserData[]>(showKeys.continueWatching)
+        const cwCached = queryClient.getQueryData<ShowWithUserData[]>(showKeys.continueWatching(userId))
         if (cwCached) {
           const updated = cwCached.map((s) =>
             s.id === data.id ? { ...s, episodes_seen: newCount } : s
           )
-          queryClient.setQueryData(showKeys.continueWatching, updated)
+          queryClient.setQueryData(showKeys.continueWatching(userId), updated)
         }
       }
     }
@@ -215,20 +246,23 @@ async function fetchShow(id: string, queryClient?: QueryClient): Promise<ShowWit
 }
 
 export function useShow(id: string) {
+  const { user } = useAuth()
   const queryClient = useQueryClient()
 
   return useQuery({
-    queryKey: ['shows', 'detail', id],
-    queryFn: () => fetchShow(id, queryClient),
+    queryKey: showKeys.detail(id),
+    queryFn: () => fetchShow(id, user?.id ?? '', queryClient),
     staleTime: 1000 * 60 * 2,
+    enabled: !!user,
     // Use placeholderData (not initialData) so the query stays in pending state
     // when no cache is available — avoids React Query v5 treating undefined
     // initialData as a "success" state with no data.
     placeholderData: () => {
+      if (!user) return undefined
       // Check both archived filter states
       for (const archived of [true, false]) {
         const cached = queryClient.getQueryData<ShowWithUserData[]>(
-          showKeys.list(archived)
+          showKeys.list(archived, user.id)
         )
         if (cached) {
           const found = cached.find((s) => s.id === id)
@@ -237,7 +271,7 @@ export function useShow(id: string) {
       }
       // Also check continue watching cache
       const cwCached = queryClient.getQueryData<ShowWithUserData[]>(
-        showKeys.continueWatching
+        showKeys.continueWatching(user.id)
       )
       if (cwCached) {
         const found = cwCached.find((s) => s.id === id)
@@ -266,10 +300,11 @@ function sortShows(shows: ShowWithUserData[]): ShowWithUserData[] {
 
 // ── Fetch continue-watching shows ──
 
-async function fetchContinueWatching(): Promise<ShowWithUserData[]> {
+async function fetchContinueWatching(userId: string): Promise<ShowWithUserData[]> {
   const { data, error } = await supabase
     .from('shows')
-    .select('*, user_shows(*)')
+    .select('*, user_shows!inner(*)')
+    .eq('user_shows.user_id', userId)
     .not('user_shows.last_watched_episode_data', 'is', null)
     .not('user_shows.archived', 'eq', true)
     .order('name', { ascending: true })
@@ -290,6 +325,7 @@ async function fetchContinueWatching(): Promise<ShowWithUserData[]> {
       .from('user_episodes')
       .select('show_id')
       .eq('watched', true)
+      .eq('user_id', userId)
       .in('show_id', showIds)
 
     const counts = new Map<string, number>()
@@ -304,7 +340,7 @@ async function fetchContinueWatching(): Promise<ShowWithUserData[]> {
         show.episodes_seen = newCount
         supabase
           .from('user_shows')
-          .upsert({ show_id: show.id, episodes_seen: newCount, is_following: true }, { onConflict: 'show_id' })
+          .upsert({ show_id: show.id, episodes_seen: newCount, is_following: true, user_id: userId }, { onConflict: 'show_id,user_id' })
           .then() // fire-and-forget, no await
       }
     }
@@ -324,21 +360,25 @@ async function fetchContinueWatching(): Promise<ShowWithUserData[]> {
 }
 
 export function useContinueWatching() {
+  const { user } = useAuth()
+
   return useQuery({
-    queryKey: showKeys.continueWatching,
-    queryFn: fetchContinueWatching,
+    queryKey: showKeys.continueWatching(user?.id ?? ''),
+    queryFn: () => fetchContinueWatching(user?.id ?? ''),
     staleTime: 1000 * 60 * 2,
+    enabled: !!user,
   })
 }
 
 // ── Mark next episode as watched ──
 
-async function markEpisodeWatched(showId: string): Promise<void> {
+async function markEpisodeWatched(showId: string, userId: string): Promise<void> {
   // 1. Get current episodes_seen
   const { data: us, error: fetchError } = await supabase
     .from('user_shows')
     .select('episodes_seen')
     .eq('show_id', showId)
+    .eq('user_id', userId)
     .single()
 
   if (fetchError && fetchError.code !== 'PGRST116') {
@@ -350,14 +390,15 @@ async function markEpisodeWatched(showId: string): Promise<void> {
   // 2. Increment episodes_seen
   const { error: updateError } = await supabase
     .from('user_shows')
-    .upsert(
-      {
-        show_id: showId,
-        episodes_seen: currentSeen + 1,
-        is_following: true,
-      },
-      { onConflict: 'show_id' }
-    )
+      .upsert(
+        {
+          show_id: showId,
+          user_id: userId,
+          episodes_seen: currentSeen + 1,
+          is_following: true,
+        },
+        { onConflict: 'show_id,user_id' }
+      )
 
   if (updateError) throw new Error(`Failed to update episodes_seen: ${updateError.message}`)
 
@@ -366,6 +407,7 @@ async function markEpisodeWatched(showId: string): Promise<void> {
   //    Later when we have the episodes table populated, we can reconcile.
   const { error: insertError } = await supabase.from('user_episodes').insert({
     show_id: showId,
+    user_id: userId,
     season_number: 0,
     episode_number: currentSeen + 1,
     watched: true,
@@ -379,10 +421,11 @@ async function markEpisodeWatched(showId: string): Promise<void> {
 }
 
 export function useMarkWatched() {
+  const { user } = useAuth()
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: (showId: string) => markEpisodeWatched(showId),
+    mutationFn: (showId: string) => markEpisodeWatched(showId, user?.id ?? ''),
     onSuccess: () => {
       // Invalidate all shows queries to refresh
       queryClient.invalidateQueries({ queryKey: showKeys.all })
@@ -392,11 +435,12 @@ export function useMarkWatched() {
 
 // ── Toggle favorite ──
 
-async function toggleFavorite(showId: string): Promise<void> {
+async function toggleFavorite(showId: string, userId: string): Promise<void> {
   const { data: us } = await supabase
     .from('user_shows')
     .select('is_favorited')
     .eq('show_id', showId)
+    .eq('user_id', userId)
     .single()
 
   const current = us?.is_favorited ?? false
@@ -405,13 +449,15 @@ async function toggleFavorite(showId: string): Promise<void> {
     .from('user_shows')
     .update({ is_favorited: !current })
     .eq('show_id', showId)
+    .eq('user_id', userId)
 }
 
 export function useToggleFavorite() {
+  const { user } = useAuth()
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: (showId: string) => toggleFavorite(showId),
+    mutationFn: (showId: string) => toggleFavorite(showId, user?.id ?? ''),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: showKeys.all })
     },
@@ -420,11 +466,12 @@ export function useToggleFavorite() {
 
 // ── Toggle archive ──
 
-async function toggleArchive(showId: string): Promise<void> {
+async function toggleArchive(showId: string, userId: string): Promise<void> {
   const { data: us } = await supabase
     .from('user_shows')
     .select('archived')
     .eq('show_id', showId)
+    .eq('user_id', userId)
     .single()
 
   const current = us?.archived ?? false
@@ -433,13 +480,15 @@ async function toggleArchive(showId: string): Promise<void> {
     .from('user_shows')
     .update({ archived: !current })
     .eq('show_id', showId)
+    .eq('user_id', userId)
 }
 
 export function useToggleArchive() {
+  const { user } = useAuth()
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: (showId: string) => toggleArchive(showId),
+    mutationFn: (showId: string) => toggleArchive(showId, user?.id ?? ''),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: showKeys.all })
     },

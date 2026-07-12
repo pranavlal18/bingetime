@@ -57,3 +57,4 @@ data/
 assets/csv/*
 .claude/
 .stitch/
+supabase/migrations/*

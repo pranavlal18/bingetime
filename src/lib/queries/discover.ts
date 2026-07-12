@@ -2,6 +2,7 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
+import { useAuth } from '@/contexts/AuthContext'
 import * as tmdb from '@/lib/tmdb'
 
 // ── Unified result type for the Discover tab ──
@@ -23,9 +24,8 @@ export interface DiscoverResult {
 
 export const discoverKeys = {
   all: ['discover'] as const,
-  trending: (filter: MediaFilter) => ['discover', 'trending', { filter }] as const,
-  search: (query: string, filter: MediaFilter) => ['discover', 'search', { query, filter }] as const,
-  checkLibrary: ['discover', 'library'] as const,
+  trending: (filter: MediaFilter, userId: string) => ['discover', 'trending', { filter, userId }] as const,
+  search: (query: string, filter: MediaFilter, userId: string) => ['discover', 'search', { query, filter, userId }] as const,
 }
 
 // ── Helpers ──
@@ -45,25 +45,30 @@ function mapResult(item: any): DiscoverResult {
   }
 }
 
-async function enrichWithLibraryStatus(results: DiscoverResult[]): Promise<DiscoverResult[]> {
-  if (results.length === 0) return []
+async function enrichWithLibraryStatus(
+  results: DiscoverResult[],
+  userId: string
+): Promise<DiscoverResult[]> {
+  if (results.length === 0 || !userId) return []
 
   const tmdbIds = results.map((r) => r.tmdbId)
 
-  // Check shows by tmdb_id — only include items with is_watchlist: true
+  // Check shows by tmdb_id — only include items with is_watchlist: true for this user
   const { data: existingShows } = await supabase
     .from('shows')
     .select('id, tmdb_id, user_shows!inner(is_watchlist)')
     .in('tmdb_id', tmdbIds)
     .not('tmdb_id', 'is', null)
+    .eq('user_shows.user_id', userId)
     .eq('user_shows.is_watchlist', true)
 
-  // Check movies by tmdb_id — only include items with is_watchlist: true
+  // Check movies by tmdb_id — only include items with is_watchlist: true for this user
   const { data: existingMovies } = await supabase
     .from('movies')
     .select('id, tmdb_id, user_movies!inner(is_watchlist)')
     .in('tmdb_id', tmdbIds)
     .not('tmdb_id', 'is', null)
+    .eq('user_movies.user_id', userId)
     .eq('user_movies.is_watchlist', true)
 
   // Build lookup maps
@@ -88,7 +93,7 @@ async function enrichWithLibraryStatus(results: DiscoverResult[]): Promise<Disco
 
 // ── Fetch trending ──
 
-async function fetchTrending(filter: MediaFilter): Promise<DiscoverResult[]> {
+async function fetchTrending(filter: MediaFilter, userId: string): Promise<DiscoverResult[]> {
   let results: DiscoverResult[] = []
 
   if (filter === 'all' || filter === 'tv') {
@@ -100,20 +105,27 @@ async function fetchTrending(filter: MediaFilter): Promise<DiscoverResult[]> {
     results.push(...movieData.results.map(mapResult))
   }
 
-  return enrichWithLibraryStatus(results)
+  return enrichWithLibraryStatus(results, userId)
 }
 
 export function useTrending(filter: MediaFilter) {
+  const { user } = useAuth()
+
   return useQuery({
-    queryKey: discoverKeys.trending(filter),
-    queryFn: () => fetchTrending(filter),
+    queryKey: discoverKeys.trending(filter, user?.id ?? ''),
+    queryFn: () => fetchTrending(filter, user?.id ?? ''),
     staleTime: 1000 * 60 * 10, // 10 min — trending changes slowly
+    enabled: !!user,
   })
 }
 
 // ── Search ──
 
-async function fetchSearch(query: string, filter: MediaFilter): Promise<DiscoverResult[]> {
+async function fetchSearch(
+  query: string,
+  filter: MediaFilter,
+  userId: string
+): Promise<DiscoverResult[]> {
   if (!query.trim()) return []
 
   let results: DiscoverResult[] = []
@@ -131,14 +143,16 @@ async function fetchSearch(query: string, filter: MediaFilter): Promise<Discover
     results = raw.map((item: any) => mapResult({ ...item, media_type: 'movie' }))
   }
 
-  return enrichWithLibraryStatus(results)
+  return enrichWithLibraryStatus(results, userId)
 }
 
 export function useSearch(query: string, filter: MediaFilter) {
+  const { user } = useAuth()
+
   return useQuery({
-    queryKey: discoverKeys.search(query, filter),
-    queryFn: () => fetchSearch(query, filter),
-    enabled: query.trim().length > 0,
+    queryKey: discoverKeys.search(query, filter, user?.id ?? ''),
+    queryFn: () => fetchSearch(query, filter, user?.id ?? ''),
+    enabled: !!user && query.trim().length > 0,
     staleTime: 1000 * 60 * 5,
   })
 }
@@ -146,66 +160,81 @@ export function useSearch(query: string, filter: MediaFilter) {
 // ── Add to library ──
 
 export function useAddToLibrary() {
+  const { user } = useAuth()
   const queryClient = useQueryClient()
 
   return useMutation({
     mutationFn: async (item: DiscoverResult) => {
+      if (!user) throw new Error('Not authenticated')
       if (item.mediaType === 'tv') {
-        return addShowToLibrary(item)
+        return addShowToLibrary(item, user.id)
       }
-      return addMovieToLibrary(item)
+      return addMovieToLibrary(item, user.id)
     },
-    onSuccess: () => {
+    onSuccess: (libraryId) => {
+      console.log('✅ [useAddToLibrary] Added to library:', libraryId)
       // Refresh discover (library status) and profile (watchlist)
       queryClient.invalidateQueries({ queryKey: discoverKeys.all })
       queryClient.invalidateQueries({ queryKey: ['movies'] })
       queryClient.invalidateQueries({ queryKey: ['shows'] })
       queryClient.invalidateQueries({ queryKey: ['profile'] })
     },
+    onError: (error) => {
+      console.error('❌ [useAddToLibrary] Error:', error.message)
+    },
   })
 }
 
 export function useRemoveFromLibrary() {
+  const { user } = useAuth()
   const queryClient = useQueryClient()
 
   return useMutation({
     mutationFn: async (item: DiscoverResult) => {
+      if (!user) throw new Error('Not authenticated')
       if (!item.libraryId) return
       if (item.mediaType === 'tv') {
-        return removeShowFromLibrary(item.libraryId)
+        return removeShowFromLibrary(item.libraryId, user.id)
       }
-      return removeMovieFromLibrary(item.libraryId)
+      return removeMovieFromLibrary(item.libraryId, user.id)
     },
     onSuccess: () => {
+      console.log('✅ [useRemoveFromLibrary] Removed from library')
       queryClient.invalidateQueries({ queryKey: discoverKeys.all })
       queryClient.invalidateQueries({ queryKey: ['movies'] })
       queryClient.invalidateQueries({ queryKey: ['shows'] })
       queryClient.invalidateQueries({ queryKey: ['profile'] })
     },
+    onError: (error) => {
+      console.error('❌ [useRemoveFromLibrary] Error:', error.message)
+    },
   })
 }
 
-async function removeShowFromLibrary(showId: string) {
+async function removeShowFromLibrary(showId: string, userId: string) {
   const { error } = await supabase
     .from('user_shows')
     .update({ is_watchlist: false })
     .eq('show_id', showId)
+    .eq('user_id', userId)
   if (error) throw new Error(`Failed to remove show: ${error.message}`)
 }
 
-async function removeMovieFromLibrary(movieId: string) {
+async function removeMovieFromLibrary(movieId: string, userId: string) {
   const { error } = await supabase
     .from('user_movies')
     .update({ is_watchlist: false })
     .eq('movie_id', movieId)
+    .eq('user_id', userId)
   if (error) throw new Error(`Failed to remove movie: ${error.message}`)
 }
 
-async function addShowToLibrary(item: DiscoverResult): Promise<string> {
+async function addShowToLibrary(item: DiscoverResult, userId: string): Promise<string> {
   // 1. Get TVDB ID from TMDb
   const external = await tmdb.getExternalIds(item.tmdbId, 'tv')
 
   // 2. Upsert show record (tvdb_id is unique NOT NULL)
+  console.log('🔍 [addShowToLibrary] Upserting show:', { tmdbId: item.tmdbId, tvdbId: external.tvdb_id, title: item.title })
   const { data: show, error: showError } = await supabase
     .from('shows')
     .upsert(
@@ -221,25 +250,36 @@ async function addShowToLibrary(item: DiscoverResult): Promise<string> {
     .select('id')
     .single()
 
-  if (showError) throw new Error(`Failed to add show: ${showError.message}`)
-  const showId = show.id
+  if (showError) {
+    console.error('🔍 [addShowToLibrary] Show upsert failed:', showError)
+    throw new Error(`Failed to add show: ${showError.message}`)
+  }
+  console.log('🔍 [addShowToLibrary] Show upserted:', { showId: show?.id })
+  const showId = show?.id
 
   // 3. Upsert into user_shows (mark as following + watchlist)
+  console.log('🔍 [addShowToLibrary] Upserting user_shows:', { showId, is_watchlist: true })
   const { error: usError } = await supabase.from('user_shows').upsert(
     {
       show_id: showId,
+      user_id: userId,
       is_following: true,
       is_watchlist: true,
     },
-    { onConflict: 'show_id' }
+    { onConflict: 'show_id,user_id' }
   )
-  if (usError) throw new Error(`Failed to add show to library: ${usError.message}`)
+  if (usError) {
+    console.error('🔍 [addShowToLibrary] user_shows upsert failed:', usError)
+    throw new Error(`Failed to add show to library: ${usError.message}`)
+  }
+  console.log('🔍 [addShowToLibrary] Success')
 
   return showId
 }
 
-async function addMovieToLibrary(item: DiscoverResult): Promise<string> {
+async function addMovieToLibrary(item: DiscoverResult, userId: string): Promise<string> {
   // 1. Upsert movie record
+  console.log('🔍 [addMovieToLibrary] Upserting movie:', { tmdbId: item.tmdbId, title: item.title })
   const { data: movie, error: movieError } = await supabase
     .from('movies')
     .upsert(
@@ -254,18 +294,28 @@ async function addMovieToLibrary(item: DiscoverResult): Promise<string> {
     .select('id')
     .single()
 
-  if (movieError) throw new Error(`Failed to add movie: ${movieError.message}`)
-  const movieId = movie.id
+  if (movieError) {
+    console.error('🔍 [addMovieToLibrary] Movie upsert failed:', movieError)
+    throw new Error(`Failed to add movie: ${movieError.message}`)
+  }
+  console.log('🔍 [addMovieToLibrary] Movie upserted:', { movieId: movie?.id })
+  const movieId = movie?.id
 
   // 2. Upsert into user_movies (mark as watchlist)
+  console.log('🔍 [addMovieToLibrary] Upserting user_movies:', { movieId, is_watchlist: true })
   const { error: umError } = await supabase.from('user_movies').upsert(
     {
       movie_id: movieId,
+      user_id: userId,
       is_watchlist: true,
     },
-    { onConflict: 'movie_id' }
+    { onConflict: 'movie_id,user_id' }
   )
-  if (umError) throw new Error(`Failed to add movie to library: ${umError.message}`)
+  if (umError) {
+    console.error('🔍 [addMovieToLibrary] user_movies upsert failed:', umError)
+    throw new Error(`Failed to add movie to library: ${umError.message}`)
+  }
+  console.log('🔍 [addMovieToLibrary] Success')
 
   return movieId
 }

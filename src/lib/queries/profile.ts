@@ -2,7 +2,7 @@
 
 import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
-import { getImageUrl } from '@/lib/tmdb'
+import { useAuth } from '@/contexts/AuthContext'
 import { useAppStore } from '@/stores/appStore'
 import type { Show, UserShow, Movie, UserMovie, List } from '@/types'
 
@@ -35,18 +35,18 @@ export interface WatchlistMovie extends Movie {
 // ── Query keys ──
 
 export const profileKeys = {
-  stats: ['profile', 'stats'] as const,
-  favorites: ['profile', 'favorites'] as const,
-  watchlist: ['profile', 'watchlist'] as const,
-  lists: ['profile', 'lists'] as const,
+  stats: (userId: string) => ['profile', 'stats', userId] as const,
+  favorites: (userId: string) => ['profile', 'favorites', userId] as const,
+  watchlist: (userId: string) => ['profile', 'watchlist', userId] as const,
+  lists: (userId: string) => ['profile', 'lists', userId] as const,
 }
 
 // ── Fetch stats ──
 
-async function fetchStats(): Promise<ProfileStats> {
+async function fetchStats(userId: string): Promise<ProfileStats> {
   const [showsResult, moviesResult, listsResult] = await Promise.all([
-    supabase.from('user_shows').select('episodes_seen, is_favorited, is_watchlist'),
-    supabase.from('user_movies').select('watched, is_watchlist'),
+    supabase.from('user_shows').select('episodes_seen, is_favorited, is_watchlist').eq('user_id', userId),
+    supabase.from('user_movies').select('watched, is_watchlist').eq('user_id', userId),
     supabase.from('lists').select('id', { count: 'exact', head: true }),
   ])
 
@@ -78,19 +78,23 @@ async function fetchStats(): Promise<ProfileStats> {
 }
 
 export function useProfileStats() {
+  const { user } = useAuth()
+
   return useQuery({
-    queryKey: profileKeys.stats,
-    queryFn: fetchStats,
+    queryKey: profileKeys.stats(user?.id ?? ''),
+    queryFn: () => fetchStats(user?.id ?? ''),
     staleTime: 1000 * 60 * 5,
+    enabled: !!user,
   })
 }
 
 // ── Fetch favorites ──
 
-async function fetchFavorites(): Promise<FavoriteShow[]> {
+async function fetchFavorites(userId: string): Promise<FavoriteShow[]> {
   const { data, error } = await supabase
     .from('user_shows')
     .select('episodes_seen, shows(*)')
+    .eq('user_id', userId)
     .eq('is_favorited', true)
 
   if (error) throw new Error(error.message)
@@ -113,19 +117,23 @@ async function fetchFavorites(): Promise<FavoriteShow[]> {
 }
 
 export function useFavorites() {
+  const { user } = useAuth()
+
   return useQuery({
-    queryKey: profileKeys.favorites,
-    queryFn: fetchFavorites,
+    queryKey: profileKeys.favorites(user?.id ?? ''),
+    queryFn: () => fetchFavorites(user?.id ?? ''),
     staleTime: 1000 * 60 * 5,
+    enabled: !!user,
   })
 }
 
 // ── Fetch watchlist ──
 
-async function fetchWatchlistShows(): Promise<WatchlistShow[]> {
+async function fetchWatchlistShows(userId: string): Promise<WatchlistShow[]> {
   const { data, error } = await supabase
     .from('user_shows')
     .select('episodes_seen, shows(*)')
+    .eq('user_id', userId)
     .eq('is_watchlist', true)
 
   if (error) throw new Error(error.message)
@@ -147,10 +155,11 @@ async function fetchWatchlistShows(): Promise<WatchlistShow[]> {
   })
 }
 
-async function fetchWatchlistMovies(): Promise<WatchlistMovie[]> {
+async function fetchWatchlistMovies(userId: string): Promise<WatchlistMovie[]> {
   const { data, error } = await supabase
     .from('user_movies')
     .select('watched, movies(*)')
+    .eq('user_id', userId)
     .eq('is_watchlist', true)
 
   if (error) throw new Error(error.message)
@@ -171,16 +180,20 @@ async function fetchWatchlistMovies(): Promise<WatchlistMovie[]> {
 }
 
 export function useWatchlist() {
+  const { user } = useAuth()
+
   return useQuery({
-    queryKey: profileKeys.watchlist,
+    queryKey: profileKeys.watchlist(user?.id ?? ''),
     queryFn: async () => {
+      if (!user) return { shows: [], movies: [] }
       const [shows, movies] = await Promise.all([
-        fetchWatchlistShows(),
-        fetchWatchlistMovies(),
+        fetchWatchlistShows(user.id),
+        fetchWatchlistMovies(user.id),
       ])
       return { shows, movies }
     },
     staleTime: 1000 * 60 * 5,
+    enabled: !!user,
   })
 }
 
@@ -197,26 +210,32 @@ async function fetchLists(): Promise<List[]> {
 }
 
 export function useCustomLists() {
+  const { user } = useAuth()
+
   return useQuery({
-    queryKey: profileKeys.lists,
+    queryKey: profileKeys.lists(user?.id ?? ''),
     queryFn: fetchLists,
     staleTime: 1000 * 60 * 5,
+    enabled: !!user,
   })
 }
 
-// ── Mark show watched (reuse from shows.ts) ──
+// ── Mark show watched ──
 
 export function useMarkWatched() {
+  const { user } = useAuth()
   const queryClient = useQueryClient()
   const setImportStarted = useAppStore((s) => s.setImportStarted)
 
   return useMutation({
     mutationFn: async (showId: string) => {
+      if (!user) throw new Error('Not authenticated')
       // Increment episodes_seen
       const { data: current } = await supabase
         .from('user_shows')
         .select('episodes_seen')
         .eq('show_id', showId)
+        .eq('user_id', user.id)
         .single()
 
       const newCount = (current?.episodes_seen ?? 0) + 1
@@ -226,10 +245,11 @@ export function useMarkWatched() {
         .upsert(
           {
             show_id: showId,
+            user_id: user.id,
             episodes_seen: newCount,
             updated_at: new Date().toISOString(),
           },
-          { onConflict: 'show_id' }
+          { onConflict: 'show_id,user_id' }
         )
 
       if (error) throw new Error(error.message)

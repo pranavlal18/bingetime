@@ -10,12 +10,14 @@ import {
   ActivityIndicator,
   Switch,
   Dimensions,
+  Alert,
 } from 'react-native'
 import { Image } from 'expo-image'
 import { Ionicons } from '@expo/vector-icons'
 import { router } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useAppStore } from '@/stores/appStore'
+import { useAuth } from '@/contexts/AuthContext'
 import { getImageUrl } from '@/lib/tmdb'
 import { useShows } from '@/lib/queries/shows'
 import { useMovies } from '@/lib/queries/movies'
@@ -37,6 +39,15 @@ const SIDE_OFFSET = 20
 
 function formatNumber(n: number): string {
   return n.toLocaleString('en-US')
+}
+
+function getInitials(email: string): string {
+  return email
+    .split('@')[0]
+    .split('.')
+    .map((part) => part[0]?.toUpperCase())
+    .slice(0, 2)
+    .join('')
 }
 
 // ── Stat Card (Bento style) ──
@@ -201,6 +212,8 @@ export default function ProfileScreen() {
   const toggleShowArchived = useAppStore((s) => s.toggleShowArchived)
   const setImportComplete = useAppStore((s) => s.setImportComplete)
 
+  const { user, signOut, loading: authLoading } = useAuth()
+
   const { data: stats, isLoading: statsLoading } = useProfileStats()
   const { data: shows, isLoading: showsLoading } = useShows(showArchived)
   const { data: movies, isLoading: moviesLoading } = useMovies()
@@ -220,7 +233,7 @@ export default function ProfileScreen() {
     return movies.filter((m) => m.watched)
   }, [movies])
 
-  const isLoading_ = statsLoading || showsLoading || moviesLoading
+  const isLoading_ = statsLoading || showsLoading || moviesLoading || authLoading
 
   // ── Loading ──
   if (isLoading_) {
@@ -229,6 +242,18 @@ export default function ProfileScreen() {
         <ActivityIndicator size="large" color={colors.primary} />
       </View>
     )
+  }
+
+  const handleSignOut = async () => {
+    Alert.alert('Sign out', 'Are you sure you want to sign out?', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Sign out', style: 'destructive', onPress: () => signOut() },
+    ])
+  }
+
+  const handleImport = () => {
+    setImportComplete(false)
+    router.push('/import')
   }
 
   return (
@@ -241,11 +266,11 @@ export default function ProfileScreen() {
         <View style={styles.userHeader}>
           <View style={styles.avatarRing}>
             <View style={styles.avatarContainer}>
-              <Text style={styles.avatarInitials}>AT</Text>
+              <Text style={styles.avatarInitials}>{user ? getInitials(user.email || '') : 'AT'}</Text>
             </View>
           </View>
-          <Text style={styles.userName}>Alex Thorne</Text>
-          <Text style={styles.userBadge}>Premium Member</Text>
+          <Text style={styles.userName}>{user?.email?.split('@')[0] || 'Alex Thorne'}</Text>
+          <Text style={styles.userBadge}>{user?.email || 'Premium Member'}</Text>
         </View>
 
         {/* ── Bento Stats Grid ── */}
@@ -324,14 +349,21 @@ export default function ProfileScreen() {
           />
           <SettingsRow
             icon="sync-outline"
-            label="Import/Export"
-            onPress={() => setImportComplete(false)}
+            label="Import TV Time Data"
+            onPress={handleImport}
           />
           <SettingsToggle
             icon="archive-outline"
             label="Archived Shows"
             value={showArchived}
             onValueChange={toggleShowArchived}
+          />
+          <SettingsRow
+            icon="log-out-outline"
+            label="Sign Out"
+            rightLabel=""
+            showChevron={false}
+            onPress={handleSignOut}
           />
         </View>
 

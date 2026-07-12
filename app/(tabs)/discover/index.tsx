@@ -12,6 +12,7 @@ import {
   RefreshControl,
   ScrollView,
   Keyboard,
+  Alert,
 } from 'react-native'
 import { FlashList } from '@shopify/flash-list'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -82,6 +83,13 @@ export default function DiscoverScreen() {
     (item: DiscoverResult) => {
       setAddingIds((prev) => new Set(prev).add(item.tmdbId))
       addMutation.mutate(item, {
+        onSuccess: () => {
+          console.log('✅ [DiscoverScreen] Add mutation succeeded')
+        },
+        onError: (error: Error) => {
+          console.error('❌ [DiscoverScreen] Add error:', error.message)
+          Alert.alert('Failed to add', error.message)
+        },
         onSettled: () => {
           setAddingIds((prev) => {
             const next = new Set(prev)
@@ -98,6 +106,13 @@ export default function DiscoverScreen() {
     (item: DiscoverResult) => {
       setRemovingIds((prev) => new Set(prev).add(item.tmdbId))
       removeMutation.mutate(item, {
+        onSuccess: () => {
+          console.log('✅ [DiscoverScreen] Remove mutation succeeded')
+        },
+        onError: (error: Error) => {
+          console.error('❌ [DiscoverScreen] Remove error:', error.message)
+          Alert.alert('Failed to remove', error.message)
+        },
         onSettled: () => {
           setRemovingIds((prev) => {
             const next = new Set(prev)

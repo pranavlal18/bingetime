@@ -3,8 +3,9 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import { getSeasonDetails } from '@/lib/tmdb'
+import { useAuth } from '@/contexts/AuthContext'
 import type { TMDbSeasonDetails } from '@/types'
-import type { ShowWithUserData } from './shows'
+import { showKeys, type ShowWithUserData } from './shows'
 
 // ── Types ──
 
@@ -29,8 +30,8 @@ export interface SeasonWithEpisodes {
 
 export const episodeKeys = {
   all: ['episodes'] as const,
-  season: (showId: string, tmdbId: number | null, seasonNumber: number) =>
-    ['episodes', 'season', showId, tmdbId, seasonNumber] as const,
+  season: (showId: string, tmdbId: number | null, seasonNumber: number, userId: string) =>
+    ['episodes', 'season', showId, tmdbId, seasonNumber, userId] as const,
 }
 
 // ── Fetch season episodes + user watch status ──
@@ -38,7 +39,8 @@ export const episodeKeys = {
 async function fetchSeasonEpisodes(
   showId: string,
   tmdbId: number | null,
-  seasonNumber: number
+  seasonNumber: number,
+  userId: string
 ): Promise<SeasonWithEpisodes> {
   // 1. Get TMDb season data
   let tmdbData: TMDbSeasonDetails | null = null
@@ -59,6 +61,7 @@ async function fetchSeasonEpisodes(
       .select('season_number, episode_number, watched, watched_at')
       .eq('show_id', showId)
       .eq('season_number', seasonNumber)
+      .eq('user_id', userId)
 
     if (userEpisodes) {
       for (const ep of userEpisodes) {
@@ -101,45 +104,52 @@ export function useSeasonEpisodes(
   tmdbId: number | null,
   seasonNumber: number
 ) {
+  const { user } = useAuth()
+
   return useQuery({
-    queryKey: episodeKeys.season(showId, tmdbId, seasonNumber),
-    queryFn: () => fetchSeasonEpisodes(showId, tmdbId, seasonNumber),
-    enabled: !!showId || !!tmdbId,
+    queryKey: episodeKeys.season(showId, tmdbId, seasonNumber, user?.id ?? ''),
+    queryFn: () => fetchSeasonEpisodes(showId, tmdbId, seasonNumber, user?.id ?? ''),
+    enabled: !!user && (!!showId || !!tmdbId),
     staleTime: 1000 * 60 * 5,
   })
 }
 
 // ── Toggle episode watched status ──
 
-async function updateEpisodesSeen(showId: string, delta: number): Promise<void> {
-  // Fetch current count from user_shows + total_episodes from shows
-  const [usResult, showResult] = await Promise.all([
-    supabase
-      .from('user_shows')
-      .select('episodes_seen')
-      .eq('show_id', showId)
-      .single(),
-    supabase
-      .from('shows')
-      .select('total_episodes')
-      .eq('id', showId)
-      .single(),
-  ])
+async function updateEpisodesSeen(
+  showId: string,
+  userId: string,
+  lastWatched?: { season_number: number; episode_number: number } | null
+): Promise<void> {
+  // Count watched episodes from the source of truth
+  const { count, error: countError } = await supabase
+    .from('user_episodes')
+    .select('*', { count: 'exact', head: true })
+    .eq('show_id', showId)
+    .eq('user_id', userId)
+    .eq('watched', true)
 
-  const current = usResult.data?.episodes_seen ?? 0
-  const totalEps = showResult.data?.total_episodes ?? null
-  const newCount = Math.max(0, totalEps ? Math.min(totalEps, current + delta) : current + delta)
+  if (countError) throw new Error(`Failed to count watched episodes: ${countError.message}`)
+
+  // Build upsert payload
+  const upsertData: Record<string, unknown> = {
+    show_id: showId,
+    user_id: userId,
+    episodes_seen: count ?? 0,
+    is_following: true,
+  }
+
+  if (lastWatched) {
+    upsertData.last_watched_episode_data = {
+      season_number: lastWatched.season_number,
+      episode_number: lastWatched.episode_number,
+      updated_at: new Date().toISOString(),
+    }
+  }
 
   const { error } = await supabase
     .from('user_shows')
-    .upsert(
-      {
-        show_id: showId,
-        episodes_seen: newCount,
-        is_following: true,
-      },
-      { onConflict: 'show_id' }
-    )
+    .upsert(upsertData, { onConflict: 'show_id,user_id' })
 
   // PGRST116 means no row returned — that's fine, we upserted
   if (error && error.code !== 'PGRST116') {
@@ -148,6 +158,7 @@ async function updateEpisodesSeen(showId: string, delta: number): Promise<void> 
 }
 
 export function useToggleEpisodeWatched() {
+  const { user } = useAuth()
   const queryClient = useQueryClient()
 
   return useMutation({
@@ -162,17 +173,20 @@ export function useToggleEpisodeWatched() {
       episodeNumber: number
       watched: boolean
     }) => {
+      if (!user) throw new Error('Not authenticated')
+
       if (watched) {
         // Mark as watched
         const { error } = await supabase.from('user_episodes').upsert(
           {
             show_id: showId,
+            user_id: user.id,
             season_number: seasonNumber,
             episode_number: episodeNumber,
             watched: true,
             watched_at: new Date().toISOString(),
           },
-          { onConflict: 'show_id, season_number, episode_number' }
+          { onConflict: 'show_id, season_number, episode_number, user_id' }
         )
         if (error) throw new Error(error.message)
       } else {
@@ -181,15 +195,18 @@ export function useToggleEpisodeWatched() {
           .from('user_episodes')
           .delete()
           .eq('show_id', showId)
+          .eq('user_id', user.id)
           .eq('season_number', seasonNumber)
           .eq('episode_number', episodeNumber)
         if (error) throw new Error(error.message)
       }
 
-      // Update user_shows.episodes_seen counter
-      await updateEpisodesSeen(showId, watched ? 1 : -1)
+      // Update user_shows.episodes_seen counter + last watched data
+      await updateEpisodesSeen(showId, user.id, watched ? { season_number: seasonNumber, episode_number: episodeNumber } : null)
     },
     onMutate: async ({ showId, watched }) => {
+      if (!user) return
+
       // Cancel refetches so optimistic write doesn't get clobbered
       await queryClient.cancelQueries({ queryKey: ['shows', 'detail', showId] })
 
@@ -216,11 +233,10 @@ export function useToggleEpisodeWatched() {
         queryClient.setQueryData(['shows', 'detail', showId], context.previousData)
       }
     },
-    onSettled: () => {
-      // Refetch to reconcile
+    onSettled: (_data, _error, { showId }) => {
+      // Refetch to reconcile — target only the affected show
+      queryClient.invalidateQueries({ queryKey: showKeys.detail(showId) })
       queryClient.invalidateQueries({ queryKey: episodeKeys.all })
-      queryClient.invalidateQueries({ queryKey: ['shows'] })
-      queryClient.invalidateQueries({ queryKey: ['profile'] })
     },
   })
 }
@@ -228,6 +244,7 @@ export function useToggleEpisodeWatched() {
 // ── Batch mark all unwatched episodes as watched ──
 
 export function useBatchMarkWatched() {
+  const { user } = useAuth()
   const queryClient = useQueryClient()
 
   return useMutation({
@@ -240,11 +257,13 @@ export function useBatchMarkWatched() {
       seasonNumber: number
       episodeNumbers: number[]
     }) => {
+      if (!user) throw new Error('Not authenticated')
       if (episodeNumbers.length === 0) return
 
       // 1. Upsert all as watched in one call
       const rows = episodeNumbers.map((ep) => ({
         show_id: showId,
+        user_id: user.id,
         season_number: seasonNumber,
         episode_number: ep,
         watched: true,
@@ -253,42 +272,43 @@ export function useBatchMarkWatched() {
 
       const { error: upsertError } = await supabase
         .from('user_episodes')
-        .upsert(rows, { onConflict: 'show_id, season_number, episode_number' })
+        .upsert(rows, { onConflict: 'show_id, season_number, episode_number, user_id' })
 
       if (upsertError) throw new Error(upsertError.message)
 
-      // 2. Update episodes_seen counter in one shot (capped at total_episodes)
-      const [usResult, showResult] = await Promise.all([
-        supabase
-          .from('user_shows')
-          .select('episodes_seen')
-          .eq('show_id', showId)
-          .single(),
-        supabase
-          .from('shows')
-          .select('total_episodes')
-          .eq('id', showId)
-          .single(),
-      ])
+      // 2. Update episodes_seen counter from the source of truth
+      const { count, error: countError } = await supabase
+        .from('user_episodes')
+        .select('*', { count: 'exact', head: true })
+        .eq('show_id', showId)
+        .eq('user_id', user.id)
+        .eq('watched', true)
 
-      const current = usResult.data?.episodes_seen ?? 0
-      const totalEps = showResult.data?.total_episodes ?? null
-      const added = totalEps ? Math.min(totalEps - current, episodeNumbers.length) : episodeNumbers.length
+      if (countError) throw new Error(`Failed to count watched episodes: ${countError.message}`)
+
+      // Build upsert payload with last watched episode data
+      const upsertData: Record<string, unknown> = {
+        show_id: showId,
+        user_id: user.id,
+        episodes_seen: count ?? 0,
+        is_following: true,
+      }
+
+      upsertData.last_watched_episode_data = {
+        season_number: seasonNumber,
+        episode_number: Math.max(...episodeNumbers),
+        updated_at: new Date().toISOString(),
+      }
 
       const { error: updateError } = await supabase
         .from('user_shows')
-        .upsert(
-          {
-            show_id: showId,
-            episodes_seen: Math.max(0, current + added),
-            is_following: true,
-          },
-          { onConflict: 'show_id' }
-        )
+        .upsert(upsertData, { onConflict: 'show_id,user_id' })
 
       if (updateError) throw new Error(`Failed to batch update episodes_seen: ${updateError.message}`)
     },
     onMutate: async ({ showId, episodeNumbers }) => {
+      if (!user) return
+
       await queryClient.cancelQueries({ queryKey: ['shows', 'detail', showId] })
 
       const previousData = queryClient.getQueryData<ShowWithUserData>(['shows', 'detail', showId])
@@ -309,10 +329,9 @@ export function useBatchMarkWatched() {
         queryClient.setQueryData(['shows', 'detail', showId], context.previousData)
       }
     },
-    onSettled: () => {
+    onSettled: (_data, _error, { showId }) => {
+      queryClient.invalidateQueries({ queryKey: showKeys.detail(showId) })
       queryClient.invalidateQueries({ queryKey: episodeKeys.all })
-      queryClient.invalidateQueries({ queryKey: ['shows'] })
-      queryClient.invalidateQueries({ queryKey: ['profile'] })
     },
   })
 }
