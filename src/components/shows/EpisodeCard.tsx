@@ -8,14 +8,19 @@ import { Ionicons } from '@expo/vector-icons'
 import { router } from 'expo-router'
 import { getImageUrl } from '@/lib/tmdb'
 import { colors, typography, spacing, borderRadius } from '@/theme'
+import { isNew } from '@/utils'
 import type { EpisodeCardData, EpisodeSectionKind } from '@/types'
 
 function formatAirTime(isoString: string): string {
   try {
     const date = new Date(isoString)
+    // Check if date is valid
+    if (isNaN(date.getTime())) {
+      return ''
+    }
     return date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })
   } catch {
-    return isoString
+    return ''
   }
 }
 
@@ -62,8 +67,10 @@ export default function EpisodeCard({ data, sectionKind, onMarkWatched }: Episod
     return null
   }, [data.isPremiere, data.isFinale])
 
+  const isNewEp = useMemo(() => isNew(data.airDate ?? null, data.isWatched), [data.airDate, data.isWatched])
+
   const renderRightActions = () => {
-    if (isWatchedHistory || !onMarkWatched) return null
+    if (isWatchedHistory || isUpcoming || !onMarkWatched) return null
     return (
       <Pressable style={styles.swipeAction} onPress={handleMark}>
         <Ionicons name="checkmark" size={24} color={colors.onPrimary} />
@@ -115,9 +122,16 @@ export default function EpisodeCard({ data, sectionKind, onMarkWatched }: Episod
           </Text>
 
           {/* Episode title */}
-          <Text style={styles.episodeTitle} numberOfLines={1}>
-            {data.episodeName || `Episode ${data.episodeNumber}`}
-          </Text>
+          <View style={styles.episodeTitleContainer}>
+            <Text style={styles.episodeTitle} numberOfLines={1}>
+              {data.episodeName || `Episode ${data.episodeNumber}`}
+            </Text>
+            {isNewEp && (
+              <View style={styles.newBadge}>
+                <Text style={styles.newBadgeText}>NEW</Text>
+              </View>
+            )}
+          </View>
 
           {/* Badge */}
           {badgeLabel && (
@@ -217,6 +231,22 @@ const styles = StyleSheet.create({
     fontSize: typography.bodySm.fontSize,
     color: colors.onSurfaceVariant,
     lineHeight: typography.bodySm.lineHeight,
+  },
+  episodeTitleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  newBadge: {
+    backgroundColor: colors.primary,
+    paddingHorizontal: 4,
+    paddingVertical: 1,
+    borderRadius: 4,
+  },
+  newBadgeText: {
+    fontSize: 9,
+    fontWeight: '800',
+    color: colors.onPrimary,
   },
   remainingBadge: {
     fontSize: typography.bodySm.fontSize,

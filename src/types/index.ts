@@ -283,6 +283,7 @@ export interface EpisodeCardData {
   seasonNumber: number
   episodeNumber: number
   episodeName: string | null
+  airDate?: string | null // Added
   totalEpisodes: number | null
   // Remaining episodes (for watch-next / haven-watched badges)
   episodesRemaining: number | null

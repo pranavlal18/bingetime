@@ -98,7 +98,8 @@ async function fetchShows(
     const updates: Promise<{ error: any }>[] = []
     for (const show of result) {
       const actual = counts.get(show.id) ?? 0
-      const newCount = Math.max(show.episodes_seen, actual)
+      // Only protect if we have no watched data in this app, but had imported count
+      const newCount = (actual === 0 && show.episodes_seen > 0) ? show.episodes_seen : actual
       if (newCount !== show.episodes_seen) {
         show.episodes_seen = newCount
         // Wrap in Promise.resolve to handle PromiseLike from Postgrest
@@ -199,7 +200,8 @@ async function fetchShow(
 
   const usDetail = Array.isArray(data.user_shows) ? (data.user_shows[0] ?? {}) : (data.user_shows ?? {})
   if (usDetail) {
-    const newCount = Math.max(usDetail.episodes_seen ?? 0, count)
+    // Only protect if we have no watched data in this app, but had imported count
+    const newCount = (count === 0 && (usDetail.episodes_seen ?? 0) > 0) ? (usDetail.episodes_seen ?? 0) : count
     if (newCount !== usDetail.episodes_seen) {
       await supabase
         .from('user_shows')
@@ -319,7 +321,8 @@ async function fetchContinueWatching(userId: string): Promise<ShowWithUserData[]
 
     for (const show of result) {
       const actual = counts.get(show.id) ?? 0
-      const newCount = Math.max(show.episodes_seen, actual)
+      // Only protect if we have no watched data in this app, but had imported count
+      const newCount = (actual === 0 && show.episodes_seen > 0) ? show.episodes_seen : actual
       if (newCount !== show.episodes_seen) {
         show.episodes_seen = newCount
         supabase
@@ -582,6 +585,7 @@ export interface NextEpisodeInfo {
   totalEpisodes: number | null
   tmdbId: number | null
   episodesRemaining: number | null
+  airDate?: string | null // Added
 }
 
 /**

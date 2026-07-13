@@ -142,24 +142,26 @@ async function fetchUpcomingEpisodes(userId: string): Promise<EpisodeSection[]> 
       const airDate = new Date(r.airDate);
       airDate.setHours(21, 0, 0, 0); // 9 PM local time
       
-      return {
-        showId: r.showId,
-        showName: r.showName,
-        posterPath: r.posterPath,
-        seasonNumber: r.seasonNumber,
-        episodeNumber: r.episodeNumber,
-        episodeName: r.episodeName,
-        totalEpisodes: null,
-        episodesRemaining: null,
-        isWatched: false,
-        airTime: airDate.toISOString(), // Include time for notification scheduling
-        network: r.networkName,
-        isPremiere: r.isPremiere,
-        isFinale: false,
-        showStatus: null,
-      };
-    }
-  )
+        return {
+          showId: r.showId,
+          showName: r.showName,
+          posterPath: r.posterPath,
+          seasonNumber: r.seasonNumber,
+          episodeNumber: r.episodeNumber,
+          episodeName: r.episodeName,
+          airDate: r.airDate,
+          totalEpisodes: null,
+          episodesRemaining: null,
+          isWatched: false,
+          airTime: airDate.toISOString(), // Include time for notification scheduling
+          network: r.networkName,
+          isPremiere: r.isPremiere,
+          isFinale: false,
+          showStatus: null,
+        };
+      }
+    )
+
 
   // Group by day
   const sections = new Map<string, EpisodeCardData[]>()

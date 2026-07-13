@@ -155,7 +155,9 @@ async function updateEpisodesSeen(
       .eq('show_id', showId)
       .eq('user_id', userId)
       .eq('watched', true)
-      .order('watched_at', { ascending: false })
+      .order('watched_at', { ascending: false, nullsFirst: true })
+      .order('season_number', { ascending: false })
+      .order('episode_number', { ascending: false })
       .limit(1)
       .maybeSingle()
 
@@ -381,8 +383,9 @@ async function fetchWatchedHistory(userId: string): Promise<EpisodeCardData[]> {
     .select('show_id, season_number, episode_number, watched_at')
     .eq('user_id', userId)
     .eq('watched', true)
-    .not('watched_at', 'is', null)
-    .order('watched_at', { ascending: false })
+    .order('watched_at', { ascending: false, nullsFirst: true })
+    .order('season_number', { ascending: false })
+    .order('episode_number', { ascending: false })
     .limit(WATCHED_HISTORY_LIMIT)
 
   if (error) throw new Error(`Failed to fetch watched history: ${error.message}`)

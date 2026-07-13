@@ -23,6 +23,7 @@ import LibraryToggle from '@/components/ui/LibraryToggle'
 import FavoriteToggle from '@/components/ui/FavoriteToggle'
 import { colors, typography, spacing, borderRadius } from '@/theme'
 import EpisodeDetailModal from '@/components/episodes/EpisodeDetailModal'
+import { isAired, getDaysUntilAiring, isNew } from '@/utils'
 import type { EpisodeWithStatus } from '@/lib/queries/episodes'
 import type { TMDbShowDetails } from '@/types'
 
@@ -430,6 +431,10 @@ export default function ShowDetailScreen() {
                   const isCurrent = epNum === (nextEpisode?.episodeNumber ?? -1)
                   const isWatched = ep.watched
                   const isPending = pendingEpisodeKeys.has(`${epNum}`)
+                  const aired = isAired(ep.airDate)
+                  const isNewEp = isNew(ep.airDate, ep.watched)
+                  const daysUntil = getDaysUntilAiring(ep.airDate)
+                  const canToggle = aired || ep.watched
 
                   return (
                     <Pressable
@@ -454,15 +459,22 @@ export default function ShowDetailScreen() {
 
                       {/* Info */}
                       <View style={styles.episodeInfo}>
-                        <Text
-                          style={[
-                            styles.episodeTitle,
-                            isWatched && styles.episodeTitleWatched,
-                          ]}
-                          numberOfLines={1}
-                        >
-                          {ep.title}
-                        </Text>
+                        <View style={styles.episodeTitleContainer}>
+                           <Text
+                            style={[
+                              styles.episodeTitle,
+                              isWatched && styles.episodeTitleWatched,
+                            ]}
+                            numberOfLines={1}
+                          >
+                            {ep.title}
+                          </Text>
+                          {isNewEp && (
+                            <View style={styles.newBadge}>
+                                <Text style={styles.newBadgeText}>NEW</Text>
+                            </View>
+                          )}
+                        </View>
                         <Text style={styles.episodeMeta}>
                           {isCurrent
                             ? 'Next up'
@@ -474,29 +486,33 @@ export default function ShowDetailScreen() {
                         </Text>
                       </View>
 
-                      {/* Check toggle — stopPropagation so row tap opens modal */}
+                      {/* Check toggle */}
                       <Pressable
                         hitSlop={8}
-                        onPress={() => handleToggleEpisode(ep)}
-                        disabled={isPending}
+                        onPress={() => canToggle && handleToggleEpisode(ep)}
+                        disabled={isPending || !canToggle}
                         style={styles.episodeCheckArea}
                       >
-                        <View
-                          style={[
-                            styles.episodeCheck,
-                            isWatched && styles.episodeCheckActive,
-                          ]}
-                        >
-                          {isPending ? (
-                            <ActivityIndicator size="small" color={colors.primary} />
-                          ) : (
-                            <Ionicons
-                              name={isWatched ? 'checkmark' : 'ellipse-outline'}
-                              size={20}
-                              color={isWatched ? colors.primary : colors.onSurfaceVariant}
-                            />
-                          )}
-                        </View>
+                        {!aired && !isWatched && daysUntil !== null ? (
+                          <Text style={styles.daysUntilText}>{daysUntil}d</Text>
+                        ) : (
+                          <View
+                            style={[
+                              styles.episodeCheck,
+                              isWatched && styles.episodeCheckActive,
+                            ]}
+                          >
+                            {isPending ? (
+                              <ActivityIndicator size="small" color={colors.primary} />
+                            ) : (
+                              <Ionicons
+                                name={isWatched ? 'checkmark' : 'ellipse-outline'}
+                                size={20}
+                                color={isWatched ? colors.primary : colors.onSurfaceVariant}
+                              />
+                            )}
+                          </View>
+                        )}
                       </Pressable>
                     </Pressable>
                   )
@@ -515,6 +531,7 @@ export default function ShowDetailScreen() {
         onClose={handleCloseModal}
         onToggleWatched={handleModalToggle}
         isPending={selectedEpisode ? pendingEpisodeKeys.has(`${selectedEpisode.episodeNumber}`) : false}
+        isAired={selectedEpisode ? isAired(selectedEpisode.airDate) : false}
       />
     </View>
   )
@@ -523,6 +540,31 @@ export default function ShowDetailScreen() {
 // ── Styles ──
 
 const styles = StyleSheet.create({
+  // ... existing styles ...
+  episodeTitleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  newBadge: {
+    backgroundColor: colors.primary,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  newBadgeText: {
+    fontFamily: 'Inter',
+    fontSize: 10,
+    fontWeight: '800',
+    color: colors.onPrimary,
+  },
+  daysUntilText: {
+    fontFamily: 'Inter',
+    fontSize: typography.bodySm.fontSize,
+    fontWeight: '600',
+    color: colors.onSurfaceVariant,
+  },
+  // ... rest of styles
   container: {
     flex: 1,
     backgroundColor: colors.surface,
@@ -857,6 +899,30 @@ const styles = StyleSheet.create({
     lineHeight: typography.labelSm.lineHeight,
     letterSpacing: typography.labelSm.letterSpacing,
     color: colors.primary,
+  },
+
+  episodeTitleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  newBadge: {
+    backgroundColor: colors.primary,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  newBadgeText: {
+    fontFamily: 'Inter',
+    fontSize: 10,
+    fontWeight: '800',
+    color: colors.onPrimary,
+  },
+  daysUntilText: {
+    fontFamily: 'Inter',
+    fontSize: typography.bodySm.fontSize,
+    fontWeight: '600',
+    color: colors.onSurfaceVariant,
   },
 
   // Episode list

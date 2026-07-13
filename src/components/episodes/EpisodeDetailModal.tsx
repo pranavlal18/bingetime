@@ -19,6 +19,7 @@ interface EpisodeDetailModalProps {
   onClose: () => void
   onToggleWatched: (episode: EpisodeWithStatus) => void
   isPending: boolean
+  isAired: boolean
 }
 
 export default function EpisodeDetailModal({
@@ -28,6 +29,7 @@ export default function EpisodeDetailModal({
   onClose,
   onToggleWatched,
   isPending,
+  isAired,
 }: EpisodeDetailModalProps) {
   if (!episode) return null
 
@@ -130,6 +132,7 @@ export default function EpisodeDetailModal({
             style={({ pressed }) => [
               styles.actionButton,
               episode.watched && styles.actionButtonUnwatch,
+              !isAired && !episode.watched && styles.actionButtonForce,
               pressed && { opacity: 0.85 },
             ]}
             onPress={handleToggle}
@@ -144,13 +147,16 @@ export default function EpisodeDetailModal({
               style={[
                 styles.actionButtonText,
                 episode.watched && styles.actionButtonTextUnwatch,
+                !isAired && !episode.watched && styles.actionButtonTextForce,
               ]}
             >
               {isPending
                 ? 'Updating...'
                 : episode.watched
                   ? 'Mark Unwatched'
-                  : 'Mark Watched'}
+                  : !isAired
+                    ? 'Force Mark Watched'
+                    : 'Mark Watched'}
             </Text>
           </Pressable>
         </View>
@@ -296,6 +302,9 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.outlineVariant,
   },
+  actionButtonForce: {
+    backgroundColor: colors.tertiary,
+  },
   actionButtonText: {
     fontFamily: 'Inter',
     fontSize: typography.bodyMd.fontSize,
@@ -305,5 +314,8 @@ const styles = StyleSheet.create({
   },
   actionButtonTextUnwatch: {
     color: colors.onSurface,
+  },
+  actionButtonTextForce: {
+    color: colors.onTertiary,
   },
 })

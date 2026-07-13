@@ -27,6 +27,7 @@ import EpisodeSection from '@/components/shows/EpisodeSection'
 import ShowsTabSwitcher from '@/components/shows/ShowsTabSwitcher'
 import type { ShowWithUserData } from '@/lib/queries/shows'
 import type { ShowsTabKind, ShowsListItem } from '@/types'
+import { isAired } from '@/utils'
 
 // ── Screen ──
 
@@ -124,17 +125,20 @@ export default function ShowsScreen() {
   })
 
   // 4. Build episode name map: `${showId}:${episodeNumber}` → episode name
-  const episodeNameMap = useMemo(() => {
-    const map = new Map<string, string>()
+  //    AND airDate map: `${showId}:${episodeNumber}` → airDate
+  const episodeDataMap = useMemo(() => {
+    const nameMap = new Map<string, string>()
+    const airDateMap = new Map<string, string | null>()
     for (let i = 0; i < episodeNamePairs.length; i++) {
       const pair = episodeNamePairs[i]
       const data = seasonQueries[i]?.data
       if (!data) continue
       for (const ep of data.episodes) {
-        map.set(`${pair.showId}:${ep.episode_number}`, ep.name)
+        nameMap.set(`${pair.showId}:${ep.episode_number}`, ep.name)
+        airDateMap.set(`${pair.showId}:${ep.episode_number}`, ep.air_date)
       }
     }
-    return map
+    return { nameMap, airDateMap }
   }, [episodeNamePairs, seasonQueries])
 
   // 4b. Build season structure: showId → { seasonNumber → episodeCount }
@@ -174,6 +178,13 @@ export default function ShowsScreen() {
             if (!seasonCounts.has(sn)) return null
           }
         }
+
+        // Get air date for this episode
+        const airDate = episodeDataMap.airDateMap.get(`${ep.showId}:${en}`) || null
+
+        // Filter out episodes that haven't aired yet
+        if (!isAired(airDate)) return null
+
         return {
           type: 'episode',
           sectionKind: 'watch-next',
@@ -183,7 +194,8 @@ export default function ShowsScreen() {
             posterPath: ep.posterPath,
             seasonNumber: sn,
             episodeNumber: en,
-            episodeName: episodeNameMap.get(`${ep.showId}:${en}`) || null,
+            episodeName: episodeDataMap.nameMap.get(`${ep.showId}:${en}`) || null,
+            airDate,
             totalEpisodes: ep.totalEpisodes,
             episodesRemaining: ep.episodesRemaining,
             isWatched: false,
@@ -192,7 +204,7 @@ export default function ShowsScreen() {
         }
       })
       .filter((item): item is ShowsListItem => item !== null)
-  }, [rawWatchNext, episodeNameMap, seasonInfoMap])
+  }, [rawWatchNext, episodeDataMap, seasonInfoMap])
 
   const haventWatchedEpisodes = useMemo(() => {
     return rawHaventWatched
@@ -208,6 +220,13 @@ export default function ShowsScreen() {
             if (!seasonCounts.has(sn)) return null
           }
         }
+
+        // Get air date for this episode
+        const airDate = episodeDataMap.airDateMap.get(`${ep.showId}:${en}`) || null
+
+        // Filter out episodes that haven't aired yet
+        if (!isAired(airDate)) return null
+
         return {
           type: 'episode',
           sectionKind: 'haven-watched',
@@ -217,7 +236,8 @@ export default function ShowsScreen() {
             posterPath: ep.posterPath,
             seasonNumber: sn,
             episodeNumber: en,
-            episodeName: episodeNameMap.get(`${ep.showId}:${en}`) || null,
+            episodeName: episodeDataMap.nameMap.get(`${ep.showId}:${en}`) || null,
+            airDate,
             totalEpisodes: ep.totalEpisodes,
             episodesRemaining: ep.episodesRemaining,
             isWatched: false,
@@ -226,7 +246,7 @@ export default function ShowsScreen() {
         }
       })
       .filter((item): item is ShowsListItem => item !== null)
-  }, [rawHaventWatched, episodeNameMap, seasonInfoMap])
+  }, [rawHaventWatched, episodeDataMap, seasonInfoMap])
 
   // Build flattened list for Watch List (list mode)
   const watchListItems: ShowsListItem[] = useMemo(() => {
