@@ -106,7 +106,7 @@ export default function ShowCard({ show, onMarkWatched }: ShowCardProps) {
         {hasProgress && (
           <ProgressBar
             episodesSeen={seenEps}
-            totalEpisodes={totalEps || seenEps}
+            totalEpisodes={totalEps}
             height={3}
           />
         )}

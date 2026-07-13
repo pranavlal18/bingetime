@@ -145,8 +145,8 @@ export default function MoviesScreen() {
   const [activeSegment, setActiveSegment] = useState<SegmentKey>('watch-later')
   const [searchQuery, setSearchQuery] = useState('')
   const [isSearchVisible, setIsSearchVisible] = useState(false)
-  const viewMode = useAppStore((s) => s.viewMode)
-  const setViewMode = useAppStore((s) => s.setViewMode)
+  const viewMode = useAppStore((s) => s.moviesViewMode)
+  const setViewMode = useAppStore((s) => s.setMoviesViewMode)
 
   const { data: movies, isLoading, isRefetching, refetch } = useMovies()
   const toggleWatched = useToggleMovieWatched()

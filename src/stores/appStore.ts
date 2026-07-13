@@ -4,7 +4,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage'
 import type { AppSettings, ViewMode, Theme } from '@/types'
 
 interface AppState extends AppSettings {
-  setViewMode: (mode: ViewMode) => void
+  setShowsViewMode: (mode: ViewMode) => void
+  setMoviesViewMode: (mode: ViewMode) => void
   setTheme: (theme: Theme) => void
   toggleShowArchived: () => void
   isImportComplete: boolean
@@ -17,13 +18,15 @@ export const useAppStore = create<AppState>()(
   persist(
     (set) => ({
       // Defaults
-      viewMode: 'poster-grid',
+      showsViewMode: 'poster-grid',
+      moviesViewMode: 'poster-grid',
       theme: 'system',
       showArchived: false,
       isImportComplete: false,
       importStarted: false,
 
-      setViewMode: (mode) => set({ viewMode: mode }),
+      setShowsViewMode: (mode) => set({ showsViewMode: mode }),
+      setMoviesViewMode: (mode) => set({ moviesViewMode: mode }),
       setTheme: (theme) => set({ theme }),
       toggleShowArchived: () => set((s) => ({ showArchived: !s.showArchived })),
       setImportComplete: (done) => set({ isImportComplete: done }),

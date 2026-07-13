@@ -35,9 +35,9 @@ function getDayLabel(airDate: Date, today: Date): string {
 }
 
 // ── Fetch upcoming episodes ──
+const MAX_CONCURRENT = 2
 
-const MAX_CONCURRENT = 5
-const BATCH_DELAY = 200 // ms between batches
+const BATCH_DELAY = 2500 // ms between batches — keeps requests under TMDb's 40 req/10sec free-tier limit
 
 interface ShowWithNextAir {
   showId: string

@@ -10,7 +10,6 @@ import {
   StyleSheet,
   ActivityIndicator,
   RefreshControl,
-  ScrollView,
   Keyboard,
   Alert,
 } from 'react-native'
@@ -32,8 +31,41 @@ import RecommendedSection from '@/components/discover/RecommendedSection'
 import { colors, typography, spacing, borderRadius } from '@/theme'
 import type { DiscoverResult, MediaFilter } from '@/lib/queries/discover'
 
-// ── Genre chips from Stitch design ──
-const GENRES = ['For You', 'Sci-Fi', 'Drama', 'Comedy', 'Horror', 'Thriller', 'Animation']
+// ── Stable search bar — memo'd outside component prevents remount on parent re-render ──
+
+interface SearchBarProps {
+  visible: boolean
+  value: string
+  onChangeText: (text: string) => void
+  onClear: () => void
+  inputRef: { current: TextInput | null }
+}
+
+function SearchBar({ visible, value, onChangeText, onClear, inputRef }: SearchBarProps) {
+  if (!visible) return null
+  return (
+    <View style={styles.compactSearchBar}>
+      <Ionicons name="search" size={18} color={colors.onSurfaceVariant} />
+      <TextInput
+        ref={inputRef}
+        style={styles.compactSearchInput}
+        placeholder="Movies, shows and more..."
+        placeholderTextColor={colors.outline}
+        value={value}
+        onChangeText={onChangeText}
+        autoFocus
+        autoCapitalize="none"
+        autoCorrect={false}
+        returnKeyType="search"
+      />
+      {value.length > 0 && (
+        <Pressable onPress={onClear} hitSlop={8}>
+          <Ionicons name="close-circle" size={18} color={colors.onSurfaceVariant} />
+        </Pressable>
+      )}
+    </View>
+  )
+}
 
 // ── Main Screen ──
 
@@ -42,7 +74,6 @@ export default function DiscoverScreen() {
   const [searchText, setSearchText] = useState('')
   const [debouncedQuery, setDebouncedQuery] = useState('')
   const [isSearchVisible, setIsSearchVisible] = useState(false)
-  const [activeGenre, setActiveGenre] = useState('For You')
   const [addingIds, setAddingIds] = useState<Set<number>>(new Set())
   const [removingIds, setRemovingIds] = useState<Set<number>>(new Set())
   const inputRef = useRef<TextInput>(null)
@@ -151,6 +182,35 @@ export default function DiscoverScreen() {
 
   const searchKeyExtractor = useCallback((item: DiscoverResult) => item.tmdbId.toString(), [])
 
+  // ── Footer: trending/recommended sections (only when not searching) ──
+
+  const ListFooter = useCallback(
+    () => (
+      <>
+        {!isSearching && (
+          <>
+            <TrendingSection
+              data={trendingForYou}
+              onAdd={handleAdd}
+              onRemove={handleRemove}
+              addingIds={addingIds}
+              removingIds={removingIds}
+            />
+            <RecommendedSection
+              data={recommended}
+              onAdd={handleAdd}
+              onRemove={handleRemove}
+              addingIds={addingIds}
+              removingIds={removingIds}
+            />
+            <View style={{ height: 32 }} />
+          </>
+        )}
+      </>
+    ),
+    [isSearching, trendingForYou, recommended, handleAdd, handleRemove, addingIds, removingIds]
+  )
+
   // ── Loading state ──
 
   if (trendingLoading && !isSearching) {
@@ -190,84 +250,45 @@ export default function DiscoverScreen() {
         </Pressable>
       </View>
 
-      <ScrollView showsVerticalScrollIndicator={false}>
-        {/* Compact Search Bar — toggled by icon */}
-        {isSearchVisible && (
-          <View style={styles.compactSearchBar}>
-            <Ionicons name="search" size={18} color={colors.onSurfaceVariant} />
-            <TextInput
-              ref={inputRef}
-              style={styles.compactSearchInput}
-              placeholder="Movies, shows and more..."
-              placeholderTextColor={colors.outline}
-              value={searchText}
-              onChangeText={setSearchText}
-              autoFocus
-              returnKeyType="search"
-            />
-            {searchText.length > 0 && (
-              <Pressable onPress={() => setSearchText('')} hitSlop={8}>
-                <Ionicons name="close-circle" size={18} color={colors.onSurfaceVariant} />
-              </Pressable>
-            )}
-          </View>
-        )}
+      {/* Search bar — outside FlashList for stable refs */}
+      <SearchBar
+        visible={isSearchVisible}
+        value={searchText}
+        onChangeText={setSearchText}
+        onClear={() => setSearchText('')}
+        inputRef={inputRef}
+      />
 
-        {/* Genre Chips */}
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.genreChipsContainer}
-        >
-          {GENRES.map((genre) => {
-            const isActive = activeGenre === genre
-            return (
-              <Pressable
-                key={genre}
-                style={[styles.genreChip, isActive && styles.genreChipActive]}
-                onPress={() => setActiveGenre(genre)}
-              >
-                <Text style={[styles.genreChipText, isActive && styles.genreChipTextActive]}>
-                  {genre}
-                </Text>
-              </Pressable>
-            )
-          })}
-        </ScrollView>
-
-        {/* ── Content ── */}
-        {isSearching ? (
-          searchLoading ? (
+      {/* Single FlashList — Search/genre above, trending in footer */}
+      <FlashList
+        data={isSearching ? (searchResults || []) : []}
+        keyExtractor={searchKeyExtractor}
+        renderItem={renderSearchItem}
+        estimatedItemSize={92}
+        ListFooterComponent={!isSearching ? ListFooter : null}
+        ListEmptyComponent={
+          searchLoading && isSearching ? (
             <ActivityIndicator size="large" color={colors.primary} style={styles.loadingContainer} />
           ) : (
-            <FlashList
-              data={searchResults || []}
-              keyExtractor={searchKeyExtractor}
-              renderItem={renderSearchItem}
-              estimatedItemSize={92}
-              contentContainerStyle={styles.listContent}
-            />
+            !isSearching ? null : undefined
           )
-        ) : (
-          <View>
-            <TrendingSection
-              data={trendingForYou}
-              onAdd={handleAdd}
-              onRemove={handleRemove}
-              addingIds={addingIds}
-              removingIds={removingIds}
-            />
-            <RecommendedSection
-              data={recommended}
-              onAdd={handleAdd}
-              onRemove={handleRemove}
-              addingIds={addingIds}
-              removingIds={removingIds}
-            />
-            <View style={{ height: 32 }} />
-          </View>
-        )}
-      </ScrollView>
+        }
+        contentContainerStyle={[
+          styles.listContent,
+          !isSearching && { flexGrow: 1 },
+          isSearching && { paddingHorizontal: spacing.marginMobile },
+        ]}
+        refreshControl={
+          <RefreshControl
+            refreshing={isRefetching}
+            onRefresh={refetch}
+            tintColor={colors.primary}
+            colors={[colors.primary]}
+          />
+        }
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+      />
     </View>
   )
 }
@@ -372,7 +393,6 @@ const styles = StyleSheet.create({
 
   // Search list
   listContent: {
-    paddingHorizontal: spacing.marginMobile,
     paddingBottom: 24,
   },
   listContentEmpty: {

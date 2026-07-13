@@ -266,7 +266,8 @@ export type ViewMode = 'poster-grid' | 'thumbnail-list'
 export type Theme = 'system' | 'light' | 'dark'
 
 export interface AppSettings {
-  viewMode: ViewMode
+  showsViewMode: ViewMode
+  moviesViewMode: ViewMode
   theme: Theme
   showArchived: boolean
 }

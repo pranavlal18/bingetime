@@ -121,6 +121,15 @@ export function useTrending(filter: MediaFilter) {
 
 // ── Search ──
 
+/** Extract a trailing 4-digit year from the query and return clean query + year */
+function extractYear(query: string): { cleanQuery: string; year: string | undefined } {
+  const match = query.trim().match(/^(.*?)\s+((?:19|20)\d{2})$/)
+  if (match) {
+    return { cleanQuery: match[1], year: match[2] }
+  }
+  return { cleanQuery: query.trim(), year: undefined }
+}
+
 async function fetchSearch(
   query: string,
   filter: MediaFilter,
@@ -128,18 +137,30 @@ async function fetchSearch(
 ): Promise<DiscoverResult[]> {
   if (!query.trim()) return []
 
+  const { cleanQuery, year } = extractYear(query)
+  if (!cleanQuery) return []
+
   let results: DiscoverResult[] = []
 
   if (filter === 'all') {
-    const { results: raw } = await tmdb.searchMulti(query)
+    const { results: raw } = await tmdb.searchMulti(cleanQuery)
     results = raw
       .filter((item: any) => item.media_type === 'tv' || item.media_type === 'movie')
+      .filter((item: any) => {
+        // /search/multi doesn't support year param — filter client-side
+        if (!year) return true
+        const date = item.media_type === 'movie' ? item.release_date : item.first_air_date
+        return date?.startsWith(year)
+      })
       .map(mapResult)
   } else if (filter === 'tv') {
-    const { results: raw } = await tmdb.searchTv(query)
-    results = raw.map((item: any) => mapResult({ ...item, media_type: 'tv' }))
+    const { results: raw } = await tmdb.searchTv(cleanQuery)
+    // /search/tv doesn't support year param — filter client-side
+    results = raw
+      .filter((item: any) => !year || (item.first_air_date?.startsWith(year)))
+      .map((item: any) => mapResult({ ...item, media_type: 'tv' }))
   } else {
-    const { results: raw } = await tmdb.searchMovie(query)
+    const { results: raw } = await tmdb.searchMovie(cleanQuery, year)
     results = raw.map((item: any) => mapResult({ ...item, media_type: 'movie' }))
   }
 

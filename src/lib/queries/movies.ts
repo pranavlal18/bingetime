@@ -197,7 +197,43 @@ export function useToggleMovieWatched() {
       )
       if (error) throw new Error(error.message)
     },
-    onSuccess: () => {
+
+    onMutate: async (movieId: string) => {
+      if (!user) return
+
+      // Cancel in-flight refetches so optimistic write isn't clobbered
+      await queryClient.cancelQueries({ queryKey: movieKeys.all })
+
+      // Snapshot previous data for rollback
+      const previousList = queryClient.getQueryData<MovieWithUserData[]>(movieKeys.list(user.id))
+
+      // Optimistically toggle the movie
+      if (previousList) {
+        queryClient.setQueryData<MovieWithUserData[]>(
+          movieKeys.list(user.id),
+          previousList.map((m) =>
+            m.id === movieId
+              ? {
+                  ...m,
+                  watched: !m.watched,
+                  watched_at: m.watched ? null : new Date().toISOString(),
+                }
+              : m
+          )
+        )
+      }
+
+      return { previousList }
+    },
+
+    onError: (_err, movieId, context) => {
+      // Rollback optimistic update
+      if (context?.previousList) {
+        queryClient.setQueryData(movieKeys.list(user?.id ?? ''), context.previousList)
+      }
+    },
+
+    onSettled: () => {
       queryClient.invalidateQueries({ queryKey: movieKeys.all })
       queryClient.invalidateQueries({ queryKey: ['profile'] })
     },

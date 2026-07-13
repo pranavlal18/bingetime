@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient, QueryClient } from '@tanstack/re
 import { supabase } from '@/lib/supabase'
 import { getImageUrl } from '@/lib/tmdb'
 import { useAuth } from '@/contexts/AuthContext'
+import { episodeKeys } from './episodes'
 import type { Show, UserShow } from '@/types'
 
 // ── Types for joined query result ──
@@ -396,9 +397,33 @@ async function markEpisodeWatched(
   //    If caller provided them (EpisodeCard), use those.
   //    Otherwise infer from last_watched_episode_data (ShowCard fallback).
   const effSeason = seasonNumber ?? us?.last_watched_episode_data?.season_number ?? 0
-  const effEpisode = episodeNumber ?? currentSeen + 1
+  const effEpisode =
+    episodeNumber ??
+    (us?.last_watched_episode_data?.episode_number != null
+      ? us.last_watched_episode_data.episode_number + 1
+      : currentSeen + 1)
 
-  // 3. Increment episodes_seen + set last_watched_episode_data
+  // 3. Insert user_episodes row FIRST (before incrementing episodes_seen)
+  //    Uses upsert so duplicate calls are idempotent.
+  const { error: insertError } = await supabase.from('user_episodes').upsert(
+    {
+      show_id: showId,
+      user_id: userId,
+      season_number: effSeason,
+      episode_number: effEpisode,
+      watched: true,
+      watched_at: new Date().toISOString(),
+    },
+    { onConflict: 'show_id, season_number, episode_number, user_id' }
+  )
+
+  if (insertError) {
+    console.warn(`Failed to insert user_episode: ${insertError.message}`)
+    // Don't throw — the episodes_seen increment will reconcile on next sync
+  }
+
+  // 4. Increment episodes_seen + set last_watched_episode_data
+  //    Done after the insert so the counter never inflates on duplicate calls.
   const { error: updateError } = await supabase
     .from('user_shows')
     .upsert(
@@ -418,20 +443,6 @@ async function markEpisodeWatched(
     )
 
   if (updateError) throw new Error(`Failed to update episodes_seen: ${updateError.message}`)
-
-  // 4. Insert a user_episodes row with real season/episode when known
-  const { error: insertError } = await supabase.from('user_episodes').insert({
-    show_id: showId,
-    user_id: userId,
-    season_number: effSeason,
-    episode_number: effEpisode,
-    watched: true,
-    watched_at: new Date().toISOString(),
-  })
-
-  if (insertError) {
-    console.warn(`Failed to insert user_episode: ${insertError.message}`)
-  }
 }
 
 export function useMarkWatched() {
@@ -531,6 +542,8 @@ export function useMarkWatched() {
       queryClient.invalidateQueries({ queryKey: showKeys.continueWatching(uid) })
       // Also sync the detail page cache so checkmarks show correctly
       queryClient.invalidateQueries({ queryKey: showKeys.detail(showId) })
+      // Refresh watched history so new entry appears at top
+      queryClient.invalidateQueries({ queryKey: episodeKeys.all })
     },
   })
 }
@@ -621,12 +634,13 @@ export function computeNextEpisode(show: ShowWithUserData): NextEpisodeInfo | nu
   const totalEps = show.total_episodes
 
   // If show is complete (ended/canceled and all episodes seen), no next episode
-  if ((show.status === 'Ended' || show.status === 'Canceled') && totalEps != null && show.episodes_seen >= totalEps) {
+  // totalEps > 0 prevents shows with unpopulated episode counts (temporary 0) from disappearing
+  if ((show.status === 'Ended' || show.status === 'Canceled') && totalEps != null && totalEps > 0 && show.episodes_seen >= totalEps) {
     return null
   }
 
   // If the show has exceeded its total episodes somehow, no next episode
-  if (totalEps != null && show.episodes_seen >= totalEps) {
+  if (totalEps != null && totalEps > 0 && show.episodes_seen >= totalEps) {
     return null
   }
 
@@ -679,8 +693,12 @@ export function computeNextEpisode(show: ShowWithUserData): NextEpisodeInfo | nu
   }
 }
 
-/** Check if a show hasn't been watched for 14+ days */
+/** Check if a show hasn't been watched for 14+ days (or never watched) */
 export function isHaventWatched(show: ShowWithUserData): boolean {
+  // Never watched — definitely "haven't watched"
+  if (show.episodes_seen === 0) return true
+
+  // Not just added but never started — check last_watched timestamp
   if (!show.last_watched_episode_data?.watched_at) return false
 
   const watchedAt = new Date(show.last_watched_episode_data.watched_at)
