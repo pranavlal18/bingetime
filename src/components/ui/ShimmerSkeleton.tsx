@@ -93,11 +93,11 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surfaceContainer,
   },
   base: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: colors.surfaceContainer,
   },
   shimmerOverlay: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     width: 200,
   },
 })

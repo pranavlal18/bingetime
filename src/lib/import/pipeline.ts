@@ -748,6 +748,7 @@ async function importMovies(
       title: string
       tmdb_id: number
       poster_path: string | null
+      release_date: string | null
     }> = []
 
     for (const [key, resolution] of resolutionMap.entries()) {
@@ -760,6 +761,7 @@ async function importMovies(
         title: resolution.title,
         tmdb_id: resolution.tmdb_id,
         poster_path: resolution.poster_path,
+        release_date: resolution.release_date,
       })
     }
 

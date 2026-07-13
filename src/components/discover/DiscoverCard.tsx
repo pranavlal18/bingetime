@@ -137,7 +137,7 @@ const styles = StyleSheet.create({
   },
   movieBadge: {
     alignSelf: 'flex-start',
-    backgroundColor: colors.warning + '33',
+    backgroundColor: colors.tertiary + '33',
     borderRadius: 4,
     paddingHorizontal: 6,
     paddingVertical: spacing.unit,

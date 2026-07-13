@@ -176,6 +176,7 @@ async function fetchWatchlistMovies(userId: string): Promise<WatchlistMovie[]> {
       release_date: movie.release_date,
       runtime: movie.runtime,
       poster_path: movie.poster_path,
+      genres: movie.genres ?? null,
       watched: row.watched,
     }
   })

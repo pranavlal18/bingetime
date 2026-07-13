@@ -17,12 +17,13 @@ import { FlashList } from '@shopify/flash-list'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { router } from 'expo-router'
-import { useMovies, useToggleMovieWatched } from '@/lib/queries/movies'
+import { useMovies, useToggleMovieWatched, useRefreshMovieReleaseDates } from '@/lib/queries/movies'
 import { useAppStore } from '@/stores/appStore'
 import { getImageUrl } from '@/lib/tmdb'
 import AnimatedPoster from '@/components/ui/AnimatedPoster'
 import MovieListItem from '@/components/movies/MovieListItem'
 import { colors, typography, borderRadius, spacing } from '@/theme'
+import { ErrorBoundary } from '@/components/ErrorBoundary'
 import type { MovieWithUserData } from '@/lib/queries/movies'
 
 // ── Card sizing (matches ShowCard) ──
@@ -32,7 +33,7 @@ const PAGE_PADDING = 20
 
 // ── Segmented Control ──
 
-type SegmentKey = 'watched' | 'watch-later'
+type SegmentKey = 'watchlist' | 'upcoming'
 
 function SegmentedControl({
   active,
@@ -47,37 +48,37 @@ function SegmentedControl({
         <Pressable
           style={[
             styles.segmentBtn,
-            active === 'watched' && styles.segmentBtnActive,
+            active === 'watchlist' && styles.segmentBtnActive,
           ]}
-          onPress={() => onChange('watched')}
+          onPress={() => onChange('watchlist')}
           accessibilityRole="radio"
-          accessibilityState={{ selected: active === 'watched' }}
+          accessibilityState={{ selected: active === 'watchlist' }}
         >
           <Text
             style={[
               styles.segmentLabel,
-              active === 'watched' && styles.segmentLabelActive,
+              active === 'watchlist' && styles.segmentLabelActive,
             ]}
           >
-            Watched
+            Watchlist
           </Text>
         </Pressable>
         <Pressable
           style={[
             styles.segmentBtn,
-            active === 'watch-later' && styles.segmentBtnActive,
+            active === 'upcoming' && styles.segmentBtnActive,
           ]}
-          onPress={() => onChange('watch-later')}
+          onPress={() => onChange('upcoming')}
           accessibilityRole="radio"
-          accessibilityState={{ selected: active === 'watch-later' }}
+          accessibilityState={{ selected: active === 'upcoming' }}
         >
           <Text
             style={[
               styles.segmentLabel,
-              active === 'watch-later' && styles.segmentLabelActive,
+              active === 'upcoming' && styles.segmentLabelActive,
             ]}
           >
-            Watch Later
+            Upcoming
           </Text>
         </Pressable>
       </View>
@@ -93,7 +94,6 @@ interface MovieCardGridProps {
 
 function MovieCardGrid({ movie }: MovieCardGridProps) {
   const posterUrl = getImageUrl(movie.poster_path, 'w342')
-  const isWatched = movie.watched ?? false
   const year = movie.release_date?.slice(0, 4)
   const genre = movie.genres?.[0] ?? null
   const metaText = year && genre ? `${year} • ${genre}` : year ?? genre ?? ''
@@ -111,7 +111,7 @@ function MovieCardGrid({ movie }: MovieCardGridProps) {
         ]}
         onPress={handlePress}
         accessibilityRole="button"
-        accessibilityLabel={`${movie.title}, ${year || 'unknown year'}${isWatched ? ', watched' : ''}`}
+        accessibilityLabel={`${movie.title}, ${year || 'unknown year'}`}
       >
         {/* Poster — same size as ShowCard */}
         <View style={styles.posterContainer}>
@@ -119,9 +119,6 @@ function MovieCardGrid({ movie }: MovieCardGridProps) {
             uri={posterUrl}
             style={StyleSheet.absoluteFill}
           />
-
-          {/* Watched accent bar at poster bottom */}
-          {isWatched && <View style={styles.watchedBar} />}
         </View>
 
         {/* Title */}
@@ -140,9 +137,9 @@ function MovieCardGrid({ movie }: MovieCardGridProps) {
 
 // ── Main Screen ──
 
-export default function MoviesScreen() {
+function MoviesScreenContent() {
   const insets = useSafeAreaInsets()
-  const [activeSegment, setActiveSegment] = useState<SegmentKey>('watch-later')
+  const [activeSegment, setActiveSegment] = useState<SegmentKey>('watchlist')
   const [searchQuery, setSearchQuery] = useState('')
   const [isSearchVisible, setIsSearchVisible] = useState(false)
   const viewMode = useAppStore((s) => s.moviesViewMode)
@@ -150,6 +147,7 @@ export default function MoviesScreen() {
 
   const { data: movies, isLoading, isRefetching, refetch } = useMovies()
   const toggleWatched = useToggleMovieWatched()
+  const refreshReleaseDates = useRefreshMovieReleaseDates()
 
   const isGrid = viewMode === 'poster-grid'
 
@@ -175,15 +173,39 @@ export default function MoviesScreen() {
 
   // Filter movies based on segment + search query
   const filteredMovies = useMemo(() => {
-    if (!movies) return []
-    const segmentFiltered = activeSegment === 'watched'
-      ? movies.filter((m) => m.watched)
-      : movies.filter((m) => !m.watched)
+    try {
+      if (!movies) return []
 
-    if (!searchQuery.trim()) return segmentFiltered
+      // Only unwatched movies in this tab (watched → Profile → All Movies)
+      const unwatched = movies.filter((m) => !m.watched && m.is_watchlist)
 
-    const q = searchQuery.trim().toLowerCase()
-    return segmentFiltered.filter((m) => m.title.toLowerCase().includes(q))
+      const today = new Date().toISOString().slice(0, 10) // "2026-07-13"
+
+      console.log('🎬 [MoviesTab] filtering:', {
+        totalMovies: movies.length,
+        unwatched: unwatched.length,
+        activeSegment,
+        today,
+        sampleDates: unwatched.slice(0, 3).map((m) => ({
+          title: m.title,
+          release_date: m.release_date,
+          type: typeof m.release_date,
+          watched: m.watched,
+        })),
+      })
+
+      const segmentFiltered = activeSegment === 'watchlist'
+        ? unwatched.filter((m) => !m.release_date || String(m.release_date).slice(0, 10) <= today)
+        : unwatched.filter((m) => m.release_date && String(m.release_date).slice(0, 10) > today)
+
+      if (!searchQuery.trim()) return segmentFiltered
+
+      const q = searchQuery.trim().toLowerCase()
+      return segmentFiltered.filter((m) => m.title.toLowerCase().includes(q))
+    } catch (e) {
+      console.error('🔥 [MoviesTab] filter error:', e)
+      return []
+    }
   }, [movies, activeSegment, searchQuery])
 
   // Empty state
@@ -195,12 +217,12 @@ export default function MoviesScreen() {
           <Ionicons name="film-outline" size={56} color={colors.outlineVariant} />
         </View>
         <Text style={styles.emptyTitle}>
-          {activeSegment === 'watched' ? 'No watched movies' : 'Watchlist is empty'}
+          {activeSegment === 'watchlist' ? 'Nothing to watch' : 'No upcoming movies'}
         </Text>
         <Text style={styles.emptySubtitle}>
-          {activeSegment === 'watched'
-            ? 'Movies you mark as watched will appear here'
-            : 'Add movies from Discover to your watchlist'}
+          {activeSegment === 'watchlist'
+            ? 'Add movies from Discover to your watchlist'
+            : 'Movies you add that aren\'t released yet will appear here'}
         </Text>
       </View>
     )
@@ -216,6 +238,13 @@ export default function MoviesScreen() {
     )
   }
 
+  console.log('🎬 [MoviesTab] rendering with:', {
+    activeSegment,
+    isGrid,
+    filteredCount: filteredMovies.length,
+    isSearchVisible,
+  })
+
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
       {/* ── AppBar ── */}
@@ -228,6 +257,19 @@ export default function MoviesScreen() {
               name={isGrid ? 'grid-outline' : 'list-outline'}
               size={20}
               color={colors.onSurfaceVariant}
+            />
+          </Pressable>
+          {/* Refresh release dates — sync from TMDb */}
+          <Pressable
+            style={[styles.appBarBtn, refreshReleaseDates.isPending && styles.appBarBtnActive]}
+            onPress={() => refreshReleaseDates.mutate()}
+            disabled={refreshReleaseDates.isPending}
+            hitSlop={8}
+          >
+            <Ionicons
+              name="sync-outline"
+              size={20}
+              color={refreshReleaseDates.isPending ? colors.primary : colors.onSurfaceVariant}
             />
           </Pressable>
           <Pressable
@@ -252,7 +294,7 @@ export default function MoviesScreen() {
           <Ionicons name="search-outline" size={18} color={colors.onSurfaceVariant} />
           <TextInput
             style={styles.searchInput}
-            placeholder={`Search ${activeSegment === 'watched' ? 'watched' : 'watch later'}...`}
+            placeholder={`Search ${activeSegment === 'watchlist' ? 'watchlist' : 'upcoming'}...`}
             placeholderTextColor={colors.outline}
             value={searchQuery}
             onChangeText={setSearchQuery}
@@ -274,10 +316,7 @@ export default function MoviesScreen() {
         renderItem={renderItem}
         numColumns={isGrid ? 2 : 1}
         key={isGrid ? 'grid' : 'list'}
-        contentContainerStyle={[
-          styles.listContent,
-          filteredMovies.length === 0 && styles.listContentEmpty,
-        ]}
+        contentContainerStyle={styles.listContent}
         ListHeaderComponent={
           <View style={styles.listHeader}>
             <SegmentedControl
@@ -447,14 +486,6 @@ const styles = StyleSheet.create({
     shadowRadius: 12,
     elevation: 8,
   },
-  watchedBar: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    height: 3,
-    backgroundColor: colors.primary,
-  },
   gridTitle: {
     fontSize: typography.bodyXs.fontSize,
     color: colors.onSurface,
@@ -473,10 +504,6 @@ const styles = StyleSheet.create({
   listContent: {
     paddingHorizontal: spacing.marginMobile,
     paddingBottom: 32,
-  },
-  listContentEmpty: {
-    flex: 1,
-    justifyContent: 'center',
   },
   // ── Empty State ──
   emptyState: {
@@ -508,3 +535,11 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
 })
+
+export default function MoviesScreen() {
+  return (
+    <ErrorBoundary>
+      <MoviesScreenContent />
+    </ErrorBoundary>
+  )
+}

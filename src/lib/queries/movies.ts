@@ -356,6 +356,78 @@ export function useRefreshMoviePosters() {
   })
 }
 
+// ── Refresh missing/incorrect release_date for existing movies ──
+
+export function useRefreshMovieReleaseDates() {
+  const { user } = useAuth()
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async () => {
+      if (!user) throw new Error('Not authenticated')
+      // 1. Fetch movies in user's watchlist that have tmdb_id (release_date may be null or wrong)
+      const { data: movies, error: fetchError } = await supabase
+        .from('movies')
+        .select('id, title, tmdb_id, release_date')
+        .eq('user_movies.user_id', user.id)
+        .eq('user_movies.is_watchlist', true)
+        .not('tmdb_id', 'is', null)
+
+      if (fetchError) throw new Error(`Failed to fetch movies: ${fetchError.message}`)
+      if (!movies || movies.length === 0) return { updated: 0, checked: 0 }
+
+      const BATCH_SIZE = 5
+      const updates: Array<{ id: string; release_date: string | null }> = []
+
+      // 2. Resolve release_date for each movie from TMDb
+      for (let i = 0; i < movies.length; i += BATCH_SIZE) {
+        const batch = movies.slice(i, i + BATCH_SIZE)
+        const results = await Promise.allSettled(
+          batch.map(async (movie) => {
+            let releaseDate: string | null = null
+
+            if (movie.tmdb_id) {
+              try {
+                const details = await getMovieDetails(movie.tmdb_id)
+                releaseDate = details.release_date
+              } catch {
+                // TMDb fetch failed
+              }
+            }
+
+            return { id: movie.id, tmdbReleaseDate: releaseDate, currentReleaseDate: movie.release_date }
+          })
+        )
+
+        for (const result of results) {
+          if (result.status === 'fulfilled' && result.value.tmdbReleaseDate) {
+            const { id, tmdbReleaseDate, currentReleaseDate } = result.value
+            // Only update if TMDb has a date and it differs from what we have
+            if (tmdbReleaseDate !== currentReleaseDate) {
+              updates.push({ id, release_date: tmdbReleaseDate })
+            }
+          }
+        }
+      }
+
+      // 3. Batch update release_date in database
+      if (updates.length > 0) {
+        const { error: updateError } = await supabase
+          .from('movies')
+          .upsert(updates, { onConflict: 'id' })
+
+        if (updateError) throw new Error(`Failed to update release dates: ${updateError.message}`)
+      }
+
+      return { updated: updates.length, checked: movies.length }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: movieKeys.all })
+      queryClient.invalidateQueries({ queryKey: ['profile'] })
+    },
+  })
+}
+
 // ── Batch-fetch genres for movies missing them ──
 
 export function useRefreshMovieGenres() {

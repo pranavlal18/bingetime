@@ -469,7 +469,7 @@ export function useMarkWatched() {
       await queryClient.cancelQueries({ queryKey: showKeys.all })
 
       // Snapshot previous data for rollback
-      const snapshot: { key: unknown[]; data: ShowWithUserData[] | undefined }[] = []
+      const snapshot: { key: unknown[] | readonly unknown[]; data: ShowWithUserData[] | undefined }[] = []
       for (const archived of [true, false]) {
         const key = showKeys.list(archived, user.id)
         const prev = queryClient.getQueryData<ShowWithUserData[]>(key)

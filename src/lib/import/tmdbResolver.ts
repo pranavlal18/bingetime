@@ -59,33 +59,34 @@ export async function resolveShowByTvdbId(tvdbId: number): Promise<ShowResolutio
 }
 
 /**
- * Search TMDb for a movie by title + optional year.
- * Returns the best match, or null if no good match found.
- */
-export async function resolveMovieByTitle(
-  title: string,
-  year?: string
-): Promise<MovieResolution | null> {
-  try {
-    const searchResult = await searchMovie(title, year)
+   * Search TMDb for a movie by title + optional year.
+   * Returns the best match, or null if no good match found.
+   */
+  export async function resolveMovieByTitle(
+    title: string,
+    year?: string
+  ): Promise<MovieResolution | null> {
+    try {
+      const searchResult = await searchMovie(title, year)
 
-    if (!searchResult.results || searchResult.results.length === 0) {
-      console.warn(`No TMDb match for movie: "${title}" (${year || 'no year'})`)
+      if (!searchResult.results || searchResult.results.length === 0) {
+        console.warn(`No TMDb match for movie: "${title}" (${year || 'no year'})`)
+        return null
+      }
+
+      const match = searchResult.results[0]
+      return {
+        title: match.title || title,
+        year: match.release_date ? match.release_date.substring(0, 4) : year,
+        tmdb_id: match.id,
+        poster_path: match.poster_path,
+        release_date: match.release_date || null
+      }
+    } catch (error) {
+      console.error(`Error searching movie "${title}" (${year}):`, error)
       return null
     }
-
-    const match = searchResult.results[0]
-    return {
-      title: match.title || title,
-      year: match.release_date ? match.release_date.substring(0, 4) : year,
-      tmdb_id: match.id,
-      poster_path: match.poster_path,
-    }
-  } catch (error) {
-    console.error(`Error searching movie "${title}" (${year}):`, error)
-    return null
   }
-}
 
 /**
  * Resolve a batch of TVDB IDs to TMDb IDs with concurrency control.

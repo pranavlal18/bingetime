@@ -413,6 +413,7 @@ async function fetchWatchedHistory(userId: string): Promise<EpisodeCardData[]> {
         episodeNumber: ep.episode_number,
         episodeName: null, // No episode name in Supabase — loaded lazily
         totalEpisodes: show.total_episodes,
+        episodesRemaining: null, // Unknown in this context
         isWatched: true,
         watchedAt: ep.watched_at ?? undefined,
         showStatus: show.status,

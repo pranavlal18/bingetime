@@ -208,7 +208,7 @@ function ImportingContent({
           const isSkipped = step.status === 'skipped'
 
           let icon: keyof typeof Ionicons.glyphMap = 'ellipse-outline'
-          let iconColor = colors.onSurfaceVariant
+          let iconColor: string = colors.onSurfaceVariant
 
           if (isDone) { icon = 'checkmark-circle'; iconColor = colors.success }
           if (isError) { icon = 'alert-circle'; iconColor = colors.error }
@@ -518,7 +518,7 @@ const styles = StyleSheet.create({
   warningsTitle: {
     fontSize: typography.labelMd.fontSize,
     fontWeight: '600',
-    color: colors.warning,
+    color: colors.tertiary,
     marginBottom: 8,
   },
   warningsList: {

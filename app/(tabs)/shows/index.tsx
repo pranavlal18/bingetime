@@ -300,9 +300,9 @@ export default function ShowsScreen() {
 
   const renderGridItem = useCallback(
     ({ item }: { item: ShowWithUserData }) => (
-      <ShowCard show={item} onMarkWatched={handleMarkWatched} />
+      <ShowCard show={item} />
     ),
-    [handleMarkWatched]
+    []
   )
 
   const renderEpisodeItem = useCallback(

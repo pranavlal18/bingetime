@@ -63,6 +63,7 @@ export interface MovieResolution {
   year: string | undefined
   tmdb_id: number
   poster_path: string | null
+  release_date: string | null
 }
 
 // ── Raw CSV Row Types (matching actual CSV columns) ──

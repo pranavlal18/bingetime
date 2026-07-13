@@ -55,8 +55,8 @@ export default function ShowDetailScreen() {
   })
 
   // ── Derived ──
-  const posterUrl = getImageUrl(show?.poster_path, 'w342')
-  const tmdbPosterUrl = tmdbDetails ? getImageUrl(tmdbDetails.poster_path, 'w342') : null
+  const posterUrl = getImageUrl(show?.poster_path ?? null, 'w342')
+  const tmdbPosterUrl = tmdbDetails ? getImageUrl(tmdbDetails.poster_path ?? null, 'w342') : null
   const displayPoster = posterUrl || tmdbPosterUrl
   const backdropUrl = tmdbDetails?.backdrop_path
     ? getImageUrl(tmdbDetails.backdrop_path, 'w780')
@@ -64,7 +64,7 @@ export default function ShowDetailScreen() {
 
   const displayName = show?.name || tmdbDetails?.name || 'Unknown'
   const year = show?.last_air_date?.slice(0, 4) || tmdbDetails?.last_air_date?.slice(0, 4)
-  const totalEpisodes = show?.total_episodes
+  const totalEpisodes = show?.total_episodes ?? null
   const episodesSeen = Math.min(show?.episodes_seen ?? 0, totalEpisodes ?? Infinity)
   const progress = totalEpisodes && totalEpisodes > 0
     ? episodesSeen / totalEpisodes

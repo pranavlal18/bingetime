@@ -141,6 +141,7 @@ async function fetchUpcomingEpisodes(userId: string): Promise<EpisodeSection[]> 
       episodeNumber: r.episodeNumber,
       episodeName: r.episodeName,
       totalEpisodes: null,
+      episodesRemaining: null,
       isWatched: false,
       airTime: null, // TMDb doesn't provide time in next_episode_to_air
       network: r.networkName,
