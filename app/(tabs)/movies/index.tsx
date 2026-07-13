@@ -274,7 +274,6 @@ export default function MoviesScreen() {
         renderItem={renderItem}
         numColumns={isGrid ? 2 : 1}
         key={isGrid ? 'grid' : 'list'}
-        estimatedItemSize={isGrid ? 280 : 100}
         contentContainerStyle={[
           styles.listContent,
           filteredMovies.length === 0 && styles.listContentEmpty,

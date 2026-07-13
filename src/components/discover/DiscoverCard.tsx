@@ -15,6 +15,7 @@ interface DiscoverCardProps {
   onRemove: (item: DiscoverResult) => void
   isAdding: boolean
   isRemoving: boolean
+  isInLibrary: boolean
 }
 
 const DiscoverCard = memo(function DiscoverCard({
@@ -23,6 +24,7 @@ const DiscoverCard = memo(function DiscoverCard({
   onRemove,
   isAdding,
   isRemoving,
+  isInLibrary,
 }: DiscoverCardProps) {
   const posterUrl = getImageUrl(item.poster_path, 'w92')
 
@@ -72,16 +74,16 @@ const DiscoverCard = memo(function DiscoverCard({
       <Pressable
         style={[
           styles.toggleButton,
-          item.inLibrary && styles.toggleButtonActive,
+          isInLibrary && styles.toggleButtonActive,
         ]}
-        onPress={() => (item.inLibrary ? onRemove(item) : onAdd(item))}
+        onPress={() => (isInLibrary ? onRemove(item) : onAdd(item))}
         disabled={isLoading}
       >
           {isLoading ? (
             <ActivityIndicator size="small" color="#fff" />
           ) : (
             <Ionicons
-              name={item.inLibrary ? 'checkmark' : 'add'}
+              name={isInLibrary ? 'checkmark' : 'add'}
               size={20}
               color="#fff"
             />

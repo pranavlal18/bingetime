@@ -17,7 +17,7 @@ import { FlashList } from '@shopify/flash-list'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Image } from 'expo-image'
 import { Ionicons } from '@expo/vector-icons'
-import { router } from 'expo-router'
+import { router, usePathname } from 'expo-router'
 import {
   useTrending,
   useSearch,
@@ -76,6 +76,7 @@ export default function DiscoverScreen() {
   const [isSearchVisible, setIsSearchVisible] = useState(false)
   const [addingIds, setAddingIds] = useState<Set<number>>(new Set())
   const [removingIds, setRemovingIds] = useState<Set<number>>(new Set())
+  const localLibraryRef = useRef<Map<number, 'added' | 'removed'>>(new Map())
   const inputRef = useRef<TextInput>(null)
   const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -93,6 +94,21 @@ export default function DiscoverScreen() {
   const isSearching = debouncedQuery.length > 0
 
   const { data: trending, isLoading: trendingLoading, isRefetching, refetch } = useTrending('all')
+
+  // Refetch trending when navigating back to this tab
+  // Clear local library tracking so previously-added items disappear
+  const pathname = usePathname()
+  const prevPathname = useRef(pathname)
+  useEffect(() => {
+    if (prevPathname.current !== pathname) {
+      prevPathname.current = pathname
+      if (pathname === '/(tabs)/discover') {
+        localLibraryRef.current = new Map()
+        refetch()
+      }
+    }
+  }, [pathname, refetch])
+
   const { data: searchResults, isLoading: searchLoading } = useSearch(
     isSearching ? debouncedQuery : '',
     'all'
@@ -100,19 +116,32 @@ export default function DiscoverScreen() {
   const addMutation = useAddToLibrary()
   const removeMutation = useRemoveFromLibrary()
 
-  // Split trending into two sets for visual variety
-  const trendingForYou = useMemo(() => {
+  // Filter trending list to exclude items already in the library
+  // (Unless they were added or removed in the current session)
+  const filteredTrending = useMemo(() => {
     if (!trending) return []
-    return trending.slice(0, Math.ceil(trending.length / 2))
+    return trending.filter((item) => {
+      const localStatus = localLibraryRef.current.get(item.tmdbId)
+      if (localStatus === 'added') return true
+      if (localStatus === 'removed') return true
+      return !item.inLibrary
+    })
   }, [trending])
 
+  // Split trending into two sets for visual variety
+  // NOTE: data array reference stays stable during session (setQueriesData removed)
+  const trendingForYou = useMemo(() => {
+    return filteredTrending.slice(0, Math.ceil(filteredTrending.length / 2))
+  }, [filteredTrending])
+
   const recommended = useMemo(() => {
-    if (!trending) return []
-    return trending.slice(Math.ceil(trending.length / 2))
-  }, [trending])
+    return filteredTrending.slice(Math.ceil(filteredTrending.length / 2))
+  }, [filteredTrending])
 
   const handleAdd = useCallback(
     (item: DiscoverResult) => {
+      // Track in session so it stays visible until tab switch (mutating ref — no re-render)
+      localLibraryRef.current.set(item.tmdbId, 'added')
       setAddingIds((prev) => new Set(prev).add(item.tmdbId))
       addMutation.mutate(item, {
         onSuccess: () => {
@@ -121,6 +150,7 @@ export default function DiscoverScreen() {
         onError: (error: Error) => {
           console.error('❌ [DiscoverScreen] Add error:', error.message)
           Alert.alert('Failed to add', error.message)
+          localLibraryRef.current.delete(item.tmdbId)
         },
         onSettled: () => {
           setAddingIds((prev) => {
@@ -136,6 +166,8 @@ export default function DiscoverScreen() {
 
   const handleRemove = useCallback(
     (item: DiscoverResult) => {
+      // Track removal locally — show item without checkmark even though cache says inLibrary
+      localLibraryRef.current.set(item.tmdbId, 'removed')
       setRemovingIds((prev) => new Set(prev).add(item.tmdbId))
       removeMutation.mutate(item, {
         onSuccess: () => {
@@ -144,6 +176,7 @@ export default function DiscoverScreen() {
         onError: (error: Error) => {
           console.error('❌ [DiscoverScreen] Remove error:', error.message)
           Alert.alert('Failed to remove', error.message)
+          localLibraryRef.current.delete(item.tmdbId)
         },
         onSettled: () => {
           setRemovingIds((prev) => {
@@ -167,49 +200,60 @@ export default function DiscoverScreen() {
 
   // ── Search results render ──
 
+  const addingRef = useRef(addingIds)
+  addingRef.current = addingIds
+  const removingRef = useRef(removingIds)
+  removingRef.current = removingIds
+
   const renderSearchItem = useCallback(
-    ({ item }: { item: DiscoverResult }) => (
-      <DiscoverCard 
-        item={item} 
-        onAdd={handleAdd} 
-        onRemove={handleRemove}
-        isAdding={addingIds.has(item.tmdbId)} 
-        isRemoving={removingIds.has(item.tmdbId)}
-      />
-    ),
-    [handleAdd, handleRemove, addingIds, removingIds]
+    ({ item }: { item: DiscoverResult }) => {
+      const localStatus = localLibraryRef.current.get(item.tmdbId)
+      const effectiveInLibrary = localStatus === 'added' || (localStatus !== 'removed' && item.inLibrary)
+
+      return (
+        <DiscoverCard 
+          item={item} 
+          onAdd={handleAdd} 
+          onRemove={handleRemove}
+          isAdding={addingRef.current.has(item.tmdbId)} 
+          isRemoving={removingRef.current.has(item.tmdbId)}
+          isInLibrary={effectiveInLibrary}
+        />
+      )
+    },
+    [handleAdd, handleRemove]
   )
 
   const searchKeyExtractor = useCallback((item: DiscoverResult) => item.tmdbId.toString(), [])
 
   // ── Footer: trending/recommended sections (only when not searching) ──
-
-  const ListFooter = useCallback(
-    () => (
+  // IMPORTANT: useMemo returns a JSX *element* (not a component function).
+  // Passing an element to ListFooterComponent lets React reconcile the same
+  // tree without remounting — so inner horizontal FlashLists keep scroll position.
+  const listFooterElement = useMemo(() => {
+    if (isSearching) return null
+    return (
       <>
-        {!isSearching && (
-          <>
-            <TrendingSection
-              data={trendingForYou}
-              onAdd={handleAdd}
-              onRemove={handleRemove}
-              addingIds={addingIds}
-              removingIds={removingIds}
-            />
-            <RecommendedSection
-              data={recommended}
-              onAdd={handleAdd}
-              onRemove={handleRemove}
-              addingIds={addingIds}
-              removingIds={removingIds}
-            />
-            <View style={{ height: 32 }} />
-          </>
-        )}
+        <TrendingSection
+          data={trendingForYou}
+          onAdd={handleAdd}
+          onRemove={handleRemove}
+          addingIds={addingIds}
+          removingIds={removingIds}
+          localLibrary={localLibraryRef.current}
+        />
+        <RecommendedSection
+          data={recommended}
+          onAdd={handleAdd}
+          onRemove={handleRemove}
+          addingIds={addingIds}
+          removingIds={removingIds}
+          localLibrary={localLibraryRef.current}
+        />
+        <View style={{ height: 32 }} />
       </>
-    ),
-    [isSearching, trendingForYou, recommended, handleAdd, handleRemove, addingIds, removingIds]
-  )
+    )
+  }, [isSearching, trendingForYou, recommended, handleAdd, handleRemove, addingIds, removingIds])
 
   // ── Loading state ──
 
@@ -259,8 +303,7 @@ export default function DiscoverScreen() {
         data={isSearching ? (searchResults || []) : []}
         keyExtractor={searchKeyExtractor}
         renderItem={renderSearchItem}
-        estimatedItemSize={92}
-        ListFooterComponent={!isSearching ? ListFooter : null}
+        ListFooterComponent={listFooterElement}
         ListEmptyComponent={
           searchLoading && isSearching ? (
             <ActivityIndicator size="large" color={colors.primary} style={styles.loadingContainer} />
@@ -283,6 +326,7 @@ export default function DiscoverScreen() {
         }
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
+        extraData={{ addingIds, removingIds }}
       />
     </View>
   )

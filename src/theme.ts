@@ -167,7 +167,7 @@ export const borderRadius = {
   md: 12,
   lg: 16,
   xl: 24,
-  full: 9999,
+  full: 100, // Fixed: 9999 causes Android background rendering issues with elevation
 } as const
 
 export const tabBar = {

@@ -122,7 +122,6 @@ export default function ContinueWatchingSection({
         keyExtractor={keyExtractor}
         horizontal
         showsHorizontalScrollIndicator={false}
-        estimatedItemSize={ITEM_WIDTH}
         contentContainerStyle={styles.scrollContent}
       />
     </View>

@@ -1,6 +1,6 @@
 // ─── TrendingSection — horizontal carousel of large poster cards ───
 
-import { memo, useCallback } from 'react'
+import { memo, useCallback, useRef } from 'react'
 import { View, Text, Pressable, StyleSheet, Dimensions, ActivityIndicator } from 'react-native'
 import { FlashList } from '@shopify/flash-list'
 import { Image } from 'expo-image'
@@ -21,6 +21,7 @@ interface TrendingSectionProps {
   onRemove: (item: DiscoverResult) => void
   addingIds: Set<number>
   removingIds: Set<number>
+  localLibrary: Map<number, 'added' | 'removed'>
 }
 
 // ── Individual Poster Card ──
@@ -31,6 +32,7 @@ interface PosterCardProps {
   onRemove: (item: DiscoverResult) => void
   isAdding: boolean
   isRemoving: boolean
+  isInLibrary: boolean
 }
 
 const PosterCard = memo(function PosterCard({
@@ -39,6 +41,7 @@ const PosterCard = memo(function PosterCard({
   onRemove,
   isAdding,
   isRemoving,
+  isInLibrary,
 }: PosterCardProps) {
   const posterUrl = getImageUrl(item.poster_path, 'w500')
 
@@ -72,16 +75,16 @@ const PosterCard = memo(function PosterCard({
         <Pressable
             style={[
               styles.inLibraryBadge,
-              item.inLibrary && styles.toggleButtonActive,
+              isInLibrary && styles.toggleButtonActive,
             ]}
-            onPress={() => (item.inLibrary ? onRemove(item) : onAdd(item))}
+            onPress={() => (isInLibrary ? onRemove(item) : onAdd(item))}
             disabled={isLoading}
         >
           {isLoading ? (
             <ActivityIndicator size="small" color="#fff" />
           ) : (
             <Ionicons
-              name={item.inLibrary ? 'checkmark' : 'add'}
+              name={isInLibrary ? 'checkmark' : 'add'}
               size={16}
               color="#fff"
             />
@@ -103,18 +106,31 @@ const PosterCard = memo(function PosterCard({
 
 // ── Trending Section ──
 
-function TrendingSection({ data, onAdd, onRemove, addingIds, removingIds }: TrendingSectionProps) {
+function TrendingSection({ data, onAdd, onRemove, addingIds, removingIds, localLibrary }: TrendingSectionProps) {
+  // Refs keep renderItem stable — FlashList won't reset scroll on add/remove
+  const addingRef = useRef(addingIds)
+  addingRef.current = addingIds
+  const removingRef = useRef(removingIds)
+  removingRef.current = removingIds
+
   const renderItem = useCallback(
-    ({ item }: { item: DiscoverResult }) => (
-      <PosterCard
-        item={item}
-        onAdd={onAdd}
-        onRemove={onRemove}
-        isAdding={addingIds.has(item.tmdbId)}
-        isRemoving={removingIds.has(item.tmdbId)}
-      />
-    ),
-    [onAdd, onRemove, addingIds, removingIds]
+    ({ item }: { item: DiscoverResult }) => {
+      // Combine server status with local session tracking
+      const localStatus = localLibrary.get(item.tmdbId)
+      const effectiveInLibrary = localStatus === 'added' || (localStatus !== 'removed' && item.inLibrary)
+
+      return (
+        <PosterCard
+          item={item}
+          onAdd={onAdd}
+          onRemove={onRemove}
+          isAdding={addingRef.current.has(item.tmdbId)}
+          isRemoving={removingRef.current.has(item.tmdbId)}
+          isInLibrary={effectiveInLibrary}
+        />
+      )
+    },
+    [onAdd, onRemove, localLibrary]
   )
 
   const keyExtractor = useCallback((item: DiscoverResult) => item.tmdbId.toString(), [])
@@ -143,6 +159,7 @@ function TrendingSection({ data, onAdd, onRemove, addingIds, removingIds }: Tren
         horizontal
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.listContent}
+        extraData={{ addingIds, removingIds }}
       />
     </View>
   )

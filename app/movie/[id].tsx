@@ -47,9 +47,9 @@ export default function MovieDetailScreen() {
     staleTime: 1000 * 60 * 60,
   })
 
-  const backdropUrl = tmdbDetails ? getImageUrl(tmdbDetails.backdrop_path, 'w780') : null
-  const posterUrl = getImageUrl(movie?.poster_path, 'w342')
-  const tmdbPosterUrl = tmdbDetails ? getImageUrl(tmdbDetails.poster_path, 'w342') : null
+  const backdropUrl = tmdbDetails ? getImageUrl(tmdbDetails.backdrop_path ?? null, 'w780') : null
+  const posterUrl = getImageUrl(movie?.poster_path ?? null, 'w342')
+  const tmdbPosterUrl = tmdbDetails ? getImageUrl(tmdbDetails.poster_path ?? null, 'w342') : null
   const displayPoster = posterUrl || tmdbPosterUrl
 
   const year = movie?.release_date?.slice(0, 4) || tmdbDetails?.release_date?.slice(0, 4) || null
@@ -197,20 +197,22 @@ export default function MovieDetailScreen() {
 
           {/* ── Watched Status (library items only) ── */}
           {movie && isWatched ? (
-            <Pressable
-              style={({ pressed }) => [styles.watchedButton, pressed && { opacity: 0.9 }]}
-              onPress={handleToggleWatched}
-            >
-              <Ionicons name="checkmark-circle" size={18} color={colors.success} />
-              <Text style={styles.watchedText}>Watched</Text>
+            <Pressable onPress={handleToggleWatched}>
+              {({ pressed }) => (
+                <View style={[styles.watchedButton, pressed && { opacity: 0.9 }]}>
+                  <Ionicons name="checkmark-circle" size={18} color={colors.success} />
+                  <Text style={styles.watchedText}>Watched</Text>
+                </View>
+              )}
             </Pressable>
           ) : movie && !isWatched ? (
-            <Pressable
-              style={({ pressed }) => [styles.watchButton, pressed && styles.watchButtonPressed]}
-              onPress={handleToggleWatched}
-            >
-              <Ionicons name="checkmark" size={18} color={colors.onPrimary} />
-              <Text style={styles.watchButtonText}>Mark as watched</Text>
+            <Pressable onPress={handleToggleWatched}>
+              {({ pressed }) => (
+                <View style={[styles.watchButton, pressed && styles.watchButtonPressed]}>
+                  <Ionicons name="checkmark" size={18} color={colors.onPrimary} />
+                  <Text style={styles.watchButtonText}>Mark as watched</Text>
+                </View>
+              )}
             </Pressable>
           ) : null}
 

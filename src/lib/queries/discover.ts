@@ -192,10 +192,16 @@ export function useAddToLibrary() {
       }
       return addMovieToLibrary(item, user.id)
     },
-    onSuccess: (libraryId) => {
+    onSuccess: (libraryId, item) => {
       console.log('✅ [useAddToLibrary] Added to library:', libraryId)
-      // Refresh discover (library status) and profile (watchlist)
-      queryClient.invalidateQueries({ queryKey: discoverKeys.all })
+      
+      // Manually update the discover cache so it's not stale when switching tabs
+      queryClient.setQueriesData<DiscoverResult[]>({ queryKey: ['discover'] }, (old) => {
+        if (!Array.isArray(old)) return old
+        return old.map(r => r.tmdbId === item.tmdbId ? { ...r, inLibrary: true, libraryId: libraryId as string } : r)
+      })
+
+      // Refresh movies/shows/profile
       queryClient.invalidateQueries({ queryKey: ['movies'] })
       queryClient.invalidateQueries({ queryKey: ['shows'] })
       queryClient.invalidateQueries({ queryKey: ['profile'] })
@@ -219,9 +225,16 @@ export function useRemoveFromLibrary() {
       }
       return removeMovieFromLibrary(item.libraryId, user.id)
     },
-    onSuccess: () => {
+    onSuccess: (_data, item) => {
       console.log('✅ [useRemoveFromLibrary] Removed from library')
-      queryClient.invalidateQueries({ queryKey: discoverKeys.all })
+      
+      // Manually update the discover cache so it's not stale when switching tabs
+      queryClient.setQueriesData<DiscoverResult[]>({ queryKey: ['discover'] }, (old) => {
+        if (!Array.isArray(old)) return old
+        return old.map(r => r.tmdbId === item.tmdbId ? { ...r, inLibrary: false, libraryId: undefined } : r)
+      })
+
+      // Refresh movies/shows/profile
       queryClient.invalidateQueries({ queryKey: ['movies'] })
       queryClient.invalidateQueries({ queryKey: ['shows'] })
       queryClient.invalidateQueries({ queryKey: ['profile'] })

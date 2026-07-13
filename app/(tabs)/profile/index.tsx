@@ -160,9 +160,9 @@ const SettingsRow = memo(function SettingsRow({
         <Text style={styles.settingsLabel}>{label}</Text>
       </View>
       <View style={styles.settingsRowRight}>
-        {rightLabel && (
+        {rightLabel ? (
           <Text style={styles.settingsRightLabel}>{rightLabel}</Text>
-        )}
+        ) : null}
         {showChevron && (
           <Ionicons name="chevron-forward" size={16} color={colors.outlineVariant} />
         )}

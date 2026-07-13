@@ -137,6 +137,7 @@ async function updateEpisodesSeen(
     user_id: userId,
     episodes_seen: count ?? 0,
     is_following: true,
+    is_watchlist: true,
   }
 
   if (lastWatched) {
@@ -321,6 +322,7 @@ export function useBatchMarkWatched() {
         user_id: user.id,
         episodes_seen: count ?? 0,
         is_following: true,
+        is_watchlist: true,
       }
 
       upsertData.last_watched_episode_data = {

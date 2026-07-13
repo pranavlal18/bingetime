@@ -438,6 +438,7 @@ async function markEpisodeWatched(
           updated_at: new Date().toISOString(),
         },
         is_following: true,
+        is_watchlist: true,
       },
       { onConflict: 'show_id,user_id' }
     )

@@ -1,6 +1,6 @@
 // ─── Trending Now — Full-screen grid of all trending content ───
 
-import { useCallback, useState } from 'react'
+import { useCallback, useState, useRef, useMemo, memo } from 'react'
 import {
   View,
   Text,
@@ -45,9 +45,10 @@ interface GridCardProps {
   onRemove: (item: DiscoverResult) => void
   isAdding: boolean
   isRemoving: boolean
+  isInLibrary: boolean
 }
 
-function GridCard({ item, onAdd, onRemove, isAdding, isRemoving }: GridCardProps) {
+const GridCard = memo(function GridCard({ item, onAdd, onRemove, isAdding, isRemoving, isInLibrary }: GridCardProps) {
   const posterUrl = getImageUrl(item.poster_path, 'w342')
   const isLoading = isAdding || isRemoving
 
@@ -78,16 +79,16 @@ function GridCard({ item, onAdd, onRemove, isAdding, isRemoving }: GridCardProps
         <Pressable
           style={[
             styles.toggleButton,
-            item.inLibrary && styles.toggleButtonActive,
+            isInLibrary && styles.toggleButtonActive,
           ]}
-          onPress={() => (item.inLibrary ? onRemove(item) : onAdd(item))}
+          onPress={() => (isInLibrary ? onRemove(item) : onAdd(item))}
           disabled={isLoading}
         >
           {isLoading ? (
             <ActivityIndicator size="small" color="#fff" />
           ) : (
             <Ionicons
-              name={item.inLibrary ? 'checkmark' : 'add'}
+              name={isInLibrary ? 'checkmark' : 'add'}
               size={16}
               color="#fff"
             />
@@ -104,7 +105,7 @@ function GridCard({ item, onAdd, onRemove, isAdding, isRemoving }: GridCardProps
       </Text>
     </Pressable>
   )
-}
+})
 
 // ── Screen ──
 
@@ -117,14 +118,23 @@ export default function TrendingScreen() {
   const removeMutation = useRemoveFromLibrary()
   const [addingIds, setAddingIds] = useState<Set<number>>(new Set())
   const [removingIds, setRemovingIds] = useState<Set<number>>(new Set())
+  const localLibraryRef = useRef<Map<number, 'added' | 'removed'>>(new Map())
+
+  // Refs for stable renderItem
+  const addingRef = useRef(addingIds)
+  addingRef.current = addingIds
+  const removingRef = useRef(removingIds)
+  removingRef.current = removingIds
 
   const handleAdd = useCallback(
     (item: DiscoverResult) => {
+      localLibraryRef.current.set(item.tmdbId, 'added')
       setAddingIds((prev) => new Set(prev).add(item.tmdbId))
       addMutation.mutate(item, {
         onError: (error: Error) => {
           console.error('[TrendingScreen] Add error:', error.message)
           Alert.alert('Failed to add', error.message)
+          localLibraryRef.current.delete(item.tmdbId)
         },
         onSettled: () => {
           setAddingIds((prev) => {
@@ -140,11 +150,13 @@ export default function TrendingScreen() {
 
   const handleRemove = useCallback(
     (item: DiscoverResult) => {
+      localLibraryRef.current.set(item.tmdbId, 'removed')
       setRemovingIds((prev) => new Set(prev).add(item.tmdbId))
       removeMutation.mutate(item, {
         onError: (error: Error) => {
           console.error('[TrendingScreen] Remove error:', error.message)
           Alert.alert('Failed to remove', error.message)
+          localLibraryRef.current.delete(item.tmdbId)
         },
         onSettled: () => {
           setRemovingIds((prev) => {
@@ -159,16 +171,22 @@ export default function TrendingScreen() {
   )
 
   const renderItem = useCallback(
-    ({ item }: { item: DiscoverResult }) => (
-      <GridCard
-        item={item}
-        onAdd={handleAdd}
-        onRemove={handleRemove}
-        isAdding={addingIds.has(item.tmdbId)}
-        isRemoving={removingIds.has(item.tmdbId)}
-      />
-    ),
-    [handleAdd, handleRemove, addingIds, removingIds]
+    ({ item }: { item: DiscoverResult }) => {
+      const localStatus = localLibraryRef.current.get(item.tmdbId)
+      const effectiveInLibrary = localStatus === 'added' || (localStatus !== 'removed' && item.inLibrary)
+
+      return (
+        <GridCard
+          item={item}
+          onAdd={handleAdd}
+          onRemove={handleRemove}
+          isAdding={addingRef.current.has(item.tmdbId)}
+          isRemoving={removingRef.current.has(item.tmdbId)}
+          isInLibrary={effectiveInLibrary}
+        />
+      )
+    },
+    [handleAdd, handleRemove]
   )
 
   const keyExtractor = useCallback((item: DiscoverResult) => item.tmdbId.toString(), [])
@@ -221,6 +239,7 @@ export default function TrendingScreen() {
         numColumns={2}
         contentContainerStyle={styles.gridContent}
         showsVerticalScrollIndicator={false}
+        extraData={{ addingIds, removingIds }}
         refreshControl={
           <RefreshControl
             refreshing={isRefetching}

@@ -156,6 +156,7 @@ export function useMarkMovieWatched() {
           user_id: user.id,
           watched: true,
           watched_at: new Date().toISOString(),
+          is_watchlist: true,
         },
         { onConflict: 'movie_id,user_id' }
       )
@@ -192,6 +193,7 @@ export function useToggleMovieWatched() {
           user_id: user.id,
           watched: newWatched,
           watched_at: newWatched ? new Date().toISOString() : null,
+          ...(newWatched ? { is_watchlist: true } : {}),
         },
         { onConflict: 'movie_id,user_id' }
       )

@@ -9,7 +9,7 @@ import { StyleSheet, ActivityIndicator, View, Linking, Platform } from 'react-na
 import { useAuth, AuthProvider } from '@/contexts/AuthContext'
 import { useSegments, useRouter } from 'expo-router'
 
-const queryClient = new QueryClient({
+export const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       staleTime: 1000 * 60 * 5,
