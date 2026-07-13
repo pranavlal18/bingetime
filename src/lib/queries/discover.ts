@@ -230,11 +230,14 @@ async function removeMovieFromLibrary(movieId: string, userId: string) {
 }
 
 async function addShowToLibrary(item: DiscoverResult, userId: string): Promise<string> {
-  // 1. Get TVDB ID from TMDb
-  const external = await tmdb.getExternalIds(item.tmdbId, 'tv')
+  // 1. Get TVDB ID + show details (number_of_episodes) from TMDb
+  const [external, details] = await Promise.all([
+    tmdb.getExternalIds(item.tmdbId, 'tv'),
+    tmdb.getShowDetails(item.tmdbId).catch(() => null),
+  ])
 
   // 2. Upsert show record (tvdb_id is unique NOT NULL)
-  console.log('🔍 [addShowToLibrary] Upserting show:', { tmdbId: item.tmdbId, tvdbId: external.tvdb_id, title: item.title })
+  console.log('🔍 [addShowToLibrary] Upserting show:', { tmdbId: item.tmdbId, tvdbId: external.tvdb_id, title: item.title, totalEps: details?.number_of_episodes })
   const { data: show, error: showError } = await supabase
     .from('shows')
     .upsert(
@@ -244,6 +247,7 @@ async function addShowToLibrary(item: DiscoverResult, userId: string): Promise<s
         name: item.title,
         poster_path: item.poster_path,
         last_air_date: item.year ? `${item.year}-01-01` : null,
+        total_episodes: details?.number_of_episodes ?? null,
       },
       { onConflict: 'tvdb_id' }
     )

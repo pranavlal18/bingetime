@@ -64,7 +64,9 @@ export default function ShowDetailScreen() {
   const year = show?.last_air_date?.slice(0, 4) || tmdbDetails?.last_air_date?.slice(0, 4)
   const totalEpisodes = show?.total_episodes
   const episodesSeen = Math.min(show?.episodes_seen ?? 0, totalEpisodes ?? Infinity)
-  const progress = totalEpisodes && totalEpisodes > 0 ? episodesSeen / totalEpisodes : 0
+  const progress = totalEpisodes && totalEpisodes > 0
+    ? episodesSeen / totalEpisodes
+    : episodesSeen > 0 ? 1 : 0
   const progressPercent = Math.round(progress * 100)
   const allCaughtUp = totalEpisodes !== null && totalEpisodes > 0 && episodesSeen >= totalEpisodes
 
