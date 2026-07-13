@@ -116,19 +116,11 @@ function RecommendedSection({ data, onAdd, onRemove, addingIds, removingIds }: R
 
   const keyExtractor = useCallback((item: DiscoverResult) => item.tmdbId.toString(), [])
 
-  const handleRefresh = useCallback(() => {
-    // Future: refetch with different data
-  }, [])
-
   return (
     <View style={styles.section}>
       {/* Section header */}
       <View style={styles.sectionHeader}>
         <Text style={styles.sectionTitle}>Recommended for You</Text>
-        <Pressable onPress={handleRefresh} style={styles.refreshBtn}>
-          <Ionicons name="refresh" size={14} color={colors.primary} />
-          <Text style={styles.refreshText}>Refresh</Text>
-        </Pressable>
       </View>
 
       {/* Horizontal carousel */}
@@ -162,17 +154,6 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: colors.onSurface,
     letterSpacing: -0.01,
-  },
-  refreshBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  refreshText: {
-    fontFamily: 'Inter',
-    fontSize: 14,
-    fontWeight: '600',
-    color: colors.primary,
   },
   listContent: {
     paddingHorizontal: SIDE_OFFSET,

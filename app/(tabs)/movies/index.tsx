@@ -220,10 +220,7 @@ export default function MoviesScreen() {
     <View style={[styles.container, { paddingTop: insets.top }]}>
       {/* ── AppBar ── */}
       <View style={styles.appBar}>
-        <View style={styles.appBarLeft}>
-          <Ionicons name="menu" size={22} color={colors.primary} />
-          <Text style={styles.appBarTitle}>BingeTime</Text>
-        </View>
+        <Text style={styles.appBarTitle}>Movies</Text>
         <View style={styles.appBarRight}>
           {/* View mode toggle — matches Shows tab */}
           <Pressable onPress={toggleViewMode} style={styles.appBarBtn}>
@@ -288,7 +285,6 @@ export default function MoviesScreen() {
               active={activeSegment}
               onChange={setActiveSegment}
             />
-            <Text style={styles.sectionTitle}>Movies</Text>
           </View>
         }
         ListEmptyComponent={emptyState}
@@ -330,11 +326,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: PAGE_PADDING,
     height: 64,
-  },
-  appBarLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
   },
   appBarTitle: {
     fontFamily: 'Inter',

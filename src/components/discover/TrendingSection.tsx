@@ -120,7 +120,7 @@ function TrendingSection({ data, onAdd, onRemove, addingIds, removingIds }: Tren
   const keyExtractor = useCallback((item: DiscoverResult) => item.tmdbId.toString(), [])
 
   const handleSeeAll = useCallback(() => {
-    // Scroll to the end or future expansion
+    router.push('/discover/trending')
   }, [])
 
   return (

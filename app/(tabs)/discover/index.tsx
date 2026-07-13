@@ -224,14 +224,9 @@ export default function DiscoverScreen() {
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
-      {/* TopAppBar — matches HTML reference */}
+      {/* TopAppBar */}
       <View style={styles.topAppBar}>
-        <View style={styles.topAppBarLeft}>
-          <Pressable style={styles.iconButton}>
-            <Ionicons name="menu" size={24} color={colors.primary} />
-          </Pressable>
-          <Text style={styles.topAppBarTitle}>BingeTime</Text>
-        </View>
+        <Text style={styles.topAppBarTitle}>Discover</Text>
         <Pressable
           style={[styles.iconButton, isSearchVisible && styles.iconButtonActive]}
           onPress={() => {
@@ -313,11 +308,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.marginMobile,
     height: 64,
     backgroundColor: 'rgba(21,18,27,0.8)',
-  },
-  topAppBarLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 16,
   },
   topAppBarTitle: {
     fontFamily: 'Inter',
