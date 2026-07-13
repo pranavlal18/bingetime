@@ -15,11 +15,12 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Image } from 'expo-image'
 import { Ionicons } from '@expo/vector-icons'
 import { LinearGradient } from 'expo-linear-gradient'
-import { useShow, useMarkWatched } from '@/lib/queries/shows'
+import { useShow, useMarkWatched, useToggleFavorite } from '@/lib/queries/shows'
 import { useSeasonEpisodes, useToggleEpisodeWatched, useBatchMarkWatched } from '@/lib/queries/episodes'
 import { getShowDetails, getImageUrl } from '@/lib/tmdb'
 import { useQuery } from '@tanstack/react-query'
 import LibraryToggle from '@/components/ui/LibraryToggle'
+import FavoriteToggle from '@/components/ui/FavoriteToggle'
 import { colors, typography, spacing, borderRadius } from '@/theme'
 import EpisodeDetailModal from '@/components/episodes/EpisodeDetailModal'
 import type { EpisodeWithStatus } from '@/lib/queries/episodes'
@@ -41,6 +42,7 @@ export default function ShowDetailScreen() {
   // ── Data ──
   const { data: show, isLoading, error } = useShow(id)
   const markWatchedMutation = useMarkWatched()
+  const toggleFavoriteMutation = useToggleFavorite()
 
   // Resolve TMDb ID — either from the DB record or directly from the param
   const resolvedTmdbId = show?.tmdb_id ?? (isTmdbIdParam ? parseInt(id, 10) : null)
@@ -308,9 +310,17 @@ export default function ShowDetailScreen() {
             <Ionicons name="chevron-back" size={24} color={colors.onSurface} />
           </Pressable>
 
-          {/* Library toggle — top-right */}
+          {/* Action buttons — top-right: Favorite + Library toggle */}
           {resolvedTmdbId && (
-            <View style={[styles.libraryOverlay, { top: insets.top + 8 }]}>
+            <View style={[styles.actionOverlay, { top: insets.top + 8 }]}>
+              {hasLocalData && (
+                <FavoriteToggle
+                  isFavorited={show?.is_favorited ?? false}
+                  onToggle={() => toggleFavoriteMutation.mutate(show!.id)}
+                  isPending={toggleFavoriteMutation.isPending}
+                  size={28}
+                />
+              )}
               <LibraryToggle
                 tmdbId={resolvedTmdbId}
                 mediaType="tv"
@@ -700,10 +710,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
 
-  // Library toggle (top-right)
-  libraryOverlay: {
+  // Action buttons (top-right)
+  actionOverlay: {
     position: 'absolute',
     right: spacing.marginMobile,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
   },
 
   // Content body

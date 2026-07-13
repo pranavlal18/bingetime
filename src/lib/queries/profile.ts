@@ -21,7 +21,7 @@ export interface ProfileStats {
 
 export interface FavoriteShow extends Show {
   episodes_seen: number
-  favorited_at?: string
+  favorited_at: string | null
 }
 
 export interface WatchlistShow extends Show {
@@ -93,9 +93,10 @@ export function useProfileStats() {
 async function fetchFavorites(userId: string): Promise<FavoriteShow[]> {
   const { data, error } = await supabase
     .from('user_shows')
-    .select('episodes_seen, shows(*)')
+    .select('episodes_seen, favorited_at, shows(*)')
     .eq('user_id', userId)
     .eq('is_favorited', true)
+    .order('favorited_at', { ascending: false })
 
   if (error) throw new Error(error.message)
   if (!data) return []
@@ -112,6 +113,7 @@ async function fetchFavorites(userId: string): Promise<FavoriteShow[]> {
       total_episodes: show.total_episodes,
       last_air_date: show.last_air_date,
       episodes_seen: row.episodes_seen ?? 0,
+      favorited_at: row.favorited_at ?? null,
     }
   })
 }

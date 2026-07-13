@@ -117,6 +117,14 @@ function InnerLayout() {
             name="all-movies"
             options={{ animation: 'slide_from_right' }}
           />
+          <Stack.Screen
+            name="favorite-shows"
+            options={{ animation: 'slide_from_right' }}
+          />
+          <Stack.Screen
+            name="favorite-movies"
+            options={{ animation: 'slide_from_right' }}
+          />
         </Stack>
       </QueryClientProvider>
     </GestureHandlerRootView>

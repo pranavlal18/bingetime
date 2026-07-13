@@ -13,6 +13,12 @@ export interface MovieWithUserData extends Movie {
   watched: boolean
   watched_at: string | null
   is_watchlist: boolean
+  is_favorited: boolean
+}
+
+export interface FavoriteMovie extends Movie {
+  watched: boolean
+  favorited_at: string | null
 }
 
 function mapRow(row: any): MovieWithUserData {
@@ -32,6 +38,7 @@ function mapRow(row: any): MovieWithUserData {
     watched: um.watched ?? false,
     watched_at: um.watched_at ?? null,
     is_watchlist: um.is_watchlist ?? false,
+    is_favorited: um.is_favorited ?? false,
   }
 }
 
@@ -41,6 +48,7 @@ export const movieKeys = {
   all: ['movies'] as const,
   list: (userId: string) => ['movies', 'list', userId] as const,
   detail: (id: string) => ['movies', 'detail', id] as const,
+  favorites: (userId: string) => ['movies', 'favorites', userId] as const,
 }
 
 // ── Sorting ──
@@ -402,6 +410,81 @@ export function useRefreshMovieGenres() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: movieKeys.all })
     },
+  })
+}
+
+// ── Toggle movie favorite ──
+
+async function toggleMovieFavorite(movieId: string, userId: string): Promise<void> {
+  const { data: um } = await supabase
+    .from('user_movies')
+    .select('is_favorited')
+    .eq('movie_id', movieId)
+    .eq('user_id', userId)
+    .single()
+
+  const current = um?.is_favorited ?? false
+  const newValue = !current
+
+  await supabase
+    .from('user_movies')
+    .update({
+      is_favorited: newValue,
+      favorited_at: newValue ? new Date().toISOString() : null,
+    })
+    .eq('movie_id', movieId)
+    .eq('user_id', userId)
+}
+
+export function useToggleMovieFavorite() {
+  const { user } = useAuth()
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: (movieId: string) => toggleMovieFavorite(movieId, user?.id ?? ''),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: movieKeys.all })
+    },
+  })
+}
+
+// ── Fetch favorite movies ──
+
+async function fetchFavoriteMovies(userId: string): Promise<FavoriteMovie[]> {
+  const { data, error } = await supabase
+    .from('user_movies')
+    .select('watched, favorited_at, movies(*)')
+    .eq('user_id', userId)
+    .eq('is_favorited', true)
+    .order('favorited_at', { ascending: false })
+
+  if (error) throw new Error(error.message)
+  if (!data) return []
+
+  return data.map((row: any) => {
+    const movie = row.movies
+    return {
+      id: movie.id,
+      tmdb_id: movie.tmdb_id,
+      title: movie.title,
+      release_date: movie.release_date,
+      runtime: movie.runtime,
+      poster_path: movie.poster_path,
+      genres: movie.genres ?? null,
+      watched: row.watched,
+      favorited_at: row.favorited_at ?? null,
+    }
+  })
+}
+
+export function useFavoriteMovies() {
+  const { user } = useAuth()
+
+  return useQuery({
+    queryKey: movieKeys.favorites(user?.id ?? ''),
+    queryFn: () => fetchFavoriteMovies(user?.id ?? ''),
+    staleTime: 1000 * 60 * 5,
+    enabled: !!user,
   })
 }
 

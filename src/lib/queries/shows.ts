@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabase'
 import { getImageUrl } from '@/lib/tmdb'
 import { useAuth } from '@/contexts/AuthContext'
 import { episodeKeys } from './episodes'
+import { profileKeys } from './profile'
 import type { Show, UserShow } from '@/types'
 
 // ── Types for joined query result ──
@@ -560,10 +561,14 @@ async function toggleFavorite(showId: string, userId: string): Promise<void> {
     .single()
 
   const current = us?.is_favorited ?? false
+  const newValue = !current
 
   await supabase
     .from('user_shows')
-    .update({ is_favorited: !current })
+    .update({
+      is_favorited: newValue,
+      favorited_at: newValue ? new Date().toISOString() : null,
+    })
     .eq('show_id', showId)
     .eq('user_id', userId)
 }
@@ -576,6 +581,9 @@ export function useToggleFavorite() {
     mutationFn: (showId: string) => toggleFavorite(showId, user?.id ?? ''),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: showKeys.all })
+      if (user) {
+        queryClient.invalidateQueries({ queryKey: profileKeys.favorites(user.id) })
+      }
     },
   })
 }

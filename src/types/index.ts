@@ -71,6 +71,7 @@ export interface UserMovie {
   watched: boolean
   watched_at: string | null
   is_watchlist: boolean
+  is_favorited: boolean
 }
 
 // ── Lists ──

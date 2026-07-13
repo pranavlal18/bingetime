@@ -17,10 +17,11 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Image } from 'expo-image'
 import { Ionicons } from '@expo/vector-icons'
 import { LinearGradient } from 'expo-linear-gradient'
-import { useMovie, useToggleMovieWatched } from '@/lib/queries/movies'
+import { useMovie, useToggleMovieWatched, useToggleMovieFavorite } from '@/lib/queries/movies'
 import { getMovieDetails, getImageUrl } from '@/lib/tmdb'
 import { useQuery } from '@tanstack/react-query'
 import LibraryToggle from '@/components/ui/LibraryToggle'
+import FavoriteToggle from '@/components/ui/FavoriteToggle'
 import { colors, typography, spacing, borderRadius } from '@/theme'
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window')
@@ -36,6 +37,7 @@ export default function MovieDetailScreen() {
 
   const { data: movie, isLoading, error } = useMovie(id)
   const toggleWatchedMutation = useToggleMovieWatched()
+  const toggleFavoriteMutation = useToggleMovieFavorite()
 
   // Resolve TMDb ID — either from the DB record or directly from the param
   const resolvedTmdbId = movie?.tmdb_id ?? (isTmdbIdParam ? parseInt(id, 10) : null)
@@ -140,9 +142,17 @@ export default function MovieDetailScreen() {
             <Ionicons name="chevron-back" size={24} color={colors.primary} />
           </Pressable>
 
-          {/* Library toggle — top-right */}
+          {/* Action buttons — top-right: Favorite + Library toggle */}
           {resolvedTmdbId && (
-            <View style={[styles.libraryOverlay, { top: insets.top + 8 }]}>
+            <View style={[styles.actionOverlay, { top: insets.top + 8 }]}>
+              {movie && (
+                <FavoriteToggle
+                  isFavorited={movie.is_favorited}
+                  onToggle={() => toggleFavoriteMutation.mutate(movie.id)}
+                  isPending={toggleFavoriteMutation.isPending}
+                  size={28}
+                />
+              )}
               <LibraryToggle
                 tmdbId={resolvedTmdbId}
                 mediaType="movie"
@@ -296,10 +306,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     zIndex: 10,
   },
-  libraryOverlay: {
+  actionOverlay: {
     position: 'absolute',
     right: spacing.marginMobile,
     zIndex: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
   },
 
   // ── Info ──

@@ -20,9 +20,10 @@ import { useAppStore } from '@/stores/appStore'
 import { useAuth } from '@/contexts/AuthContext'
 import { getImageUrl } from '@/lib/tmdb'
 import { useShows } from '@/lib/queries/shows'
-import { useMovies } from '@/lib/queries/movies'
+import { useMovies, useFavoriteMovies } from '@/lib/queries/movies'
 import {
   useProfileStats,
+  useFavorites,
 } from '@/lib/queries/profile'
 import { colors, typography, spacing, borderRadius } from '@/theme'
 import type { ShowWithUserData } from '@/lib/queries/shows'
@@ -217,6 +218,8 @@ export default function ProfileScreen() {
   const { data: stats, isLoading: statsLoading } = useProfileStats()
   const { data: shows, isLoading: showsLoading } = useShows(showArchived)
   const { data: movies, isLoading: moviesLoading } = useMovies()
+  const { data: favoriteShows } = useFavorites()
+  const { data: favoriteMovies } = useFavoriteMovies()
 
   // Theme label
   const themeLabel =
@@ -308,6 +311,33 @@ export default function ProfileScreen() {
           </View>
         )}
 
+        {/* ── Favorite Shows ── */}
+        {favoriteShows && favoriteShows.length > 0 && (
+          <View style={styles.carouselSection}>
+            <SectionHeader
+              title="Favorite Shows"
+              icon="heart"
+              iconColor="#ff3b30"
+              count={favoriteShows.length}
+              onPress={() => router.push('/favorite-shows')}
+            />
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.carouselContent}
+            >
+              {favoriteShows.slice(0, 10).map((show) => (
+                <PosterItem
+                  key={show.id}
+                  posterPath={show.poster_path}
+                  title={show.name}
+                  onPress={() => router.push(`/show/${show.id}`)}
+                />
+              ))}
+            </ScrollView>
+          </View>
+        )}
+
         {/* ── Movies Carousel (watched movies) ── */}
         {watchedMoviesList.length > 0 && (
           <View style={styles.carouselSection}>
@@ -322,6 +352,33 @@ export default function ProfileScreen() {
               contentContainerStyle={styles.carouselContent}
             >
               {watchedMoviesList.slice(0, 10).map((movie) => (
+                <PosterItem
+                  key={movie.id}
+                  posterPath={movie.poster_path}
+                  title={movie.title}
+                  onPress={() => router.push(`/movie/${movie.id}`)}
+                />
+              ))}
+            </ScrollView>
+          </View>
+        )}
+
+        {/* ── Favorite Movies ── */}
+        {favoriteMovies && favoriteMovies.length > 0 && (
+          <View style={styles.carouselSection}>
+            <SectionHeader
+              title="Favorite Movies"
+              icon="heart"
+              iconColor="#ff3b30"
+              count={favoriteMovies.length}
+              onPress={() => router.push('/favorite-movies')}
+            />
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.carouselContent}
+            >
+              {favoriteMovies.slice(0, 10).map((movie) => (
                 <PosterItem
                   key={movie.id}
                   posterPath={movie.poster_path}
