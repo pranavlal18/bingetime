@@ -6,6 +6,7 @@ import { useCallback, useMemo, useState } from 'react'
 import {
   View,
   Text,
+  TextInput,
   Pressable,
   StyleSheet,
   Dimensions,
@@ -142,6 +143,8 @@ function MovieCardGrid({ movie }: MovieCardGridProps) {
 export default function MoviesScreen() {
   const insets = useSafeAreaInsets()
   const [activeSegment, setActiveSegment] = useState<SegmentKey>('watch-later')
+  const [searchQuery, setSearchQuery] = useState('')
+  const [isSearchVisible, setIsSearchVisible] = useState(false)
   const viewMode = useAppStore((s) => s.viewMode)
   const setViewMode = useAppStore((s) => s.setViewMode)
 
@@ -170,14 +173,18 @@ export default function MoviesScreen() {
 
   const keyExtractor = useCallback((item: MovieWithUserData) => item.id, [])
 
-  // Filter movies based on segment
+  // Filter movies based on segment + search query
   const filteredMovies = useMemo(() => {
     if (!movies) return []
-    if (activeSegment === 'watched') {
-      return movies.filter((m) => m.watched)
-    }
-    return movies.filter((m) => !m.watched)
-  }, [movies, activeSegment])
+    const segmentFiltered = activeSegment === 'watched'
+      ? movies.filter((m) => m.watched)
+      : movies.filter((m) => !m.watched)
+
+    if (!searchQuery.trim()) return segmentFiltered
+
+    const q = searchQuery.trim().toLowerCase()
+    return segmentFiltered.filter((m) => m.title.toLowerCase().includes(q))
+  }, [movies, activeSegment, searchQuery])
 
   // Empty state
   const emptyState = useMemo(() => {
@@ -226,11 +233,42 @@ export default function MoviesScreen() {
               color={colors.onSurfaceVariant}
             />
           </Pressable>
-          <Pressable style={styles.appBarBtn}>
-            <Ionicons name="search-outline" size={20} color={colors.onSurfaceVariant} />
+          <Pressable
+            style={[styles.appBarBtn, isSearchVisible && styles.appBarBtnActive]}
+            onPress={() => {
+              setIsSearchVisible((v) => !v)
+              if (isSearchVisible) setSearchQuery('')
+            }}
+          >
+            <Ionicons
+              name={isSearchVisible ? 'close-outline' : 'search-outline'}
+              size={20}
+              color={isSearchVisible ? colors.primary : colors.onSurfaceVariant}
+            />
           </Pressable>
         </View>
       </View>
+
+      {/* ── Search Bar ── */}
+      {isSearchVisible && (
+        <View style={styles.searchBar}>
+          <Ionicons name="search-outline" size={18} color={colors.onSurfaceVariant} />
+          <TextInput
+            style={styles.searchInput}
+            placeholder={`Search ${activeSegment === 'watched' ? 'watched' : 'watch later'}...`}
+            placeholderTextColor={colors.outline}
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            autoFocus
+            returnKeyType="search"
+          />
+          {searchQuery.length > 0 && (
+            <Pressable onPress={() => setSearchQuery('')} hitSlop={8}>
+              <Ionicons name="close-circle" size={18} color={colors.onSurfaceVariant} />
+            </Pressable>
+          )}
+        </View>
+      )}
 
       {/* ── Content ── */}
       <FlashList
@@ -316,6 +354,28 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.full,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+
+  // ── Search Bar ──
+  searchBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginHorizontal: PAGE_PADDING,
+    marginBottom: spacing.stackSm,
+    backgroundColor: colors.surfaceContainerLow,
+    borderRadius: borderRadius.full,
+    paddingHorizontal: spacing.gutter,
+    height: 44,
+    gap: spacing.stackSm,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: typography.bodyMd.fontSize,
+    color: colors.onSurface,
+    height: '100%',
+  },
+  appBarBtnActive: {
+    backgroundColor: colors.surfaceContainerHigh,
   },
 
   // ── Segmented Control ──

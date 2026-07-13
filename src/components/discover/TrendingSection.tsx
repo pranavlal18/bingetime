@@ -228,7 +228,7 @@ const styles = StyleSheet.create({
   inLibraryBadge: {
     position: 'absolute',
     top: 8,
-    left: 8,
+    right: 8,
     width: 28,
     height: 28,
     borderRadius: 14,
