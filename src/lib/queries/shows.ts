@@ -16,7 +16,6 @@ export interface ShowWithUserData extends Show {
   is_following: boolean
   is_favorited: boolean
   is_watchlist: boolean
-  archived: boolean
   last_watched_episode_data: UserShow['last_watched_episode_data']
 }
 
@@ -39,7 +38,6 @@ function mapRow(row: any): ShowWithUserData {
     is_following: us.is_following ?? true,
     is_favorited: us.is_favorited ?? false,
     is_watchlist: us.is_watchlist ?? false,
-    archived: us.archived ?? false,
     last_watched_episode_data: us.last_watched_episode_data ?? null,
   }
 }
@@ -48,7 +46,7 @@ function mapRow(row: any): ShowWithUserData {
 
 export const showKeys = {
   all: ['shows'] as const,
-  list: (showArchived: boolean, userId: string) => ['shows', 'list', { showArchived, userId }] as const,
+  list: (userId: string) => ['shows', 'list', userId] as const,
   continueWatching: (userId: string) => ['shows', 'continue-watching', userId] as const,
   detail: (id: string) => ['shows', 'detail', id] as const,
 }
@@ -56,7 +54,6 @@ export const showKeys = {
 // ── Fetch all shows (with user data join) ──
 
 async function fetchShows(
-  showArchived: boolean,
   userId: string,
   queryClient?: QueryClient
 ): Promise<ShowWithUserData[]> {
@@ -65,11 +62,6 @@ async function fetchShows(
     .from('shows')
     .select('*, user_shows!inner(*)')
     .eq('user_shows.user_id', userId)
-
-  if (!showArchived) {
-    // Only show non-archived shows
-    query = query.not('user_shows.archived', 'eq', true)
-  }
 
   const { data, error } = await query
 
@@ -81,11 +73,6 @@ async function fetchShows(
   let result = data.map(mapRow)
 
   console.log('🔍 [fetchShows] After mapping:', { count: result.length, watchlist: result.filter(s => s.is_watchlist).length })
-
-  // Filter: if not showing archived, exclude archived
-  if (!showArchived) {
-    result = result.filter((s) => !s.archived)
-  }
 
   // Filter: only show items that are in the user's library
   result = result.filter((s) => s.is_watchlist)
@@ -153,15 +140,15 @@ async function fetchShows(
   return sortShows(result)
 }
 
-export function useShows(showArchived: boolean) {
+export function useShows() {
   const { user } = useAuth()
   const queryClient = useQueryClient()
 
   return useQuery({
-    queryKey: showKeys.list(showArchived, user?.id ?? ''),
+    queryKey: showKeys.list(user?.id ?? ''),
     queryFn: ({ queryKey }) => {
-      const [, , { showArchived: archived }] = queryKey as unknown as [string, string, { showArchived: boolean; userId: string }]
-      return fetchShows(archived, user?.id ?? '', queryClient)
+      const [, , userId] = queryKey as unknown as [string, string, string]
+      return fetchShows(userId, queryClient)
     },
     staleTime: 1000 * 60 * 2, // 2 min
     enabled: !!user,
@@ -224,14 +211,12 @@ async function fetchShow(
 
       // Propagate the fix to all cached list copies
       if (queryClient) {
-        for (const archived of [true, false]) {
-          const cached = queryClient.getQueryData<ShowWithUserData[]>(showKeys.list(archived, userId))
-          if (cached) {
-            const updated = cached.map((s) =>
-              s.id === data.id ? { ...s, episodes_seen: newCount } : s
-            )
-            queryClient.setQueryData(showKeys.list(archived, userId), updated)
-          }
+        const cached = queryClient.getQueryData<ShowWithUserData[]>(showKeys.list(userId))
+        if (cached) {
+          const updated = cached.map((s) =>
+            s.id === data.id ? { ...s, episodes_seen: newCount } : s
+          )
+          queryClient.setQueryData(showKeys.list(userId), updated)
         }
         const cwCached = queryClient.getQueryData<ShowWithUserData[]>(showKeys.continueWatching(userId))
         if (cwCached) {
@@ -261,15 +246,13 @@ export function useShow(id: string) {
     // initialData as a "success" state with no data.
     placeholderData: () => {
       if (!user) return undefined
-      // Check both archived filter states
-      for (const archived of [true, false]) {
-        const cached = queryClient.getQueryData<ShowWithUserData[]>(
-          showKeys.list(archived, user.id)
-        )
-        if (cached) {
-          const found = cached.find((s) => s.id === id)
-          if (found) return found
-        }
+      // Check the list cache
+      const cached = queryClient.getQueryData<ShowWithUserData[]>(
+        showKeys.list(user.id)
+      )
+      if (cached) {
+        const found = cached.find((s) => s.id === id)
+        if (found) return found
       }
       // Also check continue watching cache
       const cwCached = queryClient.getQueryData<ShowWithUserData[]>(
@@ -308,7 +291,6 @@ async function fetchContinueWatching(userId: string): Promise<ShowWithUserData[]
     .select('*, user_shows!inner(*)')
     .eq('user_shows.user_id', userId)
     .not('user_shows.last_watched_episode_data', 'is', null)
-    .not('user_shows.archived', 'eq', true)
     .order('name', { ascending: true })
     .limit(10)
 
@@ -358,7 +340,7 @@ async function fetchContinueWatching(userId: string): Promise<ShowWithUserData[]
     return bDate.localeCompare(aDate)
   })
 
-  return result.filter((s) => !s.archived)
+  return result
 }
 
 export function useContinueWatching() {
@@ -470,11 +452,10 @@ export function useMarkWatched() {
 
       // Snapshot previous data for rollback
       const snapshot: { key: unknown[] | readonly unknown[]; data: ShowWithUserData[] | undefined }[] = []
-      for (const archived of [true, false]) {
-        const key = showKeys.list(archived, user.id)
-        const prev = queryClient.getQueryData<ShowWithUserData[]>(key)
-        snapshot.push({ key, data: prev })
-        if (!prev) continue
+      const key = showKeys.list(user.id)
+      const prev = queryClient.getQueryData<ShowWithUserData[]>(key)
+      snapshot.push({ key, data: prev })
+      if (prev) {
         queryClient.setQueryData<ShowWithUserData[]>(
           key,
           prev.map((s) =>
@@ -539,8 +520,7 @@ export function useMarkWatched() {
     onSettled: (_data, _error, { showId }) => {
       const uid = user?.id ?? ''
       // Refetch to reconcile with server
-      queryClient.invalidateQueries({ queryKey: showKeys.list(true, uid) })
-      queryClient.invalidateQueries({ queryKey: showKeys.list(false, uid) })
+      queryClient.invalidateQueries({ queryKey: showKeys.list(uid) })
       queryClient.invalidateQueries({ queryKey: showKeys.continueWatching(uid) })
       // Also sync the detail page cache so checkmarks show correctly
       queryClient.invalidateQueries({ queryKey: showKeys.detail(showId) })
@@ -584,37 +564,6 @@ export function useToggleFavorite() {
       if (user) {
         queryClient.invalidateQueries({ queryKey: profileKeys.favorites(user.id) })
       }
-    },
-  })
-}
-
-// ── Toggle archive ──
-
-async function toggleArchive(showId: string, userId: string): Promise<void> {
-  const { data: us } = await supabase
-    .from('user_shows')
-    .select('archived')
-    .eq('show_id', showId)
-    .eq('user_id', userId)
-    .single()
-
-  const current = us?.archived ?? false
-
-  await supabase
-    .from('user_shows')
-    .update({ archived: !current })
-    .eq('show_id', showId)
-    .eq('user_id', userId)
-}
-
-export function useToggleArchive() {
-  const { user } = useAuth()
-  const queryClient = useQueryClient()
-
-  return useMutation({
-    mutationFn: (showId: string) => toggleArchive(showId, user?.id ?? ''),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: showKeys.all })
     },
   })
 }

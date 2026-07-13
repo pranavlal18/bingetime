@@ -264,8 +264,7 @@ export function useToggleEpisodeWatched() {
       queryClient.invalidateQueries({ queryKey: episodeKeys.all })
       // Also sync list caches so the Shows tab Watch Next updates
       const uid = user?.id ?? ''
-      queryClient.invalidateQueries({ queryKey: showKeys.list(true, uid) })
-      queryClient.invalidateQueries({ queryKey: showKeys.list(false, uid) })
+      queryClient.invalidateQueries({ queryKey: showKeys.list(uid) })
       queryClient.invalidateQueries({ queryKey: showKeys.continueWatching(uid) })
     },
   })
@@ -365,8 +364,7 @@ export function useBatchMarkWatched() {
       queryClient.invalidateQueries({ queryKey: episodeKeys.all })
       // Also sync list caches
       const uid = user?.id ?? ''
-      queryClient.invalidateQueries({ queryKey: showKeys.list(true, uid) })
-      queryClient.invalidateQueries({ queryKey: showKeys.list(false, uid) })
+      queryClient.invalidateQueries({ queryKey: showKeys.list(uid) })
       queryClient.invalidateQueries({ queryKey: showKeys.continueWatching(uid) })
     },
   })

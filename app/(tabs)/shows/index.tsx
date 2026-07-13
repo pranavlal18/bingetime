@@ -35,10 +35,9 @@ export default function ShowsScreen() {
   const [activeTab, setActiveTab] = useState<ShowsTabKind>('watchlist')
   const viewMode = useAppStore((s) => s.showsViewMode)
   const setViewMode = useAppStore((s) => s.setShowsViewMode)
-  const showArchived = useAppStore((s) => s.showArchived)
 
   // Data hooks
-  const { data: shows, isLoading: showsLoading, isRefetching, refetch } = useShows(showArchived)
+  const { data: shows, isLoading: showsLoading, isRefetching, refetch } = useShows()
   const { data: watchedHistory, refetch: refetchHistory } = useWatchedEpisodesHistory()
   const {
     data: upcomingSections,

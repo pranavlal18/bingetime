@@ -71,7 +71,6 @@ export interface MovieResolution {
 export interface FollowedTvShowRow {
   tv_show_id: string
   tv_show_name: string
-  archived: string // '0' or '1'
   active: string // '0' or '1'
   created_at: string
   updated_at: string
@@ -96,7 +95,6 @@ export interface TrackingV2Row {
   season_number: string // duplicate season
   episode_number: string // duplicate episode
   series_name: string
-  is_archived: string
   is_for_later: string
   most_recent_ep_watched: string
 }

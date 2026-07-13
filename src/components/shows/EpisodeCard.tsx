@@ -10,6 +10,15 @@ import { getImageUrl } from '@/lib/tmdb'
 import { colors, typography, spacing, borderRadius } from '@/theme'
 import type { EpisodeCardData, EpisodeSectionKind } from '@/types'
 
+function formatAirTime(isoString: string): string {
+  try {
+    const date = new Date(isoString)
+    return date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })
+  } catch {
+    return isoString
+  }
+}
+
 interface EpisodeCardProps {
   data: EpisodeCardData
   sectionKind: EpisodeSectionKind
@@ -122,7 +131,7 @@ export default function EpisodeCard({ data, sectionKind, onMarkWatched }: Episod
         <View style={styles.rightSection}>
           {isUpcoming ? (
             <>
-              {data.airTime && <Text style={styles.airTime}>{data.airTime}</Text>}
+              {data.airTime && <Text style={styles.airTime}>{formatAirTime(data.airTime)}</Text>}
               {data.network && (
                 <Text style={styles.network} numberOfLines={1}>
                   {data.network}

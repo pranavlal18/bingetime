@@ -1,6 +1,6 @@
 // ─── Profile Tab — TV Time style: user + horizontal carousels ───
 
-import { memo, useState, useMemo } from 'react'
+import { memo, useState, useMemo, useEffect } from 'react'
 import {
   View,
   Text,
@@ -11,7 +11,9 @@ import {
   Switch,
   Dimensions,
   Alert,
+  Linking,
 } from 'react-native'
+import { requestNotificationPermissions, cancelAllReminders, getPermissionStatus } from '@/utils/notifications'
 import { Image } from 'expo-image'
 import { Ionicons } from '@expo/vector-icons'
 import { router } from 'expo-router'
@@ -209,14 +211,22 @@ export default function ProfileScreen() {
   const insets = useSafeAreaInsets()
   const theme = useAppStore((s) => s.theme)
   const setTheme = useAppStore((s) => s.setTheme)
-  const showArchived = useAppStore((s) => s.showArchived)
-  const toggleShowArchived = useAppStore((s) => s.toggleShowArchived)
+  const notificationsEnabled = useAppStore((s) => s.notificationsEnabled)
+  const setNotificationsEnabled = useAppStore((s) => s.setNotificationsEnabled)
   const setImportComplete = useAppStore((s) => s.setImportComplete)
+  
+  useEffect(() => {
+    async function checkPermission() {
+      const { status } = await getPermissionStatus()
+      setNotificationsEnabled(status === 'granted')
+    }
+    checkPermission()
+  }, [setNotificationsEnabled])
 
   const { user, signOut, loading: authLoading } = useAuth()
 
   const { data: stats, isLoading: statsLoading } = useProfileStats()
-  const { data: shows, isLoading: showsLoading } = useShows(showArchived)
+  const { data: shows, isLoading: showsLoading } = useShows()
   const { data: movies, isLoading: moviesLoading } = useMovies()
   const { data: favoriteShows } = useFavorites()
   const { data: favoriteMovies } = useFavoriteMovies()
@@ -405,17 +415,21 @@ export default function ProfileScreen() {
           <SettingsRow
             icon="notifications-outline"
             label="Notifications"
+            rightLabel={notificationsEnabled ? 'On' : 'Off'}
+            onPress={async () => {
+              if (notificationsEnabled) {
+                setNotificationsEnabled(false)
+                await cancelAllReminders()
+              } else {
+                const granted = await requestNotificationPermissions()
+                setNotificationsEnabled(granted)
+              }
+            }}
           />
           <SettingsRow
             icon="sync-outline"
             label="Import TV Time Data"
             onPress={handleImport}
-          />
-          <SettingsToggle
-            icon="archive-outline"
-            label="Archived Shows"
-            value={showArchived}
-            onValueChange={toggleShowArchived}
           />
           <SettingsRow
             icon="log-out-outline"

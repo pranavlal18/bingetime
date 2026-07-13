@@ -15,23 +15,28 @@ export const upcomingKeys = {
 
 // ── Helpers ──
 
-function getDayLabel(airDate: Date, today: Date): string {
-  const diffDays = Math.round((airDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
-
-  if (diffDays === 0) return 'TODAY'
-  if (diffDays === 1) return 'TOMORROW'
-
-  // Within the next 7 days, show day name
-  if (diffDays > 1 && diffDays < 7) {
-    return airDate.toLocaleDateString('en-US', { weekday: 'long' }).toUpperCase()
-  }
-
-  // Beyond a week, show date
-  return airDate.toLocaleDateString('en-US', {
+function formatDate(date: Date): string {
+  return date.toLocaleDateString('en-US', {
     month: 'short',
     day: 'numeric',
     year: 'numeric',
   }).toUpperCase()
+}
+
+function getDayLabel(airDate: Date, today: Date): string {
+  const diffDays = Math.round((airDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
+
+  if (diffDays === 0) return `TODAY (${formatDate(airDate)})`
+  if (diffDays === 1) return `TOMORROW (${formatDate(airDate)})`
+
+  // Within the next 7 days, show day name + date
+  if (diffDays > 1 && diffDays < 7) {
+    const dayName = airDate.toLocaleDateString('en-US', { weekday: 'long' }).toUpperCase()
+    return `${dayName} (${formatDate(airDate)})`
+  }
+
+  // Beyond a week, show full date only (already detailed)
+  return formatDate(airDate)
 }
 
 // ── Fetch upcoming episodes ──
@@ -92,7 +97,6 @@ async function fetchUpcomingEpisodes(userId: string): Promise<EpisodeSection[]> 
     .select('show_id')
     .eq('user_id', userId)
     .eq('is_watchlist', true)
-    .not('archived', 'eq', true)
     .in('show_id', showIds)
 
   if (!userShows || userShows.length === 0) return []
@@ -133,22 +137,28 @@ async function fetchUpcomingEpisodes(userId: string): Promise<EpisodeSection[]> 
 
   // Map to EpisodeCardData
   const cardData = future.map(
-    (r): EpisodeCardData => ({
-      showId: r.showId,
-      showName: r.showName,
-      posterPath: r.posterPath,
-      seasonNumber: r.seasonNumber,
-      episodeNumber: r.episodeNumber,
-      episodeName: r.episodeName,
-      totalEpisodes: null,
-      episodesRemaining: null,
-      isWatched: false,
-      airTime: null, // TMDb doesn't provide time in next_episode_to_air
-      network: r.networkName,
-      isPremiere: r.isPremiere,
-      isFinale: false,
-      showStatus: null,
-    })
+    (r): EpisodeCardData => {
+      // Create air time at 9 PM local time on the air date
+      const airDate = new Date(r.airDate);
+      airDate.setHours(21, 0, 0, 0); // 9 PM local time
+      
+      return {
+        showId: r.showId,
+        showName: r.showName,
+        posterPath: r.posterPath,
+        seasonNumber: r.seasonNumber,
+        episodeNumber: r.episodeNumber,
+        episodeName: r.episodeName,
+        totalEpisodes: null,
+        episodesRemaining: null,
+        isWatched: false,
+        airTime: airDate.toISOString(), // Include time for notification scheduling
+        network: r.networkName,
+        isPremiere: r.isPremiere,
+        isFinale: false,
+        showStatus: null,
+      };
+    }
   )
 
   // Group by day

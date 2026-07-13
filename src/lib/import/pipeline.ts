@@ -301,10 +301,9 @@ async function importShows(
           show_id: showUuid,
           is_following: true,
           is_watchlist: true,
-          archived: row.archived === '1',
         }
       })
-      .filter(Boolean) as Array<{ show_id: string; is_following: boolean; is_watchlist: boolean; archived: boolean }>
+      .filter(Boolean) as Array<{ show_id: string; is_following: boolean; is_watchlist: boolean }>
 
     if (userShowInserts.length > 0) {
       const { error: usError } = await supabase

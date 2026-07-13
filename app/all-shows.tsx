@@ -113,11 +113,10 @@ const FilterChip = memo(function FilterChip({
 
 export default function AllShowsScreen() {
   const insets = useSafeAreaInsets()
-  const showArchived = useAppStore((s) => s.showArchived)
   const viewMode = useAppStore((s) => s.showsViewMode)
   const setViewMode = useAppStore((s) => s.setShowsViewMode)
 
-  const { data: shows, isLoading, isRefetching, refetch } = useShows(showArchived)
+  const { data: shows, isLoading, isRefetching, refetch } = useShows()
 
   const [activeFilter, setActiveFilter] = useState<ShowFilter>('all')
 

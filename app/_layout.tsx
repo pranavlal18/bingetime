@@ -8,6 +8,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler'
 import { StyleSheet, ActivityIndicator, View, Linking, Platform } from 'react-native'
 import { useAuth, AuthProvider } from '@/contexts/AuthContext'
 import { useSegments, useRouter } from 'expo-router'
+import { useNotificationScheduler } from '@/hooks/useNotificationScheduler'
 
 export const queryClient = new QueryClient({
   defaultOptions: {
@@ -76,6 +77,12 @@ function InnerLayout() {
     (StyleSheet as any).setFlag?.('darkMode', 'class')
   }, [])
 
+  // Notification scheduler component (must be inside QueryClientProvider)
+  function NotificationScheduler() {
+    useNotificationScheduler()
+    return null
+  }
+
   if (loading) {
     console.log('⏳ [InnerLayout] Loading...')
     return (
@@ -93,6 +100,7 @@ function InnerLayout() {
     <GestureHandlerRootView style={styles.root}>
       <QueryClientProvider client={queryClient}>
         <StatusBar style="light" />
+        <NotificationScheduler />
         <Stack screenOptions={{ headerShown: false }}>
           <Stack.Screen name="(auth)" />
           <Stack.Screen name="(tabs)" />

@@ -35,7 +35,6 @@ export interface UserShow {
   is_following: boolean
   is_favorited: boolean
   is_watchlist: boolean
-  archived: boolean
   episodes_seen: number
   last_watched_episode_data: {
     episode_id?: string
@@ -204,7 +203,6 @@ export interface TMDbShowDetails {
 export interface FollowedTvShowRow {
   tv_show_id: string
   tv_show_name: string
-  archived: string
   active: string
   created_at: string
   updated_at: string
@@ -271,7 +269,7 @@ export interface AppSettings {
   showsViewMode: ViewMode
   moviesViewMode: ViewMode
   theme: Theme
-  showArchived: boolean
+  notificationsEnabled: boolean
 }
 
 // ── Sectioned Episode Data (for TV Time-style Shows tab) ──

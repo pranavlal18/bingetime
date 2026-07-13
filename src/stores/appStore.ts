@@ -7,7 +7,8 @@ interface AppState extends AppSettings {
   setShowsViewMode: (mode: ViewMode) => void
   setMoviesViewMode: (mode: ViewMode) => void
   setTheme: (theme: Theme) => void
-  toggleShowArchived: () => void
+  notificationsEnabled: boolean
+  setNotificationsEnabled: (enabled: boolean) => void
   isImportComplete: boolean
   setImportComplete: (done: boolean) => void
   importStarted: boolean
@@ -21,14 +22,14 @@ export const useAppStore = create<AppState>()(
       showsViewMode: 'poster-grid',
       moviesViewMode: 'poster-grid',
       theme: 'system',
-      showArchived: false,
+      notificationsEnabled: false,
       isImportComplete: false,
       importStarted: false,
 
       setShowsViewMode: (mode) => set({ showsViewMode: mode }),
       setMoviesViewMode: (mode) => set({ moviesViewMode: mode }),
       setTheme: (theme) => set({ theme }),
-      toggleShowArchived: () => set((s) => ({ showArchived: !s.showArchived })),
+      setNotificationsEnabled: (enabled) => set({ notificationsEnabled: enabled }),
       setImportComplete: (done) => set({ isImportComplete: done }),
       setImportStarted: (started) => set({ importStarted: started }),
     }),
