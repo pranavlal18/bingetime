@@ -41,6 +41,7 @@ export default function DiscoverScreen() {
   const insets = useSafeAreaInsets()
   const [searchText, setSearchText] = useState('')
   const [debouncedQuery, setDebouncedQuery] = useState('')
+  const [isSearchVisible, setIsSearchVisible] = useState(false)
   const [activeGenre, setActiveGenre] = useState('For You')
   const [addingIds, setAddingIds] = useState<Set<number>>(new Set())
   const [removingIds, setRemovingIds] = useState<Set<number>>(new Set())
@@ -128,6 +129,7 @@ export default function DiscoverScreen() {
   const clearSearch = useCallback(() => {
     setSearchText('')
     setDebouncedQuery('')
+    setIsSearchVisible(false)
     inputRef.current?.blur()
     Keyboard.dismiss()
   }, [])
@@ -170,27 +172,46 @@ export default function DiscoverScreen() {
           </Pressable>
           <Text style={styles.topAppBarTitle}>BingeTime</Text>
         </View>
-        <Pressable style={styles.iconButton}>
-          <Ionicons name="search" size={24} color={colors.primary} />
+        <Pressable
+          style={[styles.iconButton, isSearchVisible && styles.iconButtonActive]}
+          onPress={() => {
+            setIsSearchVisible((v) => !v)
+            if (isSearchVisible) {
+              setSearchText('')
+              setDebouncedQuery('')
+            }
+          }}
+        >
+          <Ionicons
+            name={isSearchVisible ? 'close' : 'search'}
+            size={24}
+            color={isSearchVisible ? colors.onSurface : colors.primary}
+          />
         </Pressable>
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false}>
-        {/* Pinned Search Bar — refactored to align with HTML */}
-        <View style={styles.searchContainer}>
-          <View style={styles.glassSearch}>
-            <Ionicons name="search" size={18} color={colors.outline} />
+        {/* Compact Search Bar — toggled by icon */}
+        {isSearchVisible && (
+          <View style={styles.compactSearchBar}>
+            <Ionicons name="search" size={18} color={colors.onSurfaceVariant} />
             <TextInput
               ref={inputRef}
-              style={styles.searchInput}
+              style={styles.compactSearchInput}
               placeholder="Movies, shows and more..."
               placeholderTextColor={colors.outline}
               value={searchText}
               onChangeText={setSearchText}
+              autoFocus
+              returnKeyType="search"
             />
-            <Ionicons name="mic" size={18} color={colors.outline} />
+            {searchText.length > 0 && (
+              <Pressable onPress={() => setSearchText('')} hitSlop={8}>
+                <Ionicons name="close-circle" size={18} color={colors.onSurfaceVariant} />
+              </Pressable>
+            )}
           </View>
-        </View>
+        )}
 
         {/* Genre Chips */}
         <ScrollView
@@ -289,30 +310,27 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  searchContainer: {
-    paddingHorizontal: spacing.marginMobile,
-    paddingVertical: spacing.stackSm,
+  iconButtonActive: {
+    backgroundColor: colors.surfaceContainerHigh,
   },
-  glassSearch: {
+
+  // ── Compact Search Bar (Movies tab style) ──
+  compactSearchBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderRadius: borderRadius.lg,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
-    backgroundColor: 'rgba(26,29,36,0.8)',
-    gap: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 8,
+    marginHorizontal: spacing.marginMobile,
+    marginBottom: spacing.stackSm,
+    backgroundColor: colors.surfaceContainerLow,
+    borderRadius: borderRadius.full,
+    paddingHorizontal: spacing.gutter,
+    height: 44,
+    gap: spacing.stackSm,
   },
-  searchInput: {
+  compactSearchInput: {
     flex: 1,
-    fontSize: 16,
+    fontSize: typography.bodyMd.fontSize,
     color: colors.onSurface,
+    height: '100%',
   },
   genreChipsContainer: {
     paddingHorizontal: spacing.marginMobile,
