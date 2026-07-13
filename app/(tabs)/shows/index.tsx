@@ -13,7 +13,10 @@ import { FlashList } from '@shopify/flash-list'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { usePathname } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
+import { useQueries } from '@tanstack/react-query'
 import { useShows, useMarkWatched, deriveWatchNextEpisodes, deriveHaventWatchedEpisodes } from '@/lib/queries/shows'
+import type { NextEpisodeInfo } from '@/lib/queries/shows'
+import { getSeasonDetails } from '@/lib/tmdb'
 import { useWatchedEpisodesHistory } from '@/lib/queries/episodes'
 import { useUpcomingEpisodes } from '@/lib/queries/upcoming'
 import { useAppStore } from '@/stores/appStore'
@@ -63,47 +66,93 @@ export default function ShowsScreen() {
 
   // ── Watch List sections (list mode) ──
 
-  const watchNextEpisodes = useMemo(() => {
+  // 1. Raw derivation: NextEpisodeInfo[] (no episode names yet)
+  const rawWatchNext = useMemo(() => {
     if (!shows || isGrid) return []
-    return deriveWatchNextEpisodes(shows).map(
-      (ep): ShowsListItem => ({
-        type: 'episode',
-        sectionKind: 'watch-next',
-        data: {
-          showId: ep.showId,
-          showName: ep.showName,
-          posterPath: ep.posterPath,
-          seasonNumber: ep.seasonNumber,
-          episodeNumber: ep.episodeNumber,
-          episodeName: null,
-          totalEpisodes: ep.totalEpisodes,
-          isWatched: false,
-          showStatus: ep.showStatus,
-        },
-      })
-    )
+    return deriveWatchNextEpisodes(shows)
   }, [shows, isGrid])
 
-  const haventWatchedEpisodes = useMemo(() => {
+  const rawHaventWatched = useMemo(() => {
     if (!shows || isGrid) return []
-    return deriveHaventWatchedEpisodes(shows).map(
-      (ep): ShowsListItem => ({
-        type: 'episode',
-        sectionKind: 'haven-watched',
-        data: {
-          showId: ep.showId,
-          showName: ep.showName,
-          posterPath: ep.posterPath,
-          seasonNumber: ep.seasonNumber,
-          episodeNumber: ep.episodeNumber,
-          episodeName: null,
-          totalEpisodes: ep.totalEpisodes,
-          isWatched: false,
-          showStatus: ep.showStatus,
-        },
-      })
-    )
+    return deriveHaventWatchedEpisodes(shows)
   }, [shows, isGrid])
+
+  // 2. Extract unique (tmdbId, seasonNumber) pairs for TMDb episode name lookup
+  const episodeNamePairs = useMemo(() => {
+    const seen = new Set<string>()
+    return [...rawWatchNext, ...rawHaventWatched]
+      .filter((ep): ep is NextEpisodeInfo & { tmdbId: number } => ep.tmdbId != null)
+      .filter(ep => {
+        const key = `${ep.tmdbId}:${ep.seasonNumber}`
+        if (seen.has(key)) return false
+        seen.add(key)
+        return true
+      })
+      .map(ep => ({ showId: ep.showId, tmdbId: ep.tmdbId, seasonNumber: ep.seasonNumber }))
+  }, [rawWatchNext, rawHaventWatched])
+
+  // 3. Batch-fetch TMDb season details for episode names
+  const seasonQueries = useQueries({
+    queries: episodeNamePairs.map(pair => ({
+      queryKey: ['tmdb', 'season-details', pair.tmdbId, pair.seasonNumber],
+      queryFn: () => getSeasonDetails(pair.tmdbId, pair.seasonNumber),
+      staleTime: 1000 * 60 * 60, // 1 hour — episode names don't change
+      enabled: episodeNamePairs.length > 0,
+    })),
+  })
+
+  // 4. Build episode name map: `${showId}:${episodeNumber}` → episode name
+  const episodeNameMap = useMemo(() => {
+    const map = new Map<string, string>()
+    for (let i = 0; i < episodeNamePairs.length; i++) {
+      const pair = episodeNamePairs[i]
+      const data = seasonQueries[i]?.data
+      if (!data) continue
+      for (const ep of data.episodes) {
+        map.set(`${pair.showId}:${ep.episode_number}`, ep.name)
+      }
+    }
+    return map
+  }, [episodeNamePairs, seasonQueries])
+
+  // 5. Final mapping to ShowsListItem with episode names + remaining count
+  const watchNextEpisodes = useMemo(() => {
+    return rawWatchNext.map((ep): ShowsListItem => ({
+      type: 'episode',
+      sectionKind: 'watch-next',
+      data: {
+        showId: ep.showId,
+        showName: ep.showName,
+        posterPath: ep.posterPath,
+        seasonNumber: ep.seasonNumber,
+        episodeNumber: ep.episodeNumber,
+        episodeName: episodeNameMap.get(`${ep.showId}:${ep.episodeNumber}`) || null,
+        totalEpisodes: ep.totalEpisodes,
+        episodesRemaining: ep.episodesRemaining,
+        isWatched: false,
+        showStatus: ep.showStatus,
+      },
+    }))
+  }, [rawWatchNext, episodeNameMap])
+
+  const haventWatchedEpisodes = useMemo(() => {
+    return rawHaventWatched.map((ep): ShowsListItem => ({
+      type: 'episode',
+      sectionKind: 'haven-watched',
+      data: {
+        showId: ep.showId,
+        showName: ep.showName,
+        posterPath: ep.posterPath,
+        seasonNumber: ep.seasonNumber,
+        episodeNumber: ep.episodeNumber,
+        episodeName: episodeNameMap.get(`${ep.showId}:${ep.episodeNumber}`) || null,
+        totalEpisodes: ep.totalEpisodes,
+        episodesRemaining: ep.episodesRemaining,
+        isWatched: false,
+        showStatus: ep.showStatus,
+      },
+    }))
+  }, [rawHaventWatched, episodeNameMap])
 
   // Build flattened list for Watch List (list mode)
   const watchListItems: ShowsListItem[] = useMemo(() => {

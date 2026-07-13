@@ -30,7 +30,7 @@ export default function EpisodeCard({ data, sectionKind, onMarkWatched }: Episod
 
   const posterUrl = getImageUrl(data.posterPath, 'w92')
 
-  // Episode label: "S02 | E01"
+  // Episode label: "S02 | E01" (without +N badge — that's added in render)
   const episodeLabel = useMemo(() => {
     const s = data.seasonNumber
     const e = data.episodeNumber
@@ -97,8 +97,13 @@ export default function EpisodeCard({ data, sectionKind, onMarkWatched }: Episod
             </Text>
           </View>
 
-          {/* Season / Episode */}
-          <Text style={styles.episodeLabel}>{episodeLabel}</Text>
+          {/* Season / Episode + remaining badge */}
+          <Text style={styles.episodeLabel}>
+            {episodeLabel}
+            {!isWatchedHistory && !isUpcoming && data.episodesRemaining != null && data.episodesRemaining > 0 && (
+              <Text style={styles.remainingBadge}>  +{data.episodesRemaining}</Text>
+            )}
+          </Text>
 
           {/* Episode title */}
           <Text style={styles.episodeTitle} numberOfLines={1}>
@@ -203,6 +208,11 @@ const styles = StyleSheet.create({
     fontSize: typography.bodySm.fontSize,
     color: colors.onSurfaceVariant,
     lineHeight: typography.bodySm.lineHeight,
+  },
+  remainingBadge: {
+    fontSize: typography.bodySm.fontSize,
+    fontWeight: '600',
+    color: colors.outline,
   },
   badge: {
     alignSelf: 'flex-start',

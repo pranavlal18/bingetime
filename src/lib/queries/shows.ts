@@ -609,6 +609,8 @@ export interface NextEpisodeInfo {
   episodeNumber: number
   showStatus: string | null
   totalEpisodes: number | null
+  tmdbId: number | null
+  episodesRemaining: number | null
 }
 
 /**
@@ -628,6 +630,9 @@ export function computeNextEpisode(show: ShowWithUserData): NextEpisodeInfo | nu
     return null
   }
 
+  // Calculate remaining episodes
+  const episodesRemaining = totalEps != null ? Math.max(0, totalEps - show.episodes_seen) : null
+
   // If nothing watched yet, start at S01E01
   if (show.episodes_seen === 0) {
     return {
@@ -638,6 +643,8 @@ export function computeNextEpisode(show: ShowWithUserData): NextEpisodeInfo | nu
       episodeNumber: 1,
       showStatus: show.status,
       totalEpisodes: totalEps,
+      tmdbId: show.tmdb_id,
+      episodesRemaining,
     }
   }
 
@@ -652,6 +659,8 @@ export function computeNextEpisode(show: ShowWithUserData): NextEpisodeInfo | nu
       episodeNumber: lastData.episode_number + 1,
       showStatus: show.status,
       totalEpisodes: totalEps,
+      tmdbId: show.tmdb_id,
+      episodesRemaining,
     }
   }
 
@@ -665,6 +674,8 @@ export function computeNextEpisode(show: ShowWithUserData): NextEpisodeInfo | nu
     episodeNumber: show.episodes_seen + 1,
     showStatus: show.status,
     totalEpisodes: totalEps,
+    tmdbId: show.tmdb_id,
+    episodesRemaining,
   }
 }
 
