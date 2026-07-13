@@ -372,11 +372,16 @@ export function useContinueWatching() {
 
 // ── Mark next episode as watched ──
 
-async function markEpisodeWatched(showId: string, userId: string): Promise<void> {
-  // 1. Get current episodes_seen
+async function markEpisodeWatched(
+  showId: string,
+  userId: string,
+  seasonNumber?: number,
+  episodeNumber?: number
+): Promise<void> {
+  // 1. Get current episodes_seen + last_watched_episode_data
   const { data: us, error: fetchError } = await supabase
     .from('user_shows')
-    .select('episodes_seen')
+    .select('episodes_seen, last_watched_episode_data')
     .eq('show_id', showId)
     .eq('user_id', userId)
     .single()
@@ -387,35 +392,44 @@ async function markEpisodeWatched(showId: string, userId: string): Promise<void>
 
   const currentSeen = us?.episodes_seen ?? 0
 
-  // 2. Increment episodes_seen
+  // 2. Determine effective season/episode
+  //    If caller provided them (EpisodeCard), use those.
+  //    Otherwise infer from last_watched_episode_data (ShowCard fallback).
+  const effSeason = seasonNumber ?? us?.last_watched_episode_data?.season_number ?? 0
+  const effEpisode = episodeNumber ?? currentSeen + 1
+
+  // 3. Increment episodes_seen + set last_watched_episode_data
   const { error: updateError } = await supabase
     .from('user_shows')
-      .upsert(
-        {
-          show_id: showId,
-          user_id: userId,
-          episodes_seen: currentSeen + 1,
-          is_following: true,
+    .upsert(
+      {
+        show_id: showId,
+        user_id: userId,
+        episodes_seen: currentSeen + 1,
+        last_watched_episode_data: {
+          season_number: effSeason,
+          episode_number: effEpisode,
+          watched_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
         },
-        { onConflict: 'show_id,user_id' }
-      )
+        is_following: true,
+      },
+      { onConflict: 'show_id,user_id' }
+    )
 
   if (updateError) throw new Error(`Failed to update episodes_seen: ${updateError.message}`)
 
-  // 3. Insert a user_episodes row (we don't know exact season/ep without episodes table,
-  //    so we store a placeholder row with current timestamp)
-  //    Later when we have the episodes table populated, we can reconcile.
+  // 4. Insert a user_episodes row with real season/episode when known
   const { error: insertError } = await supabase.from('user_episodes').insert({
     show_id: showId,
     user_id: userId,
-    season_number: 0,
-    episode_number: currentSeen + 1,
+    season_number: effSeason,
+    episode_number: effEpisode,
     watched: true,
     watched_at: new Date().toISOString(),
   })
 
   if (insertError) {
-    // Non-fatal — the episodes_seen count is the important part
     console.warn(`Failed to insert user_episode: ${insertError.message}`)
   }
 }
@@ -425,10 +439,98 @@ export function useMarkWatched() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: (showId: string) => markEpisodeWatched(showId, user?.id ?? ''),
-    onSuccess: () => {
-      // Invalidate all shows queries to refresh
-      queryClient.invalidateQueries({ queryKey: showKeys.all })
+    mutationFn: ({
+      showId,
+      seasonNumber,
+      episodeNumber,
+    }: {
+      showId: string
+      seasonNumber?: number
+      episodeNumber?: number
+    }) => markEpisodeWatched(showId, user?.id ?? '', seasonNumber, episodeNumber),
+
+    onMutate: async ({ showId, seasonNumber, episodeNumber }) => {
+      if (!user) return
+
+      // Cancel in-flight refetches so they don't clobber our optimistic write
+      await queryClient.cancelQueries({ queryKey: showKeys.all })
+
+      // Snapshot previous data for rollback
+      const snapshot: { key: unknown[]; data: ShowWithUserData[] | undefined }[] = []
+      for (const archived of [true, false]) {
+        const key = showKeys.list(archived, user.id)
+        const prev = queryClient.getQueryData<ShowWithUserData[]>(key)
+        snapshot.push({ key, data: prev })
+        if (!prev) continue
+        queryClient.setQueryData<ShowWithUserData[]>(
+          key,
+          prev.map((s) =>
+            s.id === showId
+              ? {
+                  ...s,
+                  episodes_seen: s.episodes_seen + 1,
+                  last_watched_episode_data:
+                    seasonNumber != null && episodeNumber != null
+                      ? {
+                          season_number: seasonNumber,
+                          episode_number: episodeNumber,
+                          watched_at: new Date().toISOString(),
+                          updated_at: new Date().toISOString(),
+                        }
+                      : s.last_watched_episode_data,
+                }
+              : s
+          )
+        )
+      }
+
+      // Also snapshot continue-watching cache
+      const cwKey = showKeys.continueWatching(user.id)
+      const cwPrev = queryClient.getQueryData<ShowWithUserData[]>(cwKey)
+      snapshot.push({ key: cwKey, data: cwPrev })
+      if (cwPrev) {
+        queryClient.setQueryData<ShowWithUserData[]>(
+          cwKey,
+          cwPrev.map((s) =>
+            s.id === showId
+              ? {
+                  ...s,
+                  episodes_seen: s.episodes_seen + 1,
+                  last_watched_episode_data:
+                    seasonNumber != null && episodeNumber != null
+                      ? {
+                          season_number: seasonNumber,
+                          episode_number: episodeNumber,
+                          watched_at: new Date().toISOString(),
+                          updated_at: new Date().toISOString(),
+                        }
+                      : s.last_watched_episode_data,
+                }
+              : s
+          )
+        )
+      }
+
+      return { snapshot }
+    },
+
+    onError: (_err, _vars, context) => {
+      if (!context?.snapshot) return
+      for (const { key, data } of context.snapshot) {
+        if (data) {
+          queryClient.setQueryData(key, data)
+        }
+      }
+    },
+
+    onSettled: (_data, _error, { showId }) => {
+      const uid = user?.id ?? ''
+      // Refetch to reconcile with server
+      queryClient.invalidateQueries({ queryKey: showKeys.list(true, uid) })
+      queryClient.invalidateQueries({ queryKey: showKeys.list(false, uid) })
+      queryClient.invalidateQueries({ queryKey: showKeys.continueWatching(uid) })
+      // Also sync the detail page cache so checkmarks show correctly
+      queryClient.invalidateQueries({ queryKey: showKeys.detail(showId) })
     },
   })
 }
@@ -496,3 +598,96 @@ export function useToggleArchive() {
 }
 
 export { getImageUrl }
+
+// ── Section Derivation Helpers ──
+
+export interface NextEpisodeInfo {
+  showId: string
+  showName: string
+  posterPath: string | null
+  seasonNumber: number
+  episodeNumber: number
+  showStatus: string | null
+  totalEpisodes: number | null
+}
+
+/**
+ * Compute the next unwatched episode for a show.
+ * Returns null if the show is complete (all episodes watched, status Ended/Canceled).
+ */
+export function computeNextEpisode(show: ShowWithUserData): NextEpisodeInfo | null {
+  const totalEps = show.total_episodes
+
+  // If show is complete (ended/canceled and all episodes seen), no next episode
+  if ((show.status === 'Ended' || show.status === 'Canceled') && totalEps != null && show.episodes_seen >= totalEps) {
+    return null
+  }
+
+  // If the show has exceeded its total episodes somehow, no next episode
+  if (totalEps != null && show.episodes_seen >= totalEps) {
+    return null
+  }
+
+  // If nothing watched yet, start at S01E01
+  if (show.episodes_seen === 0) {
+    return {
+      showId: show.id,
+      showName: show.name,
+      posterPath: show.poster_path,
+      seasonNumber: 1,
+      episodeNumber: 1,
+      showStatus: show.status,
+      totalEpisodes: totalEps,
+    }
+  }
+
+  // Use last_watched_episode_data for precise next episode
+  const lastData = show.last_watched_episode_data
+  if (lastData?.season_number != null && lastData?.episode_number != null) {
+    return {
+      showId: show.id,
+      showName: show.name,
+      posterPath: show.poster_path,
+      seasonNumber: lastData.season_number,
+      episodeNumber: lastData.episode_number + 1,
+      showStatus: show.status,
+      totalEpisodes: totalEps,
+    }
+  }
+
+  // Fallback: use episodes_seen as episode number with season 0 (unknown)
+  // This is imprecise but preserves the UI
+  return {
+    showId: show.id,
+    showName: show.name,
+    posterPath: show.poster_path,
+    seasonNumber: 0,
+    episodeNumber: show.episodes_seen + 1,
+    showStatus: show.status,
+    totalEpisodes: totalEps,
+  }
+}
+
+/** Check if a show hasn't been watched for 14+ days */
+export function isHaventWatched(show: ShowWithUserData): boolean {
+  if (!show.last_watched_episode_data?.watched_at) return false
+
+  const watchedAt = new Date(show.last_watched_episode_data.watched_at)
+  const daysSinceWatched = (Date.now() - watchedAt.getTime()) / (1000 * 60 * 60 * 24)
+  return daysSinceWatched >= 14
+}
+
+/** Derive "Watch Next" episodes from show list */
+export function deriveWatchNextEpisodes(shows: ShowWithUserData[]): NextEpisodeInfo[] {
+  return shows
+    .map(computeNextEpisode)
+    .filter((ep): ep is NextEpisodeInfo => ep !== null)
+}
+
+/** Derive "Haven't Watched" episodes from show list */
+export function deriveHaventWatchedEpisodes(shows: ShowWithUserData[]): NextEpisodeInfo[] {
+  return shows
+    .filter(isHaventWatched)
+    .map(computeNextEpisode)
+    .filter((ep): ep is NextEpisodeInfo => ep !== null)
+}

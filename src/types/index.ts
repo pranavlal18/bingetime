@@ -157,17 +157,45 @@ export interface TMDbShowDetails {
   id: number
   name: string
   poster_path: string | null
+  backdrop_path: string | null
   overview: string | null
   status: string
   first_air_date: string | null
   last_air_date: string | null
   number_of_episodes: number
+  number_of_seasons: number
   seasons: Array<{
     id: number
     season_number: number
     episode_count: number
     air_date: string | null
   }>
+  networks?: Array<{
+    id: number
+    name: string
+    logo_path: string | null
+    origin_country: string
+  }>
+  next_episode_to_air?: {
+    id: number
+    name: string
+    overview: string | null
+    air_date: string | null
+    episode_number: number
+    season_number: number
+    still_path: string | null
+    vote_average: number
+  } | null
+  last_episode_to_air?: {
+    id: number
+    name: string
+    overview: string | null
+    air_date: string | null
+    episode_number: number
+    season_number: number
+    still_path: string | null
+    vote_average: number
+  } | null
 }
 
 // ── CSV Row Types (raw from export) ──
@@ -242,3 +270,42 @@ export interface AppSettings {
   theme: Theme
   showArchived: boolean
 }
+
+// ── Sectioned Episode Data (for TV Time-style Shows tab) ──
+
+export interface EpisodeCardData {
+  // Show info
+  showId: string
+  showName: string
+  posterPath: string | null
+  // Episode info
+  seasonNumber: number
+  episodeNumber: number
+  episodeName: string | null
+  totalEpisodes: number | null
+  // Watch status
+  isWatched: boolean
+  watchedAt?: string
+  // Badges
+  isPremiere?: boolean
+  isFinale?: boolean
+  // Upcoming-only fields
+  airTime?: string | null
+  network?: string | null
+  // Tracking
+  showStatus?: string | null
+}
+
+export type EpisodeSectionKind = 'watched-history' | 'watch-next' | 'haven-watched' | 'upcoming'
+
+export interface EpisodeSection {
+  kind: EpisodeSectionKind
+  title: string
+  episodes: EpisodeCardData[]
+}
+
+export type ShowsTabKind = 'watchlist' | 'upcoming'
+
+export type ShowsListItem =
+  | { type: 'section-header'; kind: EpisodeSectionKind; title: string }
+  | { type: 'episode'; data: EpisodeCardData; sectionKind: EpisodeSectionKind }

@@ -1,5 +1,5 @@
 import Constants from 'expo-constants'
-import type { TMDbFindResponse, TMDbSearchResponse, TMDbShowDetails } from '@/types'
+import type { TMDbFindResponse, TMDbSearchResponse, TMDbShowDetails, TMDbMovieDetails, TMDbSeasonDetails } from '@/types'
 
 const TMDB_API_KEY = Constants.expoConfig?.extra?.tmdbApiKey ?? process.env.EXPO_PUBLIC_TMDB_API_KEY ?? ''
 const TMDB_BASE = 'https://api.themoviedb.org/3'
@@ -42,6 +42,11 @@ export async function searchTv(query: string) {
 /** Get full show details including seasons */
 export async function getShowDetails(tmdbId: number) {
   return tmdbFetch<TMDbShowDetails>(`/tv/${tmdbId}`, { append_to_response: 'seasons' })
+}
+
+/** Get basic show details (no seasons). Used by upcoming tab for next_episode_to_air + networks. */
+export async function getShowBasicDetails(tmdbId: number) {
+  return tmdbFetch<TMDbShowDetails>(`/tv/${tmdbId}`)
 }
 
 /** Get movie details (overview, runtime, genres) */

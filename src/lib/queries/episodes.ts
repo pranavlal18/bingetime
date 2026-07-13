@@ -4,7 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import { getSeasonDetails } from '@/lib/tmdb'
 import { useAuth } from '@/contexts/AuthContext'
-import type { TMDbSeasonDetails } from '@/types'
+import type { TMDbSeasonDetails, EpisodeCardData } from '@/types'
 import { showKeys, type ShowWithUserData } from './shows'
 
 // ── Types ──
@@ -143,7 +143,31 @@ async function updateEpisodesSeen(
     upsertData.last_watched_episode_data = {
       season_number: lastWatched.season_number,
       episode_number: lastWatched.episode_number,
+      watched_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
+    }
+  } else {
+    // Unwatching — find the new latest watched episode so Watch Next recalculates correctly
+    const { data: latest } = await supabase
+      .from('user_episodes')
+      .select('season_number, episode_number, watched_at')
+      .eq('show_id', showId)
+      .eq('user_id', userId)
+      .eq('watched', true)
+      .order('watched_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+
+    if (latest) {
+      upsertData.last_watched_episode_data = {
+        season_number: latest.season_number,
+        episode_number: latest.episode_number,
+        watched_at: latest.watched_at,
+        updated_at: new Date().toISOString(),
+      }
+    } else {
+      // No watched episodes left — clear it so computeNextEpisode falls back to S01E01
+      upsertData.last_watched_episode_data = null
     }
   }
 
@@ -237,6 +261,11 @@ export function useToggleEpisodeWatched() {
       // Refetch to reconcile — target only the affected show
       queryClient.invalidateQueries({ queryKey: showKeys.detail(showId) })
       queryClient.invalidateQueries({ queryKey: episodeKeys.all })
+      // Also sync list caches so the Shows tab Watch Next updates
+      const uid = user?.id ?? ''
+      queryClient.invalidateQueries({ queryKey: showKeys.list(true, uid) })
+      queryClient.invalidateQueries({ queryKey: showKeys.list(false, uid) })
+      queryClient.invalidateQueries({ queryKey: showKeys.continueWatching(uid) })
     },
   })
 }
@@ -332,6 +361,70 @@ export function useBatchMarkWatched() {
     onSettled: (_data, _error, { showId }) => {
       queryClient.invalidateQueries({ queryKey: showKeys.detail(showId) })
       queryClient.invalidateQueries({ queryKey: episodeKeys.all })
+      // Also sync list caches
+      const uid = user?.id ?? ''
+      queryClient.invalidateQueries({ queryKey: showKeys.list(true, uid) })
+      queryClient.invalidateQueries({ queryKey: showKeys.list(false, uid) })
+      queryClient.invalidateQueries({ queryKey: showKeys.continueWatching(uid) })
     },
+  })
+}
+
+// ── Watched Episodes History ──
+
+const WATCHED_HISTORY_LIMIT = 20
+
+async function fetchWatchedHistory(userId: string): Promise<EpisodeCardData[]> {
+  // 1. Fetch user_episodes watched
+  const { data: episodes, error } = await supabase
+    .from('user_episodes')
+    .select('show_id, season_number, episode_number, watched_at')
+    .eq('user_id', userId)
+    .eq('watched', true)
+    .not('watched_at', 'is', null)
+    .order('watched_at', { ascending: false })
+    .limit(WATCHED_HISTORY_LIMIT)
+
+  if (error) throw new Error(`Failed to fetch watched history: ${error.message}`)
+  if (!episodes || episodes.length === 0) return []
+
+  // 2. Fetch show data for all referenced shows
+  const showIds = [...new Set(episodes.map((e) => e.show_id))]
+  const { data: shows, error: showsError } = await supabase
+    .from('shows')
+    .select('id, name, poster_path, status, total_episodes')
+    .in('id', showIds)
+
+  if (showsError) throw new Error(`Failed to fetch shows: ${showsError.message}`)
+  const showMap = new Map(shows?.map((s) => [s.id, s]) ?? [])
+
+  // 3. Merge episode + show data
+  return episodes
+    .filter((ep) => showMap.has(ep.show_id))
+    .map((ep) => {
+      const show = showMap.get(ep.show_id)!
+      return {
+        showId: ep.show_id,
+        showName: show.name,
+        posterPath: show.poster_path,
+        seasonNumber: ep.season_number,
+        episodeNumber: ep.episode_number,
+        episodeName: null, // No episode name in Supabase — loaded lazily
+        totalEpisodes: show.total_episodes,
+        isWatched: true,
+        watchedAt: ep.watched_at ?? undefined,
+        showStatus: show.status,
+      }
+    })
+}
+
+export function useWatchedEpisodesHistory() {
+  const { user } = useAuth()
+
+  return useQuery({
+    queryKey: [...episodeKeys.all, 'watched-history', user?.id] as const,
+    queryFn: () => fetchWatchedHistory(user?.id ?? ''),
+    staleTime: 1000 * 60 * 2, // 2 min
+    enabled: !!user,
   })
 }

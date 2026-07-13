@@ -1,4 +1,4 @@
-// ─── Shows Tab — Stitch "Shows Home" design ───
+// ─── Shows Tab — TV Time-style Watch List + Upcoming ───
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
@@ -8,50 +8,46 @@ import {
   StyleSheet,
   ActivityIndicator,
   RefreshControl,
-  ScrollView,
 } from 'react-native'
 import { FlashList } from '@shopify/flash-list'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { usePathname } from 'expo-router'
-import { Image } from 'expo-image'
 import { Ionicons } from '@expo/vector-icons'
-import { useShows, useContinueWatching, useMarkWatched } from '@/lib/queries/shows'
+import { useShows, useMarkWatched, deriveWatchNextEpisodes, deriveHaventWatchedEpisodes } from '@/lib/queries/shows'
+import { useWatchedEpisodesHistory } from '@/lib/queries/episodes'
+import { useUpcomingEpisodes } from '@/lib/queries/upcoming'
 import { useAppStore } from '@/stores/appStore'
-import { getImageUrl } from '@/lib/tmdb'
 import { colors, typography, spacing, borderRadius } from '@/theme'
 import ShowCard from '@/components/shows/ShowCard'
-import ShowListItem from '@/components/shows/ShowListItem'
-import ContinueWatchingSection from '@/components/shows/ContinueWatchingSection'
+import EpisodeCard from '@/components/shows/EpisodeCard'
+import EpisodeSection from '@/components/shows/EpisodeSection'
+import ShowsTabSwitcher from '@/components/shows/ShowsTabSwitcher'
 import type { ShowWithUserData } from '@/lib/queries/shows'
-import type { Show } from '@/types'
-
-// ── Filter chips from Stitch design ──
-
-type FilterKey = 'all' | 'watching' | 'up-to-date' | 'finished' | 'stopped'
-
-const FILTERS: { key: FilterKey; label: string }[] = [
-  { key: 'all', label: 'All' },
-  { key: 'watching', label: 'Watching' },
-  { key: 'up-to-date', label: 'Up to Date' },
-  { key: 'finished', label: 'Finished' },
-  { key: 'stopped', label: 'Stopped' },
-]
+import type { ShowsTabKind, ShowsListItem } from '@/types'
 
 // ── Screen ──
 
 export default function ShowsScreen() {
   const insets = useSafeAreaInsets()
+  const [activeTab, setActiveTab] = useState<ShowsTabKind>('watchlist')
   const viewMode = useAppStore((s) => s.viewMode)
   const setViewMode = useAppStore((s) => s.setViewMode)
   const showArchived = useAppStore((s) => s.showArchived)
-  const toggleShowArchived = useAppStore((s) => s.toggleShowArchived)
-  const [activeFilter, setActiveFilter] = useState<FilterKey>('all')
 
-  const { data: shows, isLoading, isRefetching, refetch } = useShows(showArchived)
-  const { data: continueWatching, isLoading: cwLoading, refetch: refetchCW } = useContinueWatching()
+  // Data hooks
+  const { data: shows, isLoading: showsLoading, isRefetching, refetch } = useShows(showArchived)
+  const { data: watchedHistory, refetch: refetchHistory } = useWatchedEpisodesHistory()
+  const {
+    data: upcomingSections,
+    isLoading: upcomingLoading,
+    isRefetching: upcomingRefetching,
+    refetch: refetchUpcoming,
+  } = useUpcomingEpisodes()
   const markWatchedMutation = useMarkWatched()
 
-  // Refetch when navigating back to the shows tab — syncs counters across all shows
+  const isGrid = viewMode === 'poster-grid'
+
+  // Refetch when navigating back
   const pathname = usePathname()
   const prevPathname = useRef(pathname)
   useEffect(() => {
@@ -59,16 +55,104 @@ export default function ShowsScreen() {
       prevPathname.current = pathname
       if (pathname === '/(tabs)/shows') {
         refetch()
-        refetchCW()
+        refetchHistory()
+        refetchUpcoming()
       }
     }
-  }, [pathname, refetch, refetchCW])
+  }, [pathname, refetch, refetchHistory, refetchUpcoming])
 
-  const isGrid = viewMode === 'poster-grid'
+  // ── Watch List sections (list mode) ──
+
+  const watchNextEpisodes = useMemo(() => {
+    if (!shows || isGrid) return []
+    return deriveWatchNextEpisodes(shows).map(
+      (ep): ShowsListItem => ({
+        type: 'episode',
+        sectionKind: 'watch-next',
+        data: {
+          showId: ep.showId,
+          showName: ep.showName,
+          posterPath: ep.posterPath,
+          seasonNumber: ep.seasonNumber,
+          episodeNumber: ep.episodeNumber,
+          episodeName: null,
+          totalEpisodes: ep.totalEpisodes,
+          isWatched: false,
+          showStatus: ep.showStatus,
+        },
+      })
+    )
+  }, [shows, isGrid])
+
+  const haventWatchedEpisodes = useMemo(() => {
+    if (!shows || isGrid) return []
+    return deriveHaventWatchedEpisodes(shows).map(
+      (ep): ShowsListItem => ({
+        type: 'episode',
+        sectionKind: 'haven-watched',
+        data: {
+          showId: ep.showId,
+          showName: ep.showName,
+          posterPath: ep.posterPath,
+          seasonNumber: ep.seasonNumber,
+          episodeNumber: ep.episodeNumber,
+          episodeName: null,
+          totalEpisodes: ep.totalEpisodes,
+          isWatched: false,
+          showStatus: ep.showStatus,
+        },
+      })
+    )
+  }, [shows, isGrid])
+
+  // Build flattened list for Watch List (list mode)
+  const watchListItems: ShowsListItem[] = useMemo(() => {
+    if (isGrid) return [] // Grid mode uses separate FlashList
+
+    const items: ShowsListItem[] = []
+
+    // Section: Watch Next (primary — what to watch next)
+    if (watchNextEpisodes.length > 0) {
+      items.push({ type: 'section-header', kind: 'watch-next', title: 'WATCH NEXT' })
+      items.push(...watchNextEpisodes)
+    }
+
+    // Section: Watched History (recently watched)
+    if (watchedHistory && watchedHistory.length > 0) {
+      items.push({ type: 'section-header', kind: 'watched-history', title: 'WATCHED HISTORY' })
+      for (const ep of watchedHistory) {
+        items.push({ type: 'episode', sectionKind: 'watched-history', data: ep })
+      }
+    }
+
+    // Section: Haven't Watched
+    if (haventWatchedEpisodes.length > 0) {
+      items.push({ type: 'section-header', kind: 'haven-watched', title: "HAVEN'T WATCHED..." })
+      items.push(...haventWatchedEpisodes)
+    }
+
+    return items
+  }, [watchedHistory, watchNextEpisodes, haventWatchedEpisodes, isGrid])
+
+  // Build flattened list for Upcoming tab
+  const upcomingItems: ShowsListItem[] = useMemo(() => {
+    if (!upcomingSections || upcomingSections.length === 0) return []
+
+    const items: ShowsListItem[] = []
+    for (const section of upcomingSections) {
+      items.push({ type: 'section-header', kind: 'upcoming', title: section.title })
+      for (const ep of section.episodes) {
+        items.push({ type: 'episode', sectionKind: 'upcoming', data: ep })
+      }
+    }
+    return items
+  }, [upcomingSections])
+
+  // ── Callbacks ──
 
   const handleMarkWatched = useCallback(
-    (showId: string) => {
-      markWatchedMutation.mutate(showId)
+    (showId: string, seasonNumber?: number, episodeNumber?: number) => {
+      markWatchedMutation.mutate({ showId, seasonNumber, episodeNumber })
     },
     [markWatchedMutation]
   )
@@ -77,80 +161,81 @@ export default function ShowsScreen() {
     setViewMode(isGrid ? 'thumbnail-list' : 'poster-grid')
   }, [isGrid, setViewMode])
 
-  const renderItem = useCallback(
-    ({ item }: { item: ShowWithUserData }) => {
-      if (isGrid) {
-        return <ShowCard show={item} onMarkWatched={handleMarkWatched} />
-      }
-      return <ShowListItem show={item} onMarkWatched={handleMarkWatched} />
-    },
-    [isGrid, handleMarkWatched]
+  const handleRefresh = useCallback(() => {
+    if (activeTab === 'watchlist') {
+      refetch()
+      refetchHistory()
+    } else {
+      refetchUpcoming()
+    }
+  }, [activeTab, refetch, refetchHistory, refetchUpcoming])
+
+  const isRefreshing = activeTab === 'watchlist' ? isRefetching : upcomingRefetching
+
+  // ── Render helpers ──
+
+  const renderGridItem = useCallback(
+    ({ item }: { item: ShowWithUserData }) => (
+      <ShowCard show={item} onMarkWatched={handleMarkWatched} />
+    ),
+    [handleMarkWatched]
   )
 
-  const keyExtractor = useCallback((item: ShowWithUserData) => item.id, [])
+  const renderEpisodeItem = useCallback(
+    ({ item }: { item: ShowsListItem }) => {
+      if (item.type === 'section-header') {
+        return <EpisodeSection title={item.title} />
+      }
+      return (
+        <EpisodeCard
+          data={item.data}
+          sectionKind={item.sectionKind}
+          onMarkWatched={handleMarkWatched}
+        />
+      )
+    },
+    [handleMarkWatched]
+  )
 
-  const hasContinueWatching = continueWatching && continueWatching.length > 0
+  const gridKeyExtractor = useCallback((item: ShowWithUserData) => item.id, [])
 
-  // ── Filter chips + Continue Watching as ListHeader ──
-  const ListHeader = useMemo(() => {
-    return (
-      <View>
-        {hasContinueWatching && (
-          <ContinueWatchingSection
-            shows={continueWatching!}
-            isLoading={cwLoading}
-          />
-        )}
+  const episodeKeyExtractor = useCallback(
+    (item: ShowsListItem, index: number) => {
+      if (item.type === 'section-header') {
+        return `header-${item.kind}-${index}`
+      }
+      return `ep-${item.data.showId}-${item.data.seasonNumber}-${item.data.episodeNumber}`
+    },
+    []
+  )
 
-        {/* Filter Chips — matching Stitch design */}
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.filterChipsContainer}
-          style={styles.filterChipsScroll}
-        >
-          {FILTERS.map((f) => {
-            const isActive = activeFilter === f.key
-            return (
-              <Pressable
-                key={f.key}
-                style={[
-                  styles.filterChip,
-                  isActive && styles.filterChipActive,
-                ]}
-                onPress={() => setActiveFilter(f.key)}
-              >
-                <Text
-                  style={[
-                    styles.filterChipText,
-                    isActive && styles.filterChipTextActive,
-                  ]}
-                >
-                  {f.label}
-                </Text>
-              </Pressable>
-            )
-          })}
-        </ScrollView>
-      </View>
-    )
-  }, [hasContinueWatching, continueWatching, cwLoading, activeFilter])
+  // ── Empty state ──
 
-  const emptyState = useMemo(() => {
-    if (isLoading) return null
+  const renderEmptyState = useCallback(() => {
+    const isWatchList = activeTab === 'watchlist'
+
     return (
       <View style={styles.emptyState}>
-        <Ionicons name="tv-outline" size={48} color={colors.outline} />
-        <Text style={styles.emptyTitle}>No shows yet</Text>
+        <Ionicons
+          name={isWatchList ? 'tv-outline' : 'calendar-outline'}
+          size={48}
+          color={colors.outline}
+        />
+        <Text style={styles.emptyTitle}>
+          {isWatchList ? 'No shows yet' : 'No upcoming episodes'}
+        </Text>
         <Text style={styles.emptySubtitle}>
-          Import your TV Time data or start adding shows from Discover
+          {isWatchList
+            ? 'Import your TV Time data or start adding shows from Discover'
+            : 'Check back later for upcoming episodes'}
         </Text>
       </View>
     )
-  }, [isLoading])
+  }, [activeTab])
 
-  // Loading state
-  if (isLoading) {
+  // ── Loading state ──
+
+  if (showsLoading && activeTab === 'watchlist') {
     return (
       <View style={[styles.container, styles.centered, { paddingTop: insets.top }]}>
         <ActivityIndicator size="large" color={colors.primary} />
@@ -159,55 +244,105 @@ export default function ShowsScreen() {
     )
   }
 
+  if (upcomingLoading && activeTab === 'upcoming') {
+    return (
+      <View style={[styles.container, styles.centered, { paddingTop: insets.top }]}>
+        <ActivityIndicator size="large" color={colors.primary} />
+        <Text style={styles.loadingText}>Loading upcoming episodes...</Text>
+      </View>
+    )
+  }
+
+  // ── Render ──
+
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
-      {/* TopAppBar — matches Stitch design */}
+      {/* TopAppBar — compact, matches TV Time style */}
       <View style={styles.topAppBar}>
-        <View style={styles.topAppBarLeft}>
-          <Ionicons name="menu" size={24} color={colors.primary} />
-          <Text style={styles.topAppBarTitle}>BingeTime</Text>
-        </View>
-        <View style={styles.topAppBarRight}>
-          <Pressable
-            onPress={toggleViewMode}
-            style={styles.topAppBarButton}
-          >
+        <ShowsTabSwitcher activeTab={activeTab} onTabChange={setActiveTab} />
+
+        {/* Right actions */}
+        {activeTab === 'watchlist' && (
+          <Pressable onPress={toggleViewMode} style={styles.gridToggle}>
             <Ionicons
-              name={isGrid ? 'grid-outline' : 'list-outline'}
+              name={isGrid ? 'list-outline' : 'grid-outline'}
               size={20}
               color={colors.onSurfaceVariant}
             />
           </Pressable>
-          <Pressable style={styles.topAppBarButton}>
-            <Ionicons name="search-outline" size={20} color={colors.onSurfaceVariant} />
-          </Pressable>
-        </View>
+        )}
       </View>
 
-      {/* Content */}
-      <FlashList
-        data={shows || []}
-        keyExtractor={keyExtractor}
-        renderItem={renderItem}
-        numColumns={isGrid ? 2 : 1}
-        key={isGrid ? 'grid' : 'list'}
-        estimatedItemSize={isGrid ? 280 : 100}
-        contentContainerStyle={[
-          styles.listContent,
-          shows?.length === 0 && styles.listContentEmpty,
-        ]}
-        ListHeaderComponent={ListHeader}
-        ListEmptyComponent={emptyState}
-        refreshControl={
-          <RefreshControl
-            refreshing={isRefetching}
-            onRefresh={refetch}
-            tintColor={colors.primary}
-            colors={[colors.primary]}
+      {/* Content — separate FlashList for each tab */}
+      {activeTab === 'watchlist' && (
+        isGrid ? (
+          <FlashList
+            data={shows || []}
+            keyExtractor={gridKeyExtractor}
+            renderItem={renderGridItem}
+            numColumns={2}
+            key="grid"
+            contentContainerStyle={[
+              styles.listContent,
+              (shows?.length ?? 0) === 0 && styles.listContentEmpty,
+            ]}
+            ListEmptyComponent={renderEmptyState}
+            refreshControl={
+              <RefreshControl
+                refreshing={isRefetching}
+                onRefresh={handleRefresh}
+                tintColor={colors.primary}
+                colors={[colors.primary]}
+              />
+            }
+            showsVerticalScrollIndicator={false}
           />
-        }
-        showsVerticalScrollIndicator={false}
-      />
+        ) : (
+          <FlashList
+            data={watchListItems}
+            keyExtractor={episodeKeyExtractor}
+            renderItem={renderEpisodeItem}
+            key="watchlist-list"
+            contentContainerStyle={[
+              styles.listContentTight,
+              watchListItems.length === 0 && styles.listContentEmpty,
+            ]}
+            ListEmptyComponent={renderEmptyState}
+            refreshControl={
+              <RefreshControl
+                refreshing={isRefetching}
+                onRefresh={handleRefresh}
+                tintColor={colors.primary}
+                colors={[colors.primary]}
+              />
+            }
+            showsVerticalScrollIndicator={false}
+          />
+        )
+      )}
+
+      {activeTab === 'upcoming' && (
+        <FlashList
+          data={upcomingItems}
+          keyExtractor={episodeKeyExtractor}
+          renderItem={renderEpisodeItem}
+          key="upcoming"
+          contentContainerStyle={[
+            styles.listContentTight,
+            upcomingItems.length === 0 && styles.listContentEmpty,
+          ]}
+          ListEmptyComponent={renderEmptyState}
+          refreshControl={
+            <RefreshControl
+              refreshing={upcomingRefetching}
+              onRefresh={handleRefresh}
+              tintColor={colors.primary}
+              colors={[colors.primary]}
+            />
+          }
+          showsVerticalScrollIndicator={false}
+        />
+      )}
     </View>
   )
 }
@@ -229,74 +364,32 @@ const styles = StyleSheet.create({
     marginTop: spacing.stackSm,
   },
 
-  // TopAppBar — fixed header matching Stitch
+  // TopAppBar
   topAppBar: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: spacing.marginMobile,
-    height: 64,
+    position: 'relative',
     backgroundColor: 'rgba(21,18,27,0.8)',
   },
-  topAppBarLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  topAppBarTitle: {
-    fontFamily: 'Inter',
-    fontSize: typography.headlineMd.fontSize,
-    fontWeight: '700',
-    color: colors.primary,
-    letterSpacing: -0.01,
-  },
-  topAppBarRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  topAppBarButton: {
+  gridToggle: {
+    position: 'absolute',
+    right: spacing.marginMobile,
+    top: spacing.stackSm + 4,
     width: 44,
     height: 44,
     borderRadius: borderRadius.full,
     justifyContent: 'center',
     alignItems: 'center',
-  },
-
-  // Filter Chips
-  filterChipsScroll: {
-    marginTop: spacing.stackSm,
-    marginBottom: spacing.stackSm,
-  },
-  filterChipsContainer: {
-    paddingHorizontal: spacing.marginMobile,
-    gap: spacing.stackSm,
-  },
-  filterChip: {
-    paddingHorizontal: 20,
-    paddingVertical: 8,
-    borderRadius: borderRadius.full,
-    backgroundColor: colors.surfaceContainerHigh,
-  },
-  filterChipActive: {
-    backgroundColor: colors.primary,
-  },
-  filterChipText: {
-    fontFamily: 'Inter',
-    fontSize: typography.labelMd.fontSize,
-    fontWeight: '600',
-    lineHeight: typography.labelMd.lineHeight,
-    letterSpacing: typography.labelMd.letterSpacing,
-    color: colors.onSurfaceVariant,
-  },
-  filterChipTextActive: {
-    color: colors.onPrimary,
+    zIndex: 10,
   },
 
   // List
   listContent: {
     paddingHorizontal: spacing.marginMobile,
     paddingBottom: 24,
+    paddingTop: spacing.unit,
+  },
+  listContentTight: {
+    paddingBottom: 24,
+    paddingTop: spacing.unit,
   },
   listContentEmpty: {
     flex: 1,
