@@ -289,13 +289,14 @@ export default function ProfileScreen() {
             <SectionHeader
               title="Shows"
               count={activeShows.length}
+              onPress={() => router.push('/all-shows')}
             />
             <ScrollView
               horizontal
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={styles.carouselContent}
             >
-              {activeShows.map((show) => (
+              {activeShows.slice(0, 10).map((show) => (
                 <PosterItem
                   key={show.id}
                   posterPath={show.poster_path}
@@ -313,13 +314,14 @@ export default function ProfileScreen() {
             <SectionHeader
               title="Movies"
               count={watchedMoviesList.length}
+              onPress={() => router.push('/all-movies')}
             />
             <ScrollView
               horizontal
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={styles.carouselContent}
             >
-              {watchedMoviesList.map((movie) => (
+              {watchedMoviesList.slice(0, 10).map((movie) => (
                 <PosterItem
                   key={movie.id}
                   posterPath={movie.poster_path}

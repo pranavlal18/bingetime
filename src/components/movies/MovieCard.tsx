@@ -88,10 +88,6 @@ const MovieCard = memo(function MovieCard({ movie, onMarkWatched }: MovieCardPro
           {movie.title}
         </Text>
 
-        {/* Watched indicator */}
-        {movie.watched && (
-          <Text style={styles.watchedText}>Watched</Text>
-        )}
       </Pressable>
     </Swipeable>
   )

@@ -78,9 +78,6 @@ const MovieListItem = memo(function MovieListItem({
             <Text style={styles.yearText}>{year}</Text>
           ) : null}
 
-          <Text style={[styles.statusText, { color: movie.watched ? colors.success : colors.onSurfaceVariant }]}>
-            {movie.watched ? 'Watched' : 'Not watched'}
-          </Text>
         </View>
 
         {/* Right actions */}
