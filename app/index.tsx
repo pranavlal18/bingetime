@@ -3,9 +3,11 @@
 import { useEffect } from 'react'
 import { View, ActivityIndicator, Text } from 'react-native'
 import { router } from 'expo-router'
-import { colors, typography } from '@/theme'
+import { typography } from '@/theme'
+import { useTheme } from '@/contexts/ThemeContext'
 
 export default function Index() {
+  const { colors } = useTheme()
   useEffect(() => {
     router.replace('/(tabs)/shows')
   }, [])

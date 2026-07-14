@@ -21,7 +21,8 @@ import { getShowDetails, getImageUrl } from '@/lib/tmdb'
 import { useQuery } from '@tanstack/react-query'
 import LibraryToggle from '@/components/ui/LibraryToggle'
 import FavoriteToggle from '@/components/ui/FavoriteToggle'
-import { colors, typography, spacing, borderRadius } from '@/theme'
+import { typography, spacing, borderRadius } from '@/theme'
+import { useTheme } from '@/contexts/ThemeContext'
 import EpisodeDetailModal from '@/components/episodes/EpisodeDetailModal'
 import { isAired, getDaysUntilAiring, isNew, formatRuntime } from '@/utils'
 import type { EpisodeWithStatus } from '@/lib/queries/episodes'
@@ -36,6 +37,489 @@ export default function ShowDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>()
   const insets = useSafeAreaInsets()
   const scrollRef = useRef<ScrollView>(null)
+  const { colors } = useTheme()
+
+  const styles = useMemo(
+    () =>
+      StyleSheet.create({
+        episodeTitleContainer: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: 8,
+        },
+        newBadge: {
+          backgroundColor: colors.primary,
+          paddingHorizontal: 6,
+          paddingVertical: 2,
+          borderRadius: 4,
+        },
+        newBadgeText: {
+          fontFamily: 'Inter',
+          fontSize: 10,
+          fontWeight: '800',
+          color: colors.onPrimary,
+        },
+        daysUntilText: {
+          fontFamily: 'Inter',
+          fontSize: typography.bodySm.fontSize,
+          fontWeight: '600',
+          color: colors.onSurfaceVariant,
+        },
+        container: {
+          flex: 1,
+          backgroundColor: colors.surface,
+        },
+        centered: {
+          justifyContent: 'center',
+          alignItems: 'center',
+        },
+        errorText: {
+          fontSize: typography.bodyMd.fontSize,
+          color: colors.outline,
+          marginTop: 12,
+          marginBottom: 16,
+        },
+        errorBackBtn: {
+          paddingHorizontal: 20,
+          paddingVertical: 10,
+          backgroundColor: colors.surfaceContainer,
+          borderRadius: borderRadius.DEFAULT,
+        },
+        errorBackBtnText: {
+          color: colors.primary,
+          fontSize: typography.bodySm.fontSize,
+          fontWeight: '600',
+        },
+        scroll: {
+          flex: 1,
+        },
+
+        // Backdrop
+        backdropSection: {
+          width: SCREEN_WIDTH,
+          height: BACKDROP_HEIGHT,
+          overflow: 'hidden',
+          position: 'relative',
+        },
+        backdropImage: {
+          width: '100%',
+          height: '100%',
+        },
+        backdropPlaceholder: {
+          width: '100%',
+          height: '100%',
+          backgroundColor: colors.surfaceContainer,
+          justifyContent: 'center',
+          alignItems: 'center',
+        },
+        backdropGradient: {
+          position: 'absolute',
+          bottom: 0,
+          left: 0,
+          right: 0,
+          height: '100%',
+        },
+        heroInfo: {
+          position: 'absolute',
+          bottom: 0,
+          left: 0,
+          right: 0,
+          paddingHorizontal: spacing.marginMobile,
+          paddingBottom: 24,
+          gap: spacing.stackSm,
+          maxWidth: SCREEN_WIDTH - POSTER_W - spacing.marginMobile * 2 - 16,
+        },
+        statusBadge: {
+          alignSelf: 'flex-start',
+          paddingHorizontal: 12,
+          paddingVertical: 4,
+          borderRadius: borderRadius.full,
+          backgroundColor: colors.tertiary,
+        },
+        statusBadgeComplete: {
+          backgroundColor: colors.statusFinished,
+        },
+        statusBadgeWatching: {
+          backgroundColor: colors.tertiary,
+        },
+        statusBadgeUpToDate: {
+          backgroundColor: colors.statusUpToDate,
+        },
+        statusBadgeText: {
+          fontFamily: 'Inter',
+          fontSize: typography.labelSm.fontSize,
+          fontWeight: '600',
+          lineHeight: typography.labelSm.lineHeight,
+          letterSpacing: typography.labelSm.letterSpacing,
+          color: colors.onTertiaryContainer,
+        },
+        heroTitle: {
+          fontFamily: 'Inter',
+          fontSize: typography.headlineLgMobile.fontSize,
+          fontWeight: '700',
+          lineHeight: typography.headlineLgMobile.lineHeight,
+          color: colors.onSurface,
+          letterSpacing: -0.01,
+          textShadowColor: 'rgba(0,0,0,0.5)',
+          textShadowOffset: { width: 0, height: 2 },
+          textShadowRadius: 8,
+        },
+        heroYear: {
+          fontFamily: 'Inter',
+          fontSize: typography.labelMd.fontSize,
+          fontWeight: '500',
+          color: colors.onSurfaceVariant,
+        },
+        posterOverlay: {
+          position: 'absolute',
+          bottom: -POSTER_H * 0.3,
+          right: spacing.marginMobile,
+          width: POSTER_W,
+          height: POSTER_H,
+          borderRadius: borderRadius.lg,
+          overflow: 'hidden',
+          borderWidth: 2,
+          borderColor: 'rgba(255,255,255,0.08)',
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: 4 },
+          shadowOpacity: 0.4,
+          shadowRadius: 12,
+          elevation: 8,
+        },
+        posterThumb: {
+          width: '100%',
+          height: '100%',
+        },
+
+        // Progress
+        progressContainer: {
+          marginTop: spacing.stackSm,
+          gap: 8,
+          maxWidth: 400,
+        },
+        progressLabels: {
+          flexDirection: 'row',
+          justifyContent: 'space-between',
+          alignItems: 'flex-end',
+        },
+        progressLabelText: {
+          fontFamily: 'Inter',
+          fontSize: typography.labelSm.fontSize,
+          fontWeight: '600',
+          lineHeight: typography.labelSm.lineHeight,
+          letterSpacing: typography.labelSm.letterSpacing,
+          color: colors.onSurfaceVariant,
+        },
+        progressPercentText: {
+          fontFamily: 'Inter',
+          fontSize: typography.labelSm.fontSize,
+          fontWeight: '500',
+          lineHeight: typography.labelSm.lineHeight,
+          letterSpacing: typography.labelSm.letterSpacing,
+          color: colors.primary,
+        },
+        progressTrack: {
+          height: 6,
+          backgroundColor: colors.surfaceContainerHighest,
+          borderRadius: borderRadius.full,
+          overflow: 'hidden',
+        },
+        progressFill: {
+          height: '100%',
+          backgroundColor: colors.primary,
+          shadowColor: colors.primary,
+          shadowOffset: { width: 0, height: 0 },
+          shadowOpacity: 0.4,
+          shadowRadius: 8,
+          elevation: 4,
+        },
+        progressFillComplete: {
+          backgroundColor: colors.statusFinished,
+        },
+        progressFillUpToDate: {
+          backgroundColor: colors.statusUpToDate,
+        },
+
+        // Back button
+        backOverlay: {
+          position: 'absolute',
+          left: spacing.marginMobile,
+          width: 44,
+          height: 44,
+          borderRadius: borderRadius.full,
+          backgroundColor: 'rgba(33,30,39,0.6)',
+          justifyContent: 'center',
+          alignItems: 'center',
+        },
+
+        // Action buttons (top-right)
+        actionOverlay: {
+          position: 'absolute',
+          right: spacing.marginMobile,
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: 10,
+        },
+
+        // Content body
+        contentBody: {
+          paddingHorizontal: spacing.marginMobile,
+          marginTop: POSTER_H * 0.3 - 8,
+        },
+
+        // Synopsis
+        synopsisSection: {
+          paddingVertical: spacing.stackMd,
+        },
+        sectionLabel: {
+          fontFamily: 'Inter',
+          fontSize: typography.bodyLg.fontSize,
+          fontWeight: '700',
+          lineHeight: typography.bodyLg.lineHeight,
+          color: colors.onSurface,
+          marginBottom: 8,
+        },
+        synopsisText: {
+          fontFamily: 'Inter',
+          fontSize: typography.bodyMd.fontSize,
+          fontWeight: '400',
+          lineHeight: typography.bodyMd.lineHeight,
+          color: colors.onSurfaceVariant,
+          opacity: 0.85,
+        },
+
+        // Details section
+        detailsSection: {
+          paddingVertical: spacing.stackMd,
+        },
+        detailsGrid: {
+          flexDirection: 'row',
+          flexWrap: 'wrap',
+          gap: spacing.stackMd,
+        },
+        detailItem: {
+          flex: 1,
+          minWidth: 120,
+          gap: 4,
+        },
+        detailLabel: {
+          fontFamily: 'Inter',
+          fontSize: typography.bodyXs.fontSize,
+          fontWeight: '600',
+          lineHeight: typography.bodyXs.lineHeight,
+          color: colors.outline,
+          textTransform: 'uppercase',
+        },
+        detailValue: {
+          fontFamily: 'Inter',
+          fontSize: typography.bodyMd.fontSize,
+          fontWeight: '500',
+          lineHeight: typography.bodyMd.lineHeight,
+          color: colors.onSurface,
+        },
+
+        // Season selector
+        seasonSelector: {
+          flexDirection: 'row',
+          paddingVertical: spacing.stackSm,
+          gap: spacing.stackSm,
+        },
+        seasonChip: {
+          paddingHorizontal: 20,
+          paddingVertical: 10,
+          borderRadius: borderRadius.full,
+          backgroundColor: colors.surfaceContainer,
+          borderWidth: 1,
+          borderColor: colors.outlineVariant,
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: 8,
+        },
+        seasonChipActive: {
+          backgroundColor: colors.primary,
+          borderColor: colors.primary,
+          shadowColor: colors.primary,
+          shadowOffset: { width: 0, height: 2 },
+          shadowOpacity: 0.2,
+          shadowRadius: 4,
+          elevation: 4,
+        },
+        seasonChipText: {
+          fontFamily: 'Inter',
+          fontSize: typography.labelSm.fontSize,
+          fontWeight: '600',
+          lineHeight: typography.labelSm.lineHeight,
+          letterSpacing: typography.labelSm.letterSpacing,
+          color: colors.onSurfaceVariant,
+        },
+        seasonChipTextActive: {
+          color: colors.onPrimary,
+        },
+        seasonChipEps: {
+          fontFamily: 'Inter',
+          fontSize: typography.bodyXs.fontSize,
+          fontWeight: '500',
+          color: colors.onSurfaceVariant,
+          opacity: 0.6,
+        },
+        seasonChipEpsActive: {
+          color: colors.onPrimary,
+          opacity: 0.8,
+        },
+
+        // Season loading
+        seasonLoadingContainer: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: 10,
+          paddingVertical: 32,
+        },
+        seasonLoadingText: {
+          fontFamily: 'Inter',
+          fontSize: typography.bodySm.fontSize,
+          color: colors.onSurfaceVariant,
+        },
+
+        // Episodes section
+        episodesSection: {
+          marginTop: spacing.stackSm,
+          gap: 10,
+        },
+
+        // Play Next inline button (replaces FAB)
+        playNextButton: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: 10,
+          paddingVertical: 14,
+          borderRadius: borderRadius.full,
+          backgroundColor: colors.primary,
+          shadowColor: colors.primary,
+          shadowOffset: { width: 0, height: 4 },
+          shadowOpacity: 0.3,
+          shadowRadius: 8,
+          elevation: 6,
+        },
+        playNextText: {
+          fontFamily: 'Inter',
+          fontSize: typography.bodyMd.fontSize,
+          fontWeight: '700',
+          lineHeight: typography.bodyMd.lineHeight,
+          color: colors.onPrimary,
+        },
+
+        // Batch button
+        batchButton: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: 6,
+          paddingVertical: 10,
+          borderRadius: borderRadius.full,
+          backgroundColor: colors.primary + '18',
+          borderWidth: 1,
+          borderColor: colors.primary + '30',
+        },
+        batchButtonText: {
+          fontFamily: 'Inter',
+          fontSize: typography.labelSm.fontSize,
+          fontWeight: '600',
+          lineHeight: typography.labelSm.lineHeight,
+          letterSpacing: typography.labelSm.letterSpacing,
+          color: colors.primary,
+        },
+
+        // Episode list
+        episodesList: {
+          backgroundColor: colors.surfaceContainerLow,
+          borderRadius: borderRadius.lg,
+          borderWidth: 1,
+          borderColor: colors.outlineVariant,
+          overflow: 'hidden',
+        },
+        episodeRow: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          paddingHorizontal: 16,
+          paddingVertical: 14,
+          borderBottomWidth: 1,
+          borderBottomColor: 'rgba(255,255,255,0.04)',
+          position: 'relative',
+        },
+        episodeRowCurrent: {
+          backgroundColor: 'rgba(55,51,61,0.4)',
+        },
+        episodeCurrentIndicator: {
+          position: 'absolute',
+          left: 0,
+          top: 0,
+          bottom: 0,
+          width: 4,
+          backgroundColor: colors.primary,
+          borderTopRightRadius: 2,
+          borderBottomRightRadius: 2,
+        },
+        episodeNumber: {
+          fontFamily: 'Inter',
+          fontSize: typography.headlineMd.fontSize,
+          fontWeight: '600',
+          lineHeight: typography.headlineMd.lineHeight,
+          color: 'rgba(203,195,215,0.35)',
+          width: 36,
+        },
+        episodeNumberCurrent: {
+          color: colors.primary,
+        },
+        episodeInfo: {
+          flex: 1,
+          marginRight: 12,
+        },
+        episodeTitle: {
+          fontFamily: 'Inter',
+          fontSize: typography.bodySm.fontSize,
+          fontWeight: '600',
+          lineHeight: typography.bodySm.lineHeight,
+          color: colors.onSurface,
+        },
+        episodeTitleWatched: {
+          color: colors.onSurfaceVariant,
+          textDecorationLine: 'line-through',
+        },
+        episodeMeta: {
+          fontFamily: 'Inter',
+          fontSize: typography.bodyXs.fontSize,
+          fontWeight: '500',
+          lineHeight: typography.bodyXs.lineHeight,
+          color: colors.onSurfaceVariant,
+          marginTop: spacing.unit,
+        },
+
+        // Check toggle
+        episodeCheckArea: {
+          width: 44,
+          height: 44,
+          justifyContent: 'center',
+          alignItems: 'center',
+        },
+        episodeCheck: {
+          width: 32,
+          height: 32,
+          borderRadius: borderRadius.full,
+          backgroundColor: colors.surfaceContainer,
+          justifyContent: 'center',
+          alignItems: 'center',
+          borderWidth: 1.5,
+          borderColor: colors.outlineVariant,
+        },
+        episodeCheckActive: {
+          backgroundColor: 'rgba(160,120,255,0.15)',
+          borderColor: 'rgba(208,188,255,0.3)',
+        },
+      }),
+    [colors],
+  )
 
   // Detect if the id param is a TMDb ID (numeric) vs a UUID
   const isTmdbIdParam = /^\d+$/.test(id)
@@ -599,485 +1083,3 @@ export default function ShowDetailScreen() {
     </View>
   )
 }
-
-// ── Styles ──
-
-const styles = StyleSheet.create({
-  // ... existing styles ...
-  episodeTitleContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  newBadge: {
-    backgroundColor: colors.primary,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
-  },
-  newBadgeText: {
-    fontFamily: 'Inter',
-    fontSize: 10,
-    fontWeight: '800',
-    color: colors.onPrimary,
-  },
-  daysUntilText: {
-    fontFamily: 'Inter',
-    fontSize: typography.bodySm.fontSize,
-    fontWeight: '600',
-    color: colors.onSurfaceVariant,
-  },
-  // ... rest of styles
-  container: {
-    flex: 1,
-    backgroundColor: colors.surface,
-  },
-  centered: {
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  errorText: {
-    fontSize: typography.bodyMd.fontSize,
-    color: colors.outline,
-    marginTop: 12,
-    marginBottom: 16,
-  },
-  errorBackBtn: {
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    backgroundColor: colors.surfaceContainer,
-    borderRadius: borderRadius.DEFAULT,
-  },
-  errorBackBtnText: {
-    color: colors.primary,
-    fontSize: typography.bodySm.fontSize,
-    fontWeight: '600',
-  },
-  scroll: {
-    flex: 1,
-  },
-
-  // Backdrop
-  backdropSection: {
-    width: SCREEN_WIDTH,
-    height: BACKDROP_HEIGHT,
-    overflow: 'hidden',
-    position: 'relative',
-  },
-  backdropImage: {
-    width: '100%',
-    height: '100%',
-  },
-  backdropPlaceholder: {
-    width: '100%',
-    height: '100%',
-    backgroundColor: colors.surfaceContainer,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  backdropGradient: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    height: '100%',
-  },
-  heroInfo: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    paddingHorizontal: spacing.marginMobile,
-    paddingBottom: 24,
-    gap: spacing.stackSm,
-    maxWidth: SCREEN_WIDTH - POSTER_W - spacing.marginMobile * 2 - 16,
-  },
-  statusBadge: {
-    alignSelf: 'flex-start',
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    borderRadius: borderRadius.full,
-    backgroundColor: colors.tertiary,
-  },
-  statusBadgeComplete: {
-    backgroundColor: colors.statusFinished,
-  },
-  statusBadgeWatching: {
-    backgroundColor: colors.tertiary,
-  },
-  statusBadgeUpToDate: {
-    backgroundColor: colors.statusUpToDate,
-  },
-  statusBadgeText: {
-    fontFamily: 'Inter',
-    fontSize: typography.labelSm.fontSize,
-    fontWeight: '600',
-    lineHeight: typography.labelSm.lineHeight,
-    letterSpacing: typography.labelSm.letterSpacing,
-    color: colors.onTertiaryContainer,
-  },
-  heroTitle: {
-    fontFamily: 'Inter',
-    fontSize: typography.headlineLgMobile.fontSize,
-    fontWeight: '700',
-    lineHeight: typography.headlineLgMobile.lineHeight,
-    color: colors.onSurface,
-    letterSpacing: -0.01,
-    textShadowColor: 'rgba(0,0,0,0.5)',
-    textShadowOffset: { width: 0, height: 2 },
-    textShadowRadius: 8,
-  },
-  heroYear: {
-    fontFamily: 'Inter',
-    fontSize: typography.labelMd.fontSize,
-    fontWeight: '500',
-    color: colors.onSurfaceVariant,
-  },
-  posterOverlay: {
-    position: 'absolute',
-    bottom: -POSTER_H * 0.3,
-    right: spacing.marginMobile,
-    width: POSTER_W,
-    height: POSTER_H,
-    borderRadius: borderRadius.lg,
-    overflow: 'hidden',
-    borderWidth: 2,
-    borderColor: 'rgba(255,255,255,0.08)',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.4,
-    shadowRadius: 12,
-    elevation: 8,
-  },
-  posterThumb: {
-    width: '100%',
-    height: '100%',
-  },
-
-  // Progress
-  progressContainer: {
-    marginTop: spacing.stackSm,
-    gap: 8,
-    maxWidth: 400,
-  },
-  progressLabels: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-end',
-  },
-  progressLabelText: {
-    fontFamily: 'Inter',
-    fontSize: typography.labelSm.fontSize,
-    fontWeight: '600',
-    lineHeight: typography.labelSm.lineHeight,
-    letterSpacing: typography.labelSm.letterSpacing,
-    color: colors.onSurfaceVariant,
-  },
-  progressPercentText: {
-    fontFamily: 'Inter',
-    fontSize: typography.labelSm.fontSize,
-    fontWeight: '500',
-    lineHeight: typography.labelSm.lineHeight,
-    letterSpacing: typography.labelSm.letterSpacing,
-    color: colors.primary,
-  },
-  progressTrack: {
-    height: 6,
-    backgroundColor: colors.surfaceContainerHighest,
-    borderRadius: borderRadius.full,
-    overflow: 'hidden',
-  },
-  progressFill: {
-    height: '100%',
-    backgroundColor: colors.primary,
-    shadowColor: colors.primary,
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.4,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  progressFillComplete: {
-    backgroundColor: colors.statusFinished,
-  },
-  progressFillUpToDate: {
-    backgroundColor: colors.statusUpToDate,
-  },
-
-  // Back button
-  backOverlay: {
-    position: 'absolute',
-    left: spacing.marginMobile,
-    width: 44,
-    height: 44,
-    borderRadius: borderRadius.full,
-    backgroundColor: 'rgba(33,30,39,0.6)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-
-  // Action buttons (top-right)
-  actionOverlay: {
-    position: 'absolute',
-    right: spacing.marginMobile,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-
-  // Content body
-  contentBody: {
-    paddingHorizontal: spacing.marginMobile,
-    marginTop: POSTER_H * 0.3 - 8,
-  },
-
-  // Synopsis
-  synopsisSection: {
-    paddingVertical: spacing.stackMd,
-  },
-  sectionLabel: {
-    fontFamily: 'Inter',
-    fontSize: typography.bodyLg.fontSize,
-    fontWeight: '700',
-    lineHeight: typography.bodyLg.lineHeight,
-    color: colors.onSurface,
-    marginBottom: 8,
-  },
-  synopsisText: {
-    fontFamily: 'Inter',
-    fontSize: typography.bodyMd.fontSize,
-    fontWeight: '400',
-    lineHeight: typography.bodyMd.lineHeight,
-    color: colors.onSurfaceVariant,
-    opacity: 0.85,
-  },
-
-  // Details section
-  detailsSection: {
-    paddingVertical: spacing.stackMd,
-  },
-  detailsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.stackMd,
-  },
-  detailItem: {
-    flex: 1,
-    minWidth: 120,
-    gap: 4,
-  },
-  detailLabel: {
-    fontFamily: 'Inter',
-    fontSize: typography.bodyXs.fontSize,
-    fontWeight: '600',
-    lineHeight: typography.bodyXs.lineHeight,
-    color: colors.outline,
-    textTransform: 'uppercase',
-  },
-  detailValue: {
-    fontFamily: 'Inter',
-    fontSize: typography.bodyMd.fontSize,
-    fontWeight: '500',
-    lineHeight: typography.bodyMd.lineHeight,
-    color: colors.onSurface,
-  },
-
-  // Season selector
-  seasonSelector: {
-    flexDirection: 'row',
-    paddingVertical: spacing.stackSm,
-    gap: spacing.stackSm,
-  },
-  seasonChip: {
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: borderRadius.full,
-    backgroundColor: colors.surfaceContainer,
-    borderWidth: 1,
-    borderColor: colors.outlineVariant,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  seasonChipActive: {
-    backgroundColor: colors.primary,
-    borderColor: colors.primary,
-    shadowColor: colors.primary,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 4,
-  },
-  seasonChipText: {
-    fontFamily: 'Inter',
-    fontSize: typography.labelSm.fontSize,
-    fontWeight: '600',
-    lineHeight: typography.labelSm.lineHeight,
-    letterSpacing: typography.labelSm.letterSpacing,
-    color: colors.onSurfaceVariant,
-  },
-  seasonChipTextActive: {
-    color: colors.onPrimary,
-  },
-  seasonChipEps: {
-    fontFamily: 'Inter',
-    fontSize: typography.bodyXs.fontSize,
-    fontWeight: '500',
-    color: colors.onSurfaceVariant,
-    opacity: 0.6,
-  },
-  seasonChipEpsActive: {
-    color: colors.onPrimary,
-    opacity: 0.8,
-  },
-
-  // Season loading
-  seasonLoadingContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 10,
-    paddingVertical: 32,
-  },
-  seasonLoadingText: {
-    fontFamily: 'Inter',
-    fontSize: typography.bodySm.fontSize,
-    color: colors.onSurfaceVariant,
-  },
-
-  // Episodes section
-  episodesSection: {
-    marginTop: spacing.stackSm,
-    gap: 10,
-  },
-
-  // Play Next inline button (replaces FAB)
-  playNextButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 10,
-    paddingVertical: 14,
-    borderRadius: borderRadius.full,
-    backgroundColor: colors.primary,
-    shadowColor: colors.primary,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 6,
-  },
-  playNextText: {
-    fontFamily: 'Inter',
-    fontSize: typography.bodyMd.fontSize,
-    fontWeight: '700',
-    lineHeight: typography.bodyMd.lineHeight,
-    color: colors.onPrimary,
-  },
-
-  // Batch button
-  batchButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    paddingVertical: 10,
-    borderRadius: borderRadius.full,
-    backgroundColor: colors.primary + '18',
-    borderWidth: 1,
-    borderColor: colors.primary + '30',
-  },
-  batchButtonText: {
-    fontFamily: 'Inter',
-    fontSize: typography.labelSm.fontSize,
-    fontWeight: '600',
-    lineHeight: typography.labelSm.lineHeight,
-    letterSpacing: typography.labelSm.letterSpacing,
-    color: colors.primary,
-  },
-
-  // Episode list
-  episodesList: {
-    backgroundColor: colors.surfaceContainerLow,
-    borderRadius: borderRadius.lg,
-    borderWidth: 1,
-    borderColor: colors.outlineVariant,
-    overflow: 'hidden',
-  },
-  episodeRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255,255,255,0.04)',
-    position: 'relative',
-  },
-  episodeRowCurrent: {
-    backgroundColor: 'rgba(55,51,61,0.4)',
-  },
-  episodeCurrentIndicator: {
-    position: 'absolute',
-    left: 0,
-    top: 0,
-    bottom: 0,
-    width: 4,
-    backgroundColor: colors.primary,
-    borderTopRightRadius: 2,
-    borderBottomRightRadius: 2,
-  },
-  episodeNumber: {
-    fontFamily: 'Inter',
-    fontSize: typography.headlineMd.fontSize,
-    fontWeight: '600',
-    lineHeight: typography.headlineMd.lineHeight,
-    color: 'rgba(203,195,215,0.35)',
-    width: 36,
-  },
-  episodeNumberCurrent: {
-    color: colors.primary,
-  },
-  episodeInfo: {
-    flex: 1,
-    marginRight: 12,
-  },
-  episodeTitle: {
-    fontFamily: 'Inter',
-    fontSize: typography.bodySm.fontSize,
-    fontWeight: '600',
-    lineHeight: typography.bodySm.lineHeight,
-    color: colors.onSurface,
-  },
-  episodeTitleWatched: {
-    color: colors.onSurfaceVariant,
-    textDecorationLine: 'line-through',
-  },
-  episodeMeta: {
-    fontFamily: 'Inter',
-    fontSize: typography.bodyXs.fontSize,
-    fontWeight: '500',
-    lineHeight: typography.bodyXs.lineHeight,
-    color: colors.onSurfaceVariant,
-    marginTop: spacing.unit,
-  },
-
-  // Check toggle
-  episodeCheckArea: {
-    width: 44,
-    height: 44,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  episodeCheck: {
-    width: 32,
-    height: 32,
-    borderRadius: borderRadius.full,
-    backgroundColor: colors.surfaceContainer,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1.5,
-    borderColor: colors.outlineVariant,
-  },
-  episodeCheckActive: {
-    backgroundColor: 'rgba(160,120,255,0.15)',
-    borderColor: 'rgba(208,188,255,0.3)',
-  },
-})

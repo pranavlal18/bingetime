@@ -1,13 +1,14 @@
 // ─── EpisodeCard — TV Time-style episode row ───
 
 import { useCallback, useRef, useMemo } from 'react'
-import { View, Text, Pressable, StyleSheet } from 'react-native'
+import { View, Text, Pressable, StyleSheet, Animated } from 'react-native'
 import { Image } from 'expo-image'
 import { Swipeable } from 'react-native-gesture-handler'
 import { Ionicons } from '@expo/vector-icons'
 import { router } from 'expo-router'
 import { getImageUrl } from '@/lib/tmdb'
-import { colors, typography, spacing, borderRadius } from '@/theme'
+import { typography, spacing, borderRadius } from '@/theme'
+import { useTheme } from '@/contexts/ThemeContext'
 import { isNew } from '@/utils'
 import type { EpisodeCardData, EpisodeSectionKind } from '@/types'
 
@@ -31,16 +32,23 @@ interface EpisodeCardProps {
 }
 
 export default function EpisodeCard({ data, sectionKind, onMarkWatched }: EpisodeCardProps) {
+  const { colors } = useTheme()
   const swipeableRef = useRef<Swipeable>(null)
+  const glowAnim = useRef(new Animated.Value(0)).current
 
   const handlePress = useCallback(() => {
     router.push(`/show/${data.showId}`)
   }, [data.showId])
 
   const handleMark = useCallback(() => {
+    glowAnim.setValue(0)
+    Animated.sequence([
+      Animated.timing(glowAnim, { toValue: 1, duration: 200, useNativeDriver: false }),
+      Animated.timing(glowAnim, { toValue: 0, duration: 300, useNativeDriver: false }),
+    ]).start()
     onMarkWatched?.(data.showId, data.seasonNumber, data.episodeNumber)
     swipeableRef.current?.close()
-  }, [data.showId, data.seasonNumber, data.episodeNumber, onMarkWatched])
+  }, [data.showId, data.seasonNumber, data.episodeNumber, onMarkWatched, glowAnim])
 
   const posterUrl = getImageUrl(data.posterPath, 'w92')
 
@@ -69,111 +77,7 @@ export default function EpisodeCard({ data, sectionKind, onMarkWatched }: Episod
 
   const isNewEp = useMemo(() => isNew(data.airDate ?? null, data.isWatched), [data.airDate, data.isWatched])
 
-  const renderRightActions = () => {
-    if (isWatchedHistory || isUpcoming || !onMarkWatched) return null
-    return (
-      <Pressable style={styles.swipeAction} onPress={handleMark}>
-        <Ionicons name="checkmark" size={24} color={colors.onPrimary} />
-        <Text style={styles.swipeLabel}>Watch</Text>
-      </Pressable>
-    )
-  }
-
-  return (
-    <Swipeable
-      ref={swipeableRef}
-      renderRightActions={renderRightActions}
-      overshootRight={false}
-      rightThreshold={40}
-    >
-      <Pressable style={[styles.container, isWatchedHistory && styles.watchedDimmed]} onPress={handlePress}>
-        {/* Poster thumbnail */}
-        <View style={styles.posterContainer}>
-          {posterUrl ? (
-            <Image
-              source={{ uri: posterUrl }}
-              style={styles.poster}
-              contentFit="cover"
-              cachePolicy="memory-disk"
-              transition={200}
-            />
-          ) : (
-            <View style={styles.posterPlaceholder}>
-              <Ionicons name="tv-outline" size={20} color={colors.outlineVariant} />
-            </View>
-          )}
-        </View>
-
-        {/* Info block */}
-        <View style={styles.infoBlock}>
-          {/* Show name pill */}
-          <View style={styles.showNamePill}>
-            <Text style={styles.showNameText} numberOfLines={1}>
-              {showNamePill}
-            </Text>
-          </View>
-
-          {/* Season / Episode + remaining badge */}
-          <Text style={styles.episodeLabel}>
-            {episodeLabel}
-            {!isWatchedHistory && !isUpcoming && data.episodesRemaining != null && data.episodesRemaining > 0 && (
-              <Text style={styles.remainingBadge}>  +{data.episodesRemaining}</Text>
-            )}
-          </Text>
-
-          {/* Episode title */}
-          <View style={styles.episodeTitleContainer}>
-            <Text style={styles.episodeTitle} numberOfLines={1}>
-              {data.episodeName || `Episode ${data.episodeNumber}`}
-            </Text>
-            {isNewEp && (
-              <View style={styles.newBadge}>
-                <Text style={styles.newBadgeText}>NEW</Text>
-              </View>
-            )}
-          </View>
-
-          {/* Badge */}
-          {badgeLabel && (
-            <View style={styles.badge}>
-              <Text style={styles.badgeText}>{badgeLabel}</Text>
-            </View>
-          )}
-        </View>
-
-        {/* Right side: air time (upcoming) or network or checkmark */}
-        <View style={styles.rightSection}>
-          {isUpcoming ? (
-            <>
-              {data.airTime && <Text style={styles.airTime}>{formatAirTime(data.airTime)}</Text>}
-              {data.network && (
-                <Text style={styles.network} numberOfLines={1}>
-                  {data.network}
-                </Text>
-              )}
-            </>
-          ) : (
-            <View style={styles.checkmarkContainer}>
-              {isWatchedHistory ? (
-                <Ionicons name="checkmark-circle" size={24} color={colors.success} />
-              ) : (
-                <Pressable
-                  onPress={handleMark}
-                  hitSlop={8}
-                  style={styles.checkCircle}
-                >
-                  <Ionicons name="checkmark" size={14} color={colors.onSurfaceVariant} />
-                </Pressable>
-              )}
-            </View>
-          )}
-        </View>
-      </Pressable>
-    </Swipeable>
-  )
-}
-
-const styles = StyleSheet.create({
+  const styles = useMemo(() => StyleSheet.create({
   container: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -316,4 +220,143 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     marginTop: spacing.unit,
   },
-})
+}), [colors])
+
+  // ── Glow animation interpolations ──
+  const glowBg = glowAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['transparent', colors.primary],
+  })
+  const glowIconOpacity = glowAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, 1],
+  })
+  const swipeFlashOpacity = glowAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, 0.3],
+  })
+  const swipeScale = glowAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [1, 1.03],
+  })
+
+  const renderRightActions = () => {
+    if (isWatchedHistory || isUpcoming || !onMarkWatched) return null
+    return (
+      <Pressable style={styles.swipeAction} onPress={handleMark}>
+        {/* White flash overlay */}
+        <Animated.View
+          style={[
+            StyleSheet.absoluteFill,
+            { borderRadius: borderRadius.md, backgroundColor: '#ffffff', opacity: swipeFlashOpacity },
+          ]}
+        />
+        <Animated.View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', transform: [{ scale: swipeScale }] }}>
+          <Ionicons name="checkmark" size={24} color={colors.onPrimary} />
+          <Text style={styles.swipeLabel}>Watch</Text>
+        </Animated.View>
+      </Pressable>
+    )
+  }
+
+  return (
+    <Swipeable
+      ref={swipeableRef}
+      renderRightActions={renderRightActions}
+      overshootRight={false}
+      rightThreshold={40}
+    >
+      <Pressable style={[styles.container, isWatchedHistory && styles.watchedDimmed]} onPress={handlePress}>
+        {/* Poster thumbnail */}
+        <View style={styles.posterContainer}>
+          {posterUrl ? (
+            <Image
+              source={{ uri: posterUrl }}
+              style={styles.poster}
+              contentFit="cover"
+              cachePolicy="memory-disk"
+              transition={200}
+            />
+          ) : (
+            <View style={styles.posterPlaceholder}>
+              <Ionicons name="tv-outline" size={20} color={colors.outlineVariant} />
+            </View>
+          )}
+        </View>
+
+        {/* Info block */}
+        <View style={styles.infoBlock}>
+          {/* Show name pill */}
+          <View style={styles.showNamePill}>
+            <Text style={styles.showNameText} numberOfLines={1}>
+              {showNamePill}
+            </Text>
+          </View>
+
+          {/* Season / Episode + remaining badge */}
+          <Text style={styles.episodeLabel}>
+            {episodeLabel}
+            {!isWatchedHistory && !isUpcoming && data.episodesRemaining != null && data.episodesRemaining > 0 && (
+              <Text style={styles.remainingBadge}>  +{data.episodesRemaining}</Text>
+            )}
+          </Text>
+
+          {/* Episode title */}
+          <View style={styles.episodeTitleContainer}>
+            <Text style={styles.episodeTitle} numberOfLines={1}>
+              {data.episodeName || `Episode ${data.episodeNumber}`}
+            </Text>
+            {isNewEp && (
+              <View style={styles.newBadge}>
+                <Text style={styles.newBadgeText}>NEW</Text>
+              </View>
+            )}
+          </View>
+
+          {/* Badge */}
+          {badgeLabel && (
+            <View style={styles.badge}>
+              <Text style={styles.badgeText}>{badgeLabel}</Text>
+            </View>
+          )}
+        </View>
+
+        {/* Right side: air time (upcoming) or network or checkmark */}
+        <View style={styles.rightSection}>
+          {isUpcoming ? (
+            <>
+              {data.airTime && <Text style={styles.airTime}>{formatAirTime(data.airTime)}</Text>}
+              {data.network && (
+                <Text style={styles.network} numberOfLines={1}>
+                  {data.network}
+                </Text>
+              )}
+            </>
+          ) : (
+            <View style={styles.checkmarkContainer}>
+              {isWatchedHistory ? (
+                <Ionicons name="checkmark-circle" size={24} color={colors.success} />
+              ) : (
+                <Pressable onPress={handleMark} hitSlop={8}>
+                  <Animated.View style={[styles.checkCircle, { backgroundColor: glowBg }]}>
+                    <Ionicons name="checkmark" size={14} color={colors.onSurfaceVariant} />
+                    {/* White checkmark overlay that fades in during glow */}
+                    <Animated.View
+                      style={[
+                        StyleSheet.absoluteFill,
+                        { borderRadius: 12, justifyContent: 'center', alignItems: 'center', opacity: glowIconOpacity },
+                      ]}
+                    >
+                      <Ionicons name="checkmark" size={14} color={colors.onPrimary} />
+                    </Animated.View>
+                  </Animated.View>
+                </Pressable>
+              )}
+            </View>
+          )}
+        </View>
+      </Pressable>
+    </Swipeable>
+  )
+}
+

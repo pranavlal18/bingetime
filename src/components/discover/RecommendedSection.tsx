@@ -1,6 +1,6 @@
 // ─── RecommendedSection — horizontal carousel of small poster cards ───
 
-import { memo, useCallback, useRef } from 'react'
+import { memo, useCallback, useRef, useMemo } from 'react'
 import { View, Text, Pressable, StyleSheet, Dimensions, ActivityIndicator } from 'react-native'
 import { LinearGradient } from 'expo-linear-gradient'
 import { FlashList } from '@shopify/flash-list'
@@ -8,7 +8,8 @@ import { Image } from 'expo-image'
 import { Ionicons } from '@expo/vector-icons'
 import { router } from 'expo-router'
 import { getImageUrl } from '@/lib/tmdb'
-import { colors, typography, borderRadius, spacing } from '@/theme'
+import { typography, borderRadius, spacing } from '@/theme'
+import { useTheme } from '@/contexts/ThemeContext'
 import type { DiscoverResult } from '@/lib/queries/discover'
 
 const SCREEN_WIDTH = Dimensions.get('window').width
@@ -45,6 +46,57 @@ const SmallCard = memo(function SmallCard({
   isInLibrary,
 }: SmallCardProps) {
   const posterUrl = getImageUrl(item.poster_path, 'w342')
+  const { colors } = useTheme()
+  const styles = useMemo(() => StyleSheet.create({
+  card: {
+    width: CARD_WIDTH,
+  },
+  posterContainer: {
+    width: CARD_WIDTH,
+    height: CARD_HEIGHT,
+    borderRadius: 12,
+    overflow: 'hidden',
+    backgroundColor: colors.surfaceDim,
+    borderWidth: 1,
+    borderColor: colors.outlineVariant,
+    position: 'relative',
+  },
+  poster: {
+    width: '100%',
+    height: '100%',
+  },
+  posterPlaceholder: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: colors.surfaceDim,
+  },
+  inLibraryBadge: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1.5,
+    borderColor: 'rgba(255,255,255,0.25)',
+  },
+  toggleButtonActive: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
+  },
+  title: {
+    fontFamily: 'Inter',
+    fontSize: 12,
+    fontWeight: '600',
+    color: colors.onSurface,
+    marginTop: 8,
+    lineHeight: 16,
+  },
+}), [colors])
 
   const handlePress = useCallback(() => {
     if (item.mediaType === 'tv') {
@@ -109,6 +161,29 @@ function RecommendedSection({ data, onAdd, onRemove, addingIds, removingIds, loc
   addingRef.current = addingIds
   const removingRef = useRef(removingIds)
   removingRef.current = removingIds
+  const { colors } = useTheme()
+  const styles = useMemo(() => StyleSheet.create({
+  section: {
+    marginBottom: 24,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: SIDE_OFFSET,
+    marginBottom: 12,
+  },
+  sectionTitle: {
+    fontFamily: 'Inter',
+    fontSize: 22,
+    fontWeight: '700',
+    color: colors.onSurface,
+    letterSpacing: -0.01,
+  },
+  listContent: {
+    paddingHorizontal: SIDE_OFFSET,
+  },
+}), [colors])
 
   const renderItem = useCallback(
     ({ item }: { item: DiscoverResult }) => {
@@ -154,104 +229,6 @@ function RecommendedSection({ data, onAdd, onRemove, addingIds, removingIds, loc
   )
 }
 
-const styles = StyleSheet.create({
-  section: {
-    marginBottom: 24,
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: SIDE_OFFSET,
-    marginBottom: 12,
-  },
-  sectionTitle: {
-    fontFamily: 'Inter',
-    fontSize: 22,
-    fontWeight: '700',
-    color: colors.onSurface,
-    letterSpacing: -0.01,
-  },
-  listContent: {
-    paddingHorizontal: SIDE_OFFSET,
-  },
 
-  // ── Card ──
-  card: {
-    width: CARD_WIDTH,
-  },
-  posterContainer: {
-    width: CARD_WIDTH,
-    height: CARD_HEIGHT,
-    borderRadius: 12,
-    overflow: 'hidden',
-    backgroundColor: colors.surfaceDim,
-    borderWidth: 1,
-    borderColor: colors.outlineVariant,
-    position: 'relative',
-  },
-  poster: {
-    width: '100%',
-    height: '100%',
-  },
-  posterPlaceholder: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: colors.surfaceDim,
-  },
-  topScrim: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    height: 56,
-  },
-
-  // ── Badges ──
-  discoverBadge: {
-    position: 'absolute',
-    top: 8,
-    left: 8,
-    backgroundColor: 'rgba(0,0,0,0.82)', // higher opacity for readability over bright posters
-    paddingHorizontal: 8,
-    paddingVertical: spacing.unit,
-    borderRadius: borderRadius.full,
-  },
-  discoverBadgeText: {
-    fontFamily: 'Inter',
-    fontSize: 10,
-    fontWeight: '600',
-    color: colors.onSurface,
-    letterSpacing: 0.3,
-  },
-  inLibraryBadge: {
-    position: 'absolute',
-    top: 8,
-    right: 8,
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    backgroundColor: 'rgba(0,0,0,0.55)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1.5,
-    borderColor: 'rgba(255,255,255,0.25)',
-  },
-  toggleButtonActive: {
-    backgroundColor: colors.primary,
-    borderColor: colors.primary,
-  },
-
-  // ── Info ──
-  title: {
-    fontFamily: 'Inter',
-    fontSize: 12,
-    fontWeight: '600',
-    color: colors.onSurface,
-    marginTop: 8,
-    lineHeight: 16,
-  },
-})
 
 export default RecommendedSection

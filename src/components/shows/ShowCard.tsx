@@ -1,6 +1,6 @@
 // ─── ShowCard — poster image + progress bar ───
 
-import { useCallback } from 'react'
+import { useCallback, useMemo } from 'react'
 import {
   View,
   Text,
@@ -13,7 +13,8 @@ import { Ionicons } from '@expo/vector-icons'
 import { router } from 'expo-router'
 import { getImageUrl } from '@/lib/queries/shows'
 import ProgressBar from './ProgressBar'
-import { colors, typography, borderRadius, spacing } from '@/theme'
+import { typography, borderRadius, spacing } from '@/theme'
+import { useTheme } from '@/contexts/ThemeContext'
 import type { ShowWithUserData } from '@/lib/queries/shows'
 
 const SCREEN_WIDTH = Dimensions.get('window').width
@@ -25,6 +26,8 @@ interface ShowCardProps {
 }
 
 export default function ShowCard({ show }: ShowCardProps) {
+  const { colors } = useTheme()
+
   const handlePress = useCallback(() => {
     router.push(`/show/${show.id}`)
   }, [show.id])
@@ -42,6 +45,61 @@ export default function ShowCard({ show }: ShowCardProps) {
   const isUpToDate = allCaughtUp && !isComplete
 
   const hasProgress = seenEps > 0 || (totalEps !== null && totalEps > 0)
+
+  const styles = useMemo(() => StyleSheet.create({
+  card: {
+    width: CARD_WIDTH,
+    marginBottom: 16,
+  },
+  posterContainer: {
+    width: CARD_WIDTH,
+    height: CARD_WIDTH * 1.5,
+    borderRadius: 16,
+    overflow: 'hidden',
+    backgroundColor: colors.surfaceDim,
+    position: 'relative',
+    borderWidth: 1,
+    borderColor: colors.outlineVariant,
+  },
+  poster: {
+    width: '100%',
+    height: '100%',
+  },
+  posterPlaceholder: {
+    width: '100%',
+    height: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  completeBadge: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    borderRadius: 12,
+    padding: spacing.unit,
+  },
+  upToDateBadge: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    borderRadius: 12,
+    padding: spacing.unit,
+  },
+  title: {
+    fontSize: typography.bodyXs.fontSize,
+    color: colors.onSurface,
+    fontWeight: '600',
+    marginTop: 8,
+    lineHeight: 18,
+  },
+  episodeCount: {
+    fontSize: typography.bodyXs.fontSize,
+    color: colors.onSurfaceVariant,
+    marginTop: spacing.unit,
+  },
+}), [colors])
 
   return (
     <Pressable style={styles.card} onPress={handlePress}>
@@ -99,57 +157,3 @@ export default function ShowCard({ show }: ShowCardProps) {
   )
 }
 
-const styles = StyleSheet.create({
-  card: {
-    width: CARD_WIDTH,
-    marginBottom: 16,
-  },
-  posterContainer: {
-    width: CARD_WIDTH,
-    height: CARD_WIDTH * 1.5,
-    borderRadius: 16,
-    overflow: 'hidden',
-    backgroundColor: colors.surfaceDim,
-    position: 'relative',
-    borderWidth: 1,
-    borderColor: colors.outlineVariant,
-  },
-  poster: {
-    width: '100%',
-    height: '100%',
-  },
-  posterPlaceholder: {
-    width: '100%',
-    height: '100%',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  completeBadge: {
-    position: 'absolute',
-    top: 8,
-    right: 8,
-    backgroundColor: 'rgba(0,0,0,0.7)',
-    borderRadius: 12,
-    padding: spacing.unit,
-  },
-  upToDateBadge: {
-    position: 'absolute',
-    top: 8,
-    right: 8,
-    backgroundColor: 'rgba(0,0,0,0.7)',
-    borderRadius: 12,
-    padding: spacing.unit,
-  },
-  title: {
-    fontSize: typography.bodyXs.fontSize,
-    color: colors.onSurface,
-    fontWeight: '600',
-    marginTop: 8,
-    lineHeight: 18,
-  },
-  episodeCount: {
-    fontSize: typography.bodyXs.fontSize,
-    color: colors.onSurfaceVariant,
-    marginTop: spacing.unit,
-  },
-})

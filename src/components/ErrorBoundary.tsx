@@ -1,6 +1,7 @@
 import { Component, type ReactNode, type ErrorInfo } from 'react'
-import { View, Text, StyleSheet, Pressable } from 'react-native'
-import { colors, typography } from '@/theme'
+import { View, Text, Pressable } from 'react-native'
+import { ThemeContext } from '@/contexts/ThemeContext'
+import type { ThemePayload } from '@/themes'
 
 interface Props {
   children: ReactNode
@@ -10,6 +11,63 @@ interface Props {
 interface State {
   hasError: boolean
   error: Error | null
+}
+
+function ErrorFallback({ error, onRetry, colors }: { error: Error | null; onRetry: () => void; colors: ThemePayload['colors'] }) {
+  return (
+    <View
+      style={{
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: colors.surface,
+        padding: 24,
+      }}
+    >
+      <Text
+        style={{
+          fontSize: 18,
+          fontWeight: '700',
+          color: colors.onSurface,
+          marginBottom: 12,
+          fontFamily: 'Inter',
+        }}
+      >
+        Something went wrong
+      </Text>
+      <Text
+        style={{
+          fontSize: 14,
+          color: colors.error,
+          textAlign: 'center',
+          marginBottom: 24,
+          fontFamily: 'Inter',
+        }}
+      >
+        {error?.message}
+      </Text>
+      <Pressable
+        style={{
+          backgroundColor: colors.primary,
+          paddingHorizontal: 24,
+          paddingVertical: 12,
+          borderRadius: 8,
+        }}
+        onPress={onRetry}
+      >
+        <Text
+          style={{
+            color: colors.onPrimary,
+            fontWeight: '600',
+            fontSize: 14,
+            fontFamily: 'Inter',
+          }}
+        >
+          Retry
+        </Text>
+      </Pressable>
+    </View>
+  )
 }
 
 export class ErrorBoundary extends Component<Props, State> {
@@ -30,54 +88,21 @@ export class ErrorBoundary extends Component<Props, State> {
     if (this.state.hasError) {
       if (this.props.fallback) return this.props.fallback
       return (
-        <View style={styles.container}>
-          <Text style={styles.title}>Something went wrong</Text>
-          <Text style={styles.message}>{this.state.error?.message}</Text>
-          <Pressable
-            style={styles.button}
-            onPress={() => this.setState({ hasError: false, error: null })}
-          >
-            <Text style={styles.buttonText}>Retry</Text>
-          </Pressable>
-        </View>
+        <ThemeContext.Consumer>
+          {(ctx) =>
+            ctx ? (
+              <ErrorFallback
+                error={this.state.error}
+                onRetry={() => this.setState({ hasError: false, error: null })}
+                colors={ctx.colors}
+              />
+            ) : (
+              this.props.children
+            )
+          }
+        </ThemeContext.Consumer>
       )
     }
     return this.props.children
   }
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: colors.surface,
-    padding: 24,
-  },
-  title: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: colors.onSurface,
-    marginBottom: 12,
-    fontFamily: 'Inter',
-  },
-  message: {
-    fontSize: 14,
-    color: colors.error,
-    textAlign: 'center',
-    marginBottom: 24,
-    fontFamily: 'Inter',
-  },
-  button: {
-    backgroundColor: colors.primary,
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 8,
-  },
-  buttonText: {
-    color: colors.onPrimary,
-    fontWeight: '600',
-    fontSize: 14,
-    fontFamily: 'Inter',
-  },
-})

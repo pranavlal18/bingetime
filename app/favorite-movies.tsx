@@ -18,7 +18,8 @@ import { Ionicons } from '@expo/vector-icons'
 import { router, Stack } from 'expo-router'
 import { useFavoriteMovies } from '@/lib/queries/movies'
 import { getImageUrl } from '@/lib/tmdb'
-import { colors, typography, spacing, borderRadius } from '@/theme'
+import { typography, spacing, borderRadius } from '@/theme'
+import { useTheme } from '@/contexts/ThemeContext'
 import type { FavoriteMovie } from '@/lib/queries/movies'
 
 const SCREEN_WIDTH = Dimensions.get('window').width
@@ -59,9 +60,35 @@ interface SortChipProps {
 }
 
 const SortChip = memo(function SortChip({ label, icon, isActive, onPress }: SortChipProps) {
+  const { colors } = useTheme()
+  const chipStyles = useMemo(() => StyleSheet.create({
+    chip: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: 14,
+      height: 34,
+      borderRadius: borderRadius.full,
+      borderWidth: 1,
+      borderColor: colors.outlineVariant,
+      backgroundColor: colors.surfaceContainerLow,
+      gap: 6,
+    },
+    chipActive: {
+      backgroundColor: colors.primary,
+      borderColor: colors.primary,
+    },
+    chipLabel: {
+      fontSize: 13,
+      fontWeight: '600',
+      color: colors.onSurfaceVariant,
+    },
+    chipLabelActive: {
+      color: colors.onPrimary,
+    },
+  }), [colors])
   return (
     <Pressable
-      style={[styles.chip, isActive && styles.chipActive]}
+      style={[chipStyles.chip, isActive && chipStyles.chipActive]}
       onPress={onPress}
     >
       <Ionicons
@@ -69,7 +96,7 @@ const SortChip = memo(function SortChip({ label, icon, isActive, onPress }: Sort
         size={14}
         color={isActive ? colors.onPrimary : colors.onSurfaceVariant}
       />
-      <Text style={[styles.chipLabel, isActive && styles.chipLabelActive]}>
+      <Text style={[chipStyles.chipLabel, isActive && chipStyles.chipLabelActive]}>
         {label}
       </Text>
     </Pressable>
@@ -86,26 +113,66 @@ interface GridItemProps {
 }
 
 const GridItem = memo(function GridItem({ title, posterPath, favoritedAt, onPress }: GridItemProps) {
+  const { colors } = useTheme()
   const posterUrl = getImageUrl(posterPath, 'w185')
+  const gridStyles = useMemo(() => StyleSheet.create({
+    item: {
+      width: GRID_POSTER_W,
+      marginBottom: GRID_GAP,
+      marginRight: GRID_GAP,
+    },
+    posterContainer: {
+      width: GRID_POSTER_W,
+      height: GRID_POSTER_H,
+      borderRadius: borderRadius.md,
+      overflow: 'hidden',
+      backgroundColor: colors.surfaceContainer,
+      borderWidth: 1,
+      borderColor: colors.outlineVariant,
+    },
+    poster: {
+      width: '100%',
+      height: '100%',
+    },
+    posterPlaceholder: {
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    title: {
+      fontFamily: 'Inter',
+      fontSize: 12,
+      fontWeight: '600',
+      color: colors.onSurface,
+      marginTop: 6,
+      lineHeight: 16,
+    },
+    date: {
+      fontFamily: 'Inter',
+      fontSize: 11,
+      fontWeight: '500',
+      color: colors.onSurfaceVariant,
+      marginTop: 2,
+    },
+  }), [colors])
   return (
-    <Pressable style={styles.gridItem} onPress={onPress}>
-      <View style={styles.gridPosterContainer}>
+    <Pressable style={gridStyles.item} onPress={onPress}>
+      <View style={gridStyles.posterContainer}>
         {posterUrl ? (
           <Image
             source={{ uri: posterUrl }}
-            style={styles.gridPoster}
+            style={gridStyles.poster}
             contentFit="cover"
             cachePolicy="memory-disk"
           />
         ) : (
-          <View style={[styles.gridPoster, styles.gridPosterPlaceholder]}>
+          <View style={[gridStyles.poster, gridStyles.posterPlaceholder]}>
             <Ionicons name="film-outline" size={24} color={colors.outlineVariant} />
           </View>
         )}
       </View>
-      <Text style={styles.gridTitle} numberOfLines={2}>{title}</Text>
+      <Text style={gridStyles.title} numberOfLines={2}>{title}</Text>
       {favoritedAt && (
-        <Text style={styles.gridDate}>{formatFavDate(favoritedAt)}</Text>
+        <Text style={gridStyles.date}>{formatFavDate(favoritedAt)}</Text>
       )}
     </Pressable>
   )
@@ -125,38 +192,99 @@ interface ListItemProps {
 const ListItem = memo(function ListItem({
   title, posterPath, year, watched, favoritedAt, onPress,
 }: ListItemProps) {
+  const { colors } = useTheme()
   const posterUrl = getImageUrl(posterPath, 'w92')
+  const listItemStyles = useMemo(() => StyleSheet.create({
+    item: {
+      flexDirection: 'row',
+      gap: 14,
+      paddingVertical: 10,
+      borderBottomWidth: 1,
+      borderBottomColor: 'rgba(255,255,255,0.04)',
+    },
+    posterContainer: {
+      width: 56,
+      height: 84,
+      borderRadius: borderRadius.sm,
+      overflow: 'hidden',
+      backgroundColor: colors.surfaceContainer,
+    },
+    poster: {
+      width: '100%',
+      height: '100%',
+    },
+    posterPlaceholder: {
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    info: {
+      flex: 1,
+      justifyContent: 'center',
+      gap: 4,
+    },
+    title: {
+      fontFamily: 'Inter',
+      fontSize: 15,
+      fontWeight: '600',
+      color: colors.onSurface,
+    },
+    metaRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 4,
+    },
+    meta: {
+      fontFamily: 'Inter',
+      fontSize: 12,
+      fontWeight: '500',
+      color: colors.onSurfaceVariant,
+    },
+    metaDot: {
+      width: 3,
+      height: 3,
+      borderRadius: borderRadius.full,
+      backgroundColor: colors.onSurfaceVariant,
+      opacity: 0.4,
+    },
+    date: {
+      fontFamily: 'Inter',
+      fontSize: 11,
+      fontWeight: '500',
+      color: colors.onSurfaceVariant,
+      marginTop: 2,
+    },
+  }), [colors])
 
   return (
-    <Pressable style={styles.listItem} onPress={onPress}>
-      <View style={styles.listPosterContainer}>
+    <Pressable style={listItemStyles.item} onPress={onPress}>
+      <View style={listItemStyles.posterContainer}>
         {posterUrl ? (
           <Image
             source={{ uri: posterUrl }}
-            style={styles.listPoster}
+            style={listItemStyles.poster}
             contentFit="cover"
             cachePolicy="memory-disk"
           />
         ) : (
-          <View style={[styles.listPoster, styles.listPosterPlaceholder]}>
+          <View style={[listItemStyles.poster, listItemStyles.posterPlaceholder]}>
             <Ionicons name="film-outline" size={20} color={colors.outlineVariant} />
           </View>
         )}
       </View>
-      <View style={styles.listInfo}>
-        <Text style={styles.listTitle} numberOfLines={1}>{title}</Text>
-        <View style={styles.listMetaRow}>
-          {year && <Text style={styles.listMeta}>{year}</Text>}
+      <View style={listItemStyles.info}>
+        <Text style={listItemStyles.title} numberOfLines={1}>{title}</Text>
+        <View style={listItemStyles.metaRow}>
+          {year && <Text style={listItemStyles.meta}>{year}</Text>}
           {watched && (
             <>
-              <View style={styles.metaDot} />
+              <View style={listItemStyles.metaDot} />
               <Ionicons name="checkmark-circle" size={12} color={colors.success} />
-              <Text style={[styles.listMeta, { color: colors.success }]}>Watched</Text>
+              <Text style={[listItemStyles.meta, { color: colors.success }]}>Watched</Text>
             </>
           )}
         </View>
         {favoritedAt && (
-          <Text style={styles.listDate}>Favorited {formatFavDate(favoritedAt)}</Text>
+          <Text style={listItemStyles.date}>Favorited {formatFavDate(favoritedAt)}</Text>
         )}
       </View>
     </Pressable>
@@ -166,10 +294,86 @@ const ListItem = memo(function ListItem({
 // ── Main Screen ──
 
 export default function FavoriteMoviesScreen() {
+  const { colors } = useTheme()
   const insets = useSafeAreaInsets()
   const { data: movies, isLoading, isRefetching, refetch } = useFavoriteMovies()
   const [sortMode, setSortMode] = useState<SortMode>('recent')
   const [isGrid, setIsGrid] = useState(true)
+
+  const styles = useMemo(() => StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: colors.surface,
+    },
+    centered: {
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    appBar: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: spacing.marginMobile,
+      height: 56,
+      gap: 12,
+    },
+    backBtn: {
+      width: 40,
+      height: 40,
+      borderRadius: borderRadius.full,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    appBarTitle: {
+      flex: 1,
+      fontFamily: 'Inter',
+      fontSize: 22,
+      fontWeight: '700',
+      color: colors.onSurface,
+      letterSpacing: -0.01,
+    },
+    gridToggle: {
+      width: 40,
+      height: 40,
+      borderRadius: borderRadius.full,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    chipsContainer: {
+      paddingVertical: spacing.stackSm,
+    },
+    chipsContent: {
+      paddingHorizontal: spacing.marginMobile,
+      gap: 8,
+      flexDirection: 'row',
+    },
+    listContent: {
+      paddingHorizontal: spacing.marginMobile,
+      paddingBottom: 32,
+      paddingTop: spacing.stackSm,
+    },
+    listContentEmpty: {
+      flex: 1,
+      justifyContent: 'center',
+    },
+    emptyState: {
+      alignItems: 'center',
+      paddingHorizontal: 48,
+    },
+    emptyTitle: {
+      fontFamily: 'Inter',
+      fontSize: 18,
+      fontWeight: '700',
+      color: colors.onSurface,
+      marginTop: 16,
+      marginBottom: 8,
+    },
+    emptySubtitle: {
+      fontSize: 14,
+      color: colors.outline,
+      textAlign: 'center',
+      lineHeight: 20,
+    },
+  }), [colors])
 
   // ── Sort ──
 
@@ -225,7 +429,7 @@ export default function FavoriteMoviesScreen() {
         Tap the heart icon on a movie to add it here.
       </Text>
     </View>
-  ), [])
+  ), [styles, colors])
 
   // ── Loading ──
 
@@ -306,209 +510,3 @@ export default function FavoriteMoviesScreen() {
   )
 }
 
-// ── Styles ──
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.surface,
-  },
-  centered: {
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-
-  // ── AppBar ──
-  appBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: spacing.marginMobile,
-    height: 56,
-    gap: 12,
-  },
-  backBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: borderRadius.full,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  appBarTitle: {
-    flex: 1,
-    fontFamily: 'Inter',
-    fontSize: 22,
-    fontWeight: '700',
-    color: colors.onSurface,
-    letterSpacing: -0.01,
-  },
-  gridToggle: {
-    width: 40,
-    height: 40,
-    borderRadius: borderRadius.full,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-
-  // ── Sort Chips ──
-  chipsContainer: {
-    paddingVertical: spacing.stackSm,
-  },
-  chipsContent: {
-    paddingHorizontal: spacing.marginMobile,
-    gap: 8,
-    flexDirection: 'row',
-  },
-  chip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 14,
-    height: 34,
-    borderRadius: borderRadius.full,
-    borderWidth: 1,
-    borderColor: colors.outlineVariant,
-    backgroundColor: colors.surfaceContainerLow,
-    gap: 6,
-  },
-  chipActive: {
-    backgroundColor: colors.primary,
-    borderColor: colors.primary,
-  },
-  chipLabel: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: colors.onSurfaceVariant,
-  },
-  chipLabelActive: {
-    color: colors.onPrimary,
-  },
-
-  // ── List ──
-  listContent: {
-    paddingHorizontal: spacing.marginMobile,
-    paddingBottom: 32,
-    paddingTop: spacing.stackSm,
-  },
-  listContentEmpty: {
-    flex: 1,
-    justifyContent: 'center',
-  },
-
-  // ── Grid Item ──
-  gridItem: {
-    width: GRID_POSTER_W,
-    marginBottom: GRID_GAP,
-    marginRight: GRID_GAP,
-  },
-  gridPosterContainer: {
-    width: GRID_POSTER_W,
-    height: GRID_POSTER_H,
-    borderRadius: borderRadius.md,
-    overflow: 'hidden',
-    backgroundColor: colors.surfaceContainer,
-    borderWidth: 1,
-    borderColor: colors.outlineVariant,
-  },
-  gridPoster: {
-    width: '100%',
-    height: '100%',
-  },
-  gridPosterPlaceholder: {
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  gridTitle: {
-    fontFamily: 'Inter',
-    fontSize: 12,
-    fontWeight: '600',
-    color: colors.onSurface,
-    marginTop: 6,
-    lineHeight: 16,
-  },
-  gridDate: {
-    fontFamily: 'Inter',
-    fontSize: 11,
-    fontWeight: '500',
-    color: colors.onSurfaceVariant,
-    marginTop: 2,
-  },
-
-  // ── List Item ──
-  listItem: {
-    flexDirection: 'row',
-    gap: 14,
-    paddingVertical: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255,255,255,0.04)',
-  },
-  listPosterContainer: {
-    width: 56,
-    height: 84,
-    borderRadius: borderRadius.sm,
-    overflow: 'hidden',
-    backgroundColor: colors.surfaceContainer,
-  },
-  listPoster: {
-    width: '100%',
-    height: '100%',
-  },
-  listPosterPlaceholder: {
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  listInfo: {
-    flex: 1,
-    justifyContent: 'center',
-    gap: 4,
-  },
-  listTitle: {
-    fontFamily: 'Inter',
-    fontSize: 15,
-    fontWeight: '600',
-    color: colors.onSurface,
-  },
-  listMetaRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  listMeta: {
-    fontFamily: 'Inter',
-    fontSize: 12,
-    fontWeight: '500',
-    color: colors.onSurfaceVariant,
-  },
-  metaDot: {
-    width: 3,
-    height: 3,
-    borderRadius: borderRadius.full,
-    backgroundColor: colors.onSurfaceVariant,
-    opacity: 0.4,
-  },
-  listDate: {
-    fontFamily: 'Inter',
-    fontSize: 11,
-    fontWeight: '500',
-    color: colors.onSurfaceVariant,
-    marginTop: 2,
-  },
-
-  // ── Empty State ──
-  emptyState: {
-    alignItems: 'center',
-    paddingHorizontal: 48,
-  },
-  emptyTitle: {
-    fontFamily: 'Inter',
-    fontSize: 18,
-    fontWeight: '700',
-    color: colors.onSurface,
-    marginTop: 16,
-    marginBottom: 8,
-  },
-  emptySubtitle: {
-    fontSize: 14,
-    color: colors.outline,
-    textAlign: 'center',
-    lineHeight: 20,
-  },
-})

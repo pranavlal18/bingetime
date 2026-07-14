@@ -1,6 +1,6 @@
 // ─── ContinueWatchingSection — Stitch-aligned horizontal scroll ───
 
-import { useCallback } from 'react'
+import { useCallback, useMemo } from 'react'
 import { View, Text, StyleSheet, Pressable } from 'react-native'
 import { Image } from 'expo-image'
 import { FlashList } from '@shopify/flash-list'
@@ -8,7 +8,8 @@ import { Ionicons } from '@expo/vector-icons'
 import { router } from 'expo-router'
 import { getImageUrl } from '@/lib/queries/shows'
 import ProgressBar from './ProgressBar'
-import { colors, typography, spacing, borderRadius } from '@/theme'
+import { typography, spacing, borderRadius } from '@/theme'
+import { useTheme } from '@/contexts/ThemeContext'
 import type { ShowWithUserData } from '@/lib/queries/shows'
 
 const ITEM_WIDTH = 110
@@ -23,112 +24,9 @@ export default function ContinueWatchingSection({
   shows,
   isLoading,
 }: ContinueWatchingSectionProps) {
-  const renderItem = useCallback(
-    ({ item }: { item: ShowWithUserData }) => {
-      const posterUrl = getImageUrl(item.poster_path, 'w185')
-      const totalEps = item.total_episodes
-      const seenEps = item.episodes_seen
-      const hasProgress = totalEps !== null && totalEps > 0
+  const { colors } = useTheme()
 
-      const allCaughtUp = totalEps !== null && totalEps > 0 && seenEps >= totalEps
-      const isComplete = allCaughtUp && (item.status === 'Ended' || item.status === 'Canceled')
-      const isUpToDate = allCaughtUp && !isComplete
-
-      return (
-        <Pressable style={styles.card} onPress={() => router.push(`/show/${item.id}`)}>
-          {/* Poster */}
-          <View style={styles.posterContainer}>
-            {posterUrl ? (
-              <Image
-                source={{ uri: posterUrl }}
-                style={styles.poster}
-                contentFit="cover"
-                cachePolicy="memory-disk"
-              />
-            ) : (
-              <View style={styles.posterPlaceholder}>
-                <Ionicons name="tv-outline" size={24} color={colors.outlineVariant} />
-              </View>
-            )}
-
-            {/* Poster only — no decorative play icon (misleading) */}
-
-            {/* Status badge */}
-            {isComplete && (
-              <View style={styles.completeBadge}>
-                <Ionicons name="checkmark-circle" size={14} color={colors.statusFinished} />
-              </View>
-            )}
-            {isUpToDate && (
-              <View style={styles.completeBadge}>
-                <Ionicons name="checkmark-circle" size={14} color={colors.statusUpToDate} />
-              </View>
-            )}
-          </View>
-
-          {/* Progress bar */}
-          {hasProgress && (
-            <ProgressBar
-              episodesSeen={seenEps}
-              totalEpisodes={totalEps}
-              height={3}
-              color={colors.primary}
-            />
-          )}
-
-          {/* Title */}
-          <Text style={styles.title} numberOfLines={2}>
-            {item.name}
-          </Text>
-
-          {/* Episode count */}
-          {hasProgress && (
-            <Text style={styles.episodeCount}>
-              {Math.min(seenEps, totalEps!)}/{totalEps}
-            </Text>
-          )}
-        </Pressable>
-      )
-    },
-    []
-  )
-
-  const keyExtractor = useCallback((item: ShowWithUserData) => item.id, [])
-
-  if (isLoading) {
-    return (
-      <View style={styles.container}>
-        <Text style={styles.sectionTitle}>Continue Watching</Text>
-        <View style={styles.loadingRow}>
-          {[1, 2, 3].map((i) => (
-            <View key={i} style={styles.skeletonCard}>
-              <View style={styles.skeletonPoster} />
-              <View style={styles.skeletonText} />
-            </View>
-          ))}
-        </View>
-      </View>
-    )
-  }
-
-  if (!shows || shows.length === 0) return null
-
-  return (
-    <View style={styles.container}>
-      <Text style={styles.sectionTitle}>Continue Watching</Text>
-      <FlashList
-        data={shows}
-        renderItem={renderItem}
-        keyExtractor={keyExtractor}
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.scrollContent}
-      />
-    </View>
-  )
-}
-
-const styles = StyleSheet.create({
+  const styles = useMemo(() => StyleSheet.create({
   container: {
     marginBottom: 8,
   },
@@ -206,4 +104,110 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surfaceContainerHighest,
     marginTop: 8,
   },
-})
+}), [colors])
+
+  const renderItem = useCallback(
+    ({ item }: { item: ShowWithUserData }) => {
+      const posterUrl = getImageUrl(item.poster_path, 'w185')
+      const totalEps = item.total_episodes
+      const seenEps = item.episodes_seen
+      const hasProgress = totalEps !== null && totalEps > 0
+
+      const allCaughtUp = totalEps !== null && totalEps > 0 && seenEps >= totalEps
+      const isComplete = allCaughtUp && (item.status === 'Ended' || item.status === 'Canceled')
+      const isUpToDate = allCaughtUp && !isComplete
+
+      return (
+        <Pressable style={styles.card} onPress={() => router.push(`/show/${item.id}`)}>
+          {/* Poster */}
+          <View style={styles.posterContainer}>
+            {posterUrl ? (
+              <Image
+                source={{ uri: posterUrl }}
+                style={styles.poster}
+                contentFit="cover"
+                cachePolicy="memory-disk"
+              />
+            ) : (
+              <View style={styles.posterPlaceholder}>
+                <Ionicons name="tv-outline" size={24} color={colors.outlineVariant} />
+              </View>
+            )}
+
+            {/* Poster only — no decorative play icon (misleading) */}
+
+            {/* Status badge */}
+            {isComplete && (
+              <View style={styles.completeBadge}>
+                <Ionicons name="checkmark-circle" size={14} color={colors.statusFinished} />
+              </View>
+            )}
+            {isUpToDate && (
+              <View style={styles.completeBadge}>
+                <Ionicons name="checkmark-circle" size={14} color={colors.statusUpToDate} />
+              </View>
+            )}
+          </View>
+
+          {/* Progress bar */}
+          {hasProgress && (
+            <ProgressBar
+              episodesSeen={seenEps}
+              totalEpisodes={totalEps}
+              height={3}
+              color={colors.primary}
+            />
+          )}
+
+          {/* Title */}
+          <Text style={styles.title} numberOfLines={2}>
+            {item.name}
+          </Text>
+
+          {/* Episode count */}
+          {hasProgress && (
+            <Text style={styles.episodeCount}>
+              {Math.min(seenEps, totalEps!)}/{totalEps}
+            </Text>
+          )}
+        </Pressable>
+      )
+    },
+    [colors, styles]
+  )
+
+  const keyExtractor = useCallback((item: ShowWithUserData) => item.id, [])
+
+  if (isLoading) {
+    return (
+      <View style={styles.container}>
+        <Text style={styles.sectionTitle}>Continue Watching</Text>
+        <View style={styles.loadingRow}>
+          {[1, 2, 3].map((i) => (
+            <View key={i} style={styles.skeletonCard}>
+              <View style={styles.skeletonPoster} />
+              <View style={styles.skeletonText} />
+            </View>
+          ))}
+        </View>
+      </View>
+    )
+  }
+
+  if (!shows || shows.length === 0) return null
+
+  return (
+    <View style={styles.container}>
+      <Text style={styles.sectionTitle}>Continue Watching</Text>
+      <FlashList
+        data={shows}
+        renderItem={renderItem}
+        keyExtractor={keyExtractor}
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.scrollContent}
+      />
+    </View>
+  )
+}
+

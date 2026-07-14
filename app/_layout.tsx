@@ -5,8 +5,9 @@ import { Stack } from 'expo-router'
 import { StatusBar } from 'expo-status-bar'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { GestureHandlerRootView } from 'react-native-gesture-handler'
-import { StyleSheet, ActivityIndicator, View, Linking, Platform } from 'react-native'
+import { StyleSheet, ActivityIndicator, View, Linking } from 'react-native'
 import { useAuth, AuthProvider } from '@/contexts/AuthContext'
+import { ThemeProvider, useTheme } from '@/contexts/ThemeContext'
 import { useSegments, useRouter } from 'expo-router'
 import { useNotificationScheduler } from '@/hooks/useNotificationScheduler'
 
@@ -25,6 +26,8 @@ function InnerLayout() {
   const { user, loading, session } = useAuth()
   const segments = useSegments()
   const router = useRouter()
+  const { themeKey } = useTheme()
+  const isLightTheme = themeKey === 'luminescent'
 
   // Handle auth redirects after initial session loads
   useEffect(() => {
@@ -88,7 +91,7 @@ function InnerLayout() {
     return (
       <GestureHandlerRootView style={styles.root}>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#d0bcff" />
+          <ActivityIndicator size="large" color={themeKey !== 'luminescent' ? '#d0bcff' : '#6750a4'} />
         </View>
       </GestureHandlerRootView>
     )
@@ -99,7 +102,7 @@ function InnerLayout() {
   return (
     <GestureHandlerRootView style={styles.root}>
       <QueryClientProvider client={queryClient}>
-        <StatusBar style="light" />
+        <StatusBar style={isLightTheme ? 'dark' : 'light'} />
         <NotificationScheduler />
         <Stack screenOptions={{ headerShown: false }}>
           <Stack.Screen name="(auth)" />
@@ -143,7 +146,9 @@ export default function RootLayout() {
   return (
     <GestureHandlerRootView style={styles.root}>
       <AuthProvider>
-        <InnerLayout />
+        <ThemeProvider>
+          <InnerLayout />
+        </ThemeProvider>
       </AuthProvider>
     </GestureHandlerRootView>
   )

@@ -1,6 +1,6 @@
 // ─── Import Screen — first-launch onboarding for importing TV Time data ───
 
-import { useState, useCallback, useRef, useEffect } from 'react'
+import { useState, useCallback, useRef, useEffect, useMemo } from 'react'
 import { View, Text, ScrollView, Pressable, Animated, StyleSheet } from 'react-native'
 import { router } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
@@ -8,11 +8,14 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { runImport, IMPORT_STEPS } from '@/lib/import/pipeline'
 import type { ImportStep } from '@/lib/import/types'
 import { useAppStore } from '@/stores/appStore'
-import { colors, typography, spacing, borderRadius } from '@/theme'
+import { typography, spacing, borderRadius } from '@/theme'
+import type { ThemeColors } from '@/themes'
+import { useTheme } from '@/contexts/ThemeContext'
 
 type Phase = 'welcome' | 'importing' | 'complete' | 'error'
 
 export default function ImportScreen() {
+  const { colors } = useTheme()
   const insets = useSafeAreaInsets()
   const setImportComplete = useAppStore((s) => s.setImportComplete)
 
@@ -98,6 +101,8 @@ export default function ImportScreen() {
     }).start()
   }, [overallProgress, progressAnim])
 
+  const styles = useMemo(() => createStyles(colors), [colors])
+
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
       {/* Header */}
@@ -134,6 +139,8 @@ export default function ImportScreen() {
 // ── Sub-components ──
 
 function WelcomeContent({ onStart }: { onStart: () => void }) {
+  const { colors } = useTheme()
+  const styles = useMemo(() => createStyles(colors), [colors])
   const insets = useSafeAreaInsets()
 
   return (
@@ -181,6 +188,8 @@ function ImportingContent({
   progressAnim: Animated.Value
   scrollRef: React.RefObject<ScrollView | null>
 }) {
+  const { colors } = useTheme()
+  const styles = useMemo(() => createStyles(colors), [colors])
   const insets = useSafeAreaInsets()
 
   return (
@@ -240,6 +249,8 @@ function ImportingContent({
 }
 
 function CompleteContent({ warnings, onContinue }: { warnings: string[]; onContinue: () => void }) {
+  const { colors } = useTheme()
+  const styles = useMemo(() => createStyles(colors), [colors])
   const insets = useSafeAreaInsets()
 
   return (
@@ -288,6 +299,8 @@ function ErrorContent({
   onRetry: () => void
   onSkip: () => void
 }) {
+  const { colors } = useTheme()
+  const styles = useMemo(() => createStyles(colors), [colors])
   const insets = useSafeAreaInsets()
 
   return (
@@ -321,6 +334,9 @@ function ErrorContent({
 }
 
 function StatRow({ icon, label, value }: { icon: keyof typeof Ionicons.glyphMap; label: string; value: string }) {
+  const { colors } = useTheme()
+  const styles = useMemo(() => createStyles(colors), [colors])
+
   return (
     <View style={styles.statRow}>
       <Ionicons name={icon} size={18} color={colors.onSurfaceVariant} />
@@ -332,7 +348,8 @@ function StatRow({ icon, label, value }: { icon: keyof typeof Ionicons.glyphMap;
 
 // ── Styles ──
 
-const styles = StyleSheet.create({
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.surface,
@@ -595,4 +612,5 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: colors.onSurfaceVariant,
   },
-})
+  })
+}

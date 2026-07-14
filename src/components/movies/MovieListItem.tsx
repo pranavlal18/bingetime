@@ -1,13 +1,14 @@
 // ─── MovieListItem — thumbnail + title + year + swipe-to-watch ───
 
-import { useRef, memo, useCallback } from 'react'
+import { useRef, memo, useCallback, useMemo } from 'react'
 import { View, Text, StyleSheet, Pressable } from 'react-native'
 import { Image } from 'expo-image'
 import { Swipeable } from 'react-native-gesture-handler'
 import { Ionicons } from '@expo/vector-icons'
 import { router } from 'expo-router'
 import { getImageUrl } from '@/lib/queries/movies'
-import { colors, typography, borderRadius, spacing } from '@/theme'
+import { typography, borderRadius, spacing } from '@/theme'
+import { useTheme } from '@/contexts/ThemeContext'
 import type { MovieWithUserData } from '@/lib/queries/movies'
 
 interface MovieListItemProps {
@@ -20,6 +21,79 @@ const MovieListItem = memo(function MovieListItem({
   onMarkWatched,
 }: MovieListItemProps) {
   const swipeableRef = useRef<Swipeable>(null)
+  const { colors } = useTheme()
+  const styles = useMemo(() => StyleSheet.create({
+  container: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.surfaceContainer,
+    borderRadius: borderRadius.lg,
+    padding: 12,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: colors.outlineVariant,
+  },
+  thumbnailContainer: {
+    width: 48,
+    height: 72,
+    borderRadius: 8,
+    overflow: 'hidden',
+    backgroundColor: colors.surfaceDim,
+  },
+  thumbnail: {
+    width: '100%',
+    height: '100%',
+  },
+  thumbnailPlaceholder: {
+    width: '100%',
+    height: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  info: {
+    flex: 1,
+    marginLeft: 12,
+  },
+  title: {
+    fontSize: typography.bodyMd.fontSize,
+    fontWeight: '600',
+    color: colors.onSurface,
+    marginBottom: spacing.unit,
+  },
+  yearText: {
+    fontSize: typography.bodyXs.fontSize,
+    color: colors.onSurfaceVariant,
+    marginBottom: spacing.unit,
+  },
+  statusText: {
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  completeIcon: {
+    marginLeft: 8,
+  },
+  rightActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginLeft: 8,
+  },
+  swipeAction: {
+    backgroundColor: colors.primary,
+    justifyContent: 'center',
+    alignItems: 'center',
+    width: 64,
+    borderRadius: borderRadius.lg,
+    marginLeft: 8,
+    marginBottom: 8,
+  },
+  swipeLabel: {
+    color: colors.onPrimary,
+    fontSize: typography.bodyXs.fontSize,
+    fontWeight: '600',
+    marginTop: spacing.unit,
+  },
+}), [colors])
 
   const handlePress = useCallback(() => {
     router.push(`/movie/${movie.id}`)
@@ -93,79 +167,6 @@ const MovieListItem = memo(function MovieListItem({
       </Pressable>
     </Swipeable>
   )
-})
-
-const styles = StyleSheet.create({
-  container: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.surfaceContainer,
-    borderRadius: borderRadius.lg,
-    padding: 12,
-    marginBottom: 8,
-    borderWidth: 1,
-    borderColor: colors.outlineVariant,
-  },
-  thumbnailContainer: {
-    width: 48,
-    height: 72,
-    borderRadius: 8,
-    overflow: 'hidden',
-    backgroundColor: colors.surfaceDim,
-  },
-  thumbnail: {
-    width: '100%',
-    height: '100%',
-  },
-  thumbnailPlaceholder: {
-    width: '100%',
-    height: '100%',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  info: {
-    flex: 1,
-    marginLeft: 12,
-  },
-  title: {
-    fontSize: typography.bodyMd.fontSize,
-    fontWeight: '600',
-    color: colors.onSurface,
-    marginBottom: spacing.unit,
-  },
-  yearText: {
-    fontSize: typography.bodyXs.fontSize,
-    color: colors.onSurfaceVariant,
-    marginBottom: spacing.unit,
-  },
-  statusText: {
-    fontSize: 12,
-    fontWeight: '500',
-  },
-  completeIcon: {
-    marginLeft: 8,
-  },
-  rightActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    marginLeft: 8,
-  },
-  swipeAction: {
-    backgroundColor: colors.primary,
-    justifyContent: 'center',
-    alignItems: 'center',
-    width: 64,
-    borderRadius: borderRadius.lg,
-    marginLeft: 8,
-    marginBottom: 8,
-  },
-  swipeLabel: {
-    color: colors.onPrimary,
-    fontSize: typography.bodyXs.fontSize,
-    fontWeight: '600',
-    marginTop: spacing.unit,
-  },
 })
 
 export default MovieListItem

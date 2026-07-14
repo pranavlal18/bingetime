@@ -1,6 +1,6 @@
 // ─── ProgressBar — thin animated progress indicator ───
 
-import { useEffect } from 'react'
+import { useEffect, useMemo } from 'react'
 import { View, StyleSheet } from 'react-native'
 import Animated, {
   useSharedValue,
@@ -8,7 +8,7 @@ import Animated, {
   useAnimatedStyle,
   interpolate,
 } from 'react-native-reanimated'
-import { colors } from '@/theme'
+import { useTheme } from '@/contexts/ThemeContext'
 
 interface ProgressBarProps {
   episodesSeen: number
@@ -22,10 +22,27 @@ export default function ProgressBar({
   episodesSeen,
   totalEpisodes,
   height = 3,
-  color = colors.primary,
-  backgroundColor = colors.surfaceContainerHighest,
+  color,
+  backgroundColor,
 }: ProgressBarProps) {
+  const { colors } = useTheme()
+
+  const resolvedColor = color ?? colors.primary
+  const resolvedBg = backgroundColor ?? colors.surfaceContainerHighest
+
   const animatedWidth = useSharedValue(0)
+
+  const styles = useMemo(() => StyleSheet.create({
+    track: {
+      width: '100%',
+      overflow: 'hidden',
+    },
+    fill: {
+      position: 'absolute',
+      left: 0,
+      top: 0,
+    },
+  }), [])
 
   const fraction =
     totalEpisodes && totalEpisodes > 0
@@ -49,7 +66,7 @@ export default function ProgressBar({
     <View
       style={[
         styles.track,
-        { height, backgroundColor, borderRadius: height / 2 },
+        { height, backgroundColor: resolvedBg, borderRadius: height / 2 },
       ]}
     >
       <Animated.View
@@ -58,7 +75,7 @@ export default function ProgressBar({
           animatedStyle,
           {
             height,
-            backgroundColor: isComplete ? colors.success : color,
+            backgroundColor: isComplete ? colors.success : resolvedColor,
             borderRadius: height / 2,
           },
         ]}
@@ -66,15 +83,3 @@ export default function ProgressBar({
     </View>
   )
 }
-
-const styles = StyleSheet.create({
-  track: {
-    width: '100%',
-    overflow: 'hidden',
-  },
-  fill: {
-    position: 'absolute',
-    left: 0,
-    top: 0,
-  },
-})

@@ -19,10 +19,11 @@ import { Ionicons } from '@expo/vector-icons'
 import { router } from 'expo-router'
 import { useMovies, useToggleMovieWatched, useRefreshMovieReleaseDates } from '@/lib/queries/movies'
 import { useAppStore } from '@/stores/appStore'
+import { useTheme } from '@/contexts/ThemeContext'
 import { getImageUrl } from '@/lib/tmdb'
 import AnimatedPoster from '@/components/ui/AnimatedPoster'
 import MovieListItem from '@/components/movies/MovieListItem'
-import { colors, typography, borderRadius, spacing } from '@/theme'
+import { typography, borderRadius, spacing } from '@/theme'
 import { ErrorBoundary } from '@/components/ErrorBoundary'
 import type { MovieWithUserData } from '@/lib/queries/movies'
 
@@ -31,119 +32,16 @@ const SCREEN_WIDTH = Dimensions.get('window').width
 const CARD_WIDTH = (SCREEN_WIDTH - 40 - 16) / 2 // 40 outer margins, 16 gap = 2 cols
 const PAGE_PADDING = 20
 
-// ── Segmented Control ──
-
-type SegmentKey = 'watchlist' | 'upcoming'
-
-function SegmentedControl({
-  active,
-  onChange,
-}: {
-  active: SegmentKey
-  onChange: (key: SegmentKey) => void
-}) {
-  return (
-    <View style={styles.segmentOuter}>
-      <View style={styles.segmentTrack}>
-        <Pressable
-          style={[
-            styles.segmentBtn,
-            active === 'watchlist' && styles.segmentBtnActive,
-          ]}
-          onPress={() => onChange('watchlist')}
-          accessibilityRole="radio"
-          accessibilityState={{ selected: active === 'watchlist' }}
-        >
-          <Text
-            style={[
-              styles.segmentLabel,
-              active === 'watchlist' && styles.segmentLabelActive,
-            ]}
-          >
-            Watchlist
-          </Text>
-        </Pressable>
-        <Pressable
-          style={[
-            styles.segmentBtn,
-            active === 'upcoming' && styles.segmentBtnActive,
-          ]}
-          onPress={() => onChange('upcoming')}
-          accessibilityRole="radio"
-          accessibilityState={{ selected: active === 'upcoming' }}
-        >
-          <Text
-            style={[
-              styles.segmentLabel,
-              active === 'upcoming' && styles.segmentLabelActive,
-            ]}
-          >
-            Upcoming
-          </Text>
-        </Pressable>
-      </View>
-    </View>
-  )
-}
-
-// ── Movie Card — Grid View (matches ShowCard sizing) ──
-
-interface MovieCardGridProps {
-  movie: MovieWithUserData
-}
-
-function MovieCardGrid({ movie }: MovieCardGridProps) {
-  const posterUrl = getImageUrl(movie.poster_path, 'w342')
-  const year = movie.release_date?.slice(0, 4)
-  const genre = movie.genres?.[0] ?? null
-  const metaText = year && genre ? `${year} • ${genre}` : year ?? genre ?? ''
-
-  const handlePress = useCallback(() => {
-    router.push(`/movie/${movie.id}`)
-  }, [movie.id])
-
-  return (
-    <View style={styles.gridCardWrapper}>
-      <Pressable
-        style={({ pressed }) => [
-          styles.gridCard,
-          pressed && styles.gridCardPressed,
-        ]}
-        onPress={handlePress}
-        accessibilityRole="button"
-        accessibilityLabel={`${movie.title}, ${year || 'unknown year'}`}
-      >
-        {/* Poster — same size as ShowCard */}
-        <View style={styles.posterContainer}>
-          <AnimatedPoster
-            uri={posterUrl}
-            style={StyleSheet.absoluteFill}
-          />
-        </View>
-
-        {/* Title */}
-        <Text style={styles.gridTitle} numberOfLines={2}>
-          {movie.title}
-        </Text>
-
-        {/* Year • Genre */}
-        {metaText ? (
-          <Text style={styles.gridYear} numberOfLines={1}>{metaText}</Text>
-        ) : null}
-      </Pressable>
-    </View>
-  )
-}
-
-// ── Main Screen ──
+// ── Screen Content ──
 
 function MoviesScreenContent() {
   const insets = useSafeAreaInsets()
-  const [activeSegment, setActiveSegment] = useState<SegmentKey>('watchlist')
+  const [activeSegment, setActiveSegment] = useState<'watchlist' | 'upcoming'>('watchlist')
   const [searchQuery, setSearchQuery] = useState('')
   const [isSearchVisible, setIsSearchVisible] = useState(false)
   const viewMode = useAppStore((s) => s.moviesViewMode)
   const setViewMode = useAppStore((s) => s.setMoviesViewMode)
+  const { colors } = useTheme()
 
   const { data: movies, isLoading, isRefetching, refetch } = useMovies()
   const toggleWatched = useToggleMovieWatched()
@@ -159,6 +57,162 @@ function MoviesScreenContent() {
     toggleWatched.mutate(movieId)
   }, [toggleWatched])
 
+  // ── Inner sub-components (theme-aware) ──
+
+  const SegmentedControl = useCallback(function SegmentedControl({
+    active,
+    onChange,
+  }: {
+    active: 'watchlist' | 'upcoming'
+    onChange: (key: 'watchlist' | 'upcoming') => void
+  }) {
+    return (
+      <View style={{ paddingHorizontal: PAGE_PADDING, marginBottom: 20 }}>
+        <View
+          style={{
+            flexDirection: 'row',
+            backgroundColor: colors.surfaceContainerLow,
+            borderRadius: 100,
+            padding: 4,
+          }}
+        >
+          <Pressable
+            style={{
+              flex: 1,
+              height: 44,
+              justifyContent: 'center',
+              alignItems: 'center',
+              borderRadius: 100,
+              backgroundColor: active === 'watchlist' ? colors.primary : 'transparent',
+              shadowColor: active === 'watchlist' ? colors.primary : 'transparent',
+              shadowOffset: { width: 0, height: 4 },
+              shadowOpacity: active === 'watchlist' ? 0.3 : 0,
+              shadowRadius: 8,
+              elevation: active === 'watchlist' ? 6 : 0,
+            }}
+            onPress={() => onChange('watchlist')}
+            accessibilityRole="radio"
+            accessibilityState={{ selected: active === 'watchlist' }}
+          >
+            <Text
+              style={{
+                fontFamily: 'Inter',
+                fontSize: 14,
+                fontWeight: '600',
+                color: active === 'watchlist' ? colors.onPrimary : colors.onSurfaceVariant,
+              }}
+            >
+              Watchlist
+            </Text>
+          </Pressable>
+          <Pressable
+            style={{
+              flex: 1,
+              height: 44,
+              justifyContent: 'center',
+              alignItems: 'center',
+              borderRadius: 100,
+              backgroundColor: active === 'upcoming' ? colors.primary : 'transparent',
+              shadowColor: active === 'upcoming' ? colors.primary : 'transparent',
+              shadowOffset: { width: 0, height: 4 },
+              shadowOpacity: active === 'upcoming' ? 0.3 : 0,
+              shadowRadius: 8,
+              elevation: active === 'upcoming' ? 6 : 0,
+            }}
+            onPress={() => onChange('upcoming')}
+            accessibilityRole="radio"
+            accessibilityState={{ selected: active === 'upcoming' }}
+          >
+            <Text
+              style={{
+                fontFamily: 'Inter',
+                fontSize: 14,
+                fontWeight: '600',
+                color: active === 'upcoming' ? colors.onPrimary : colors.onSurfaceVariant,
+              }}
+            >
+              Upcoming
+            </Text>
+          </Pressable>
+        </View>
+      </View>
+    )
+  }, [colors])
+
+  const MovieCardGrid = useCallback(function MovieCardGrid({ movie }: { movie: MovieWithUserData }) {
+    const posterUrl = getImageUrl(movie.poster_path, 'w342')
+    const year = movie.release_date?.slice(0, 4)
+    const genre = movie.genres?.[0] ?? null
+    const metaText = year && genre ? `${year} • ${genre}` : year ?? genre ?? ''
+
+    return (
+      <View style={{ width: CARD_WIDTH, marginBottom: 16 }}>
+        <Pressable
+          style={({ pressed }) => [
+            { width: CARD_WIDTH },
+            pressed && { opacity: 0.85, transform: [{ scale: 0.97 }] },
+          ]}
+          onPress={() => router.push(`/movie/${movie.id}`)}
+          accessibilityRole="button"
+          accessibilityLabel={`${movie.title}, ${year || 'unknown year'}`}
+        >
+          {/* Poster — same size as ShowCard */}
+          <View
+            style={{
+              width: CARD_WIDTH,
+              height: CARD_WIDTH * 1.5,
+              borderRadius: 16,
+              overflow: 'hidden',
+              backgroundColor: colors.surfaceDim,
+              position: 'relative',
+              borderWidth: 1,
+              borderColor: colors.outlineVariant,
+              shadowColor: '#000',
+              shadowOffset: { width: 0, height: 8 },
+              shadowOpacity: 0.4,
+              shadowRadius: 12,
+              elevation: 8,
+            }}
+          >
+            <AnimatedPoster
+              uri={posterUrl}
+              style={StyleSheet.absoluteFill}
+            />
+          </View>
+
+          {/* Title */}
+          <Text
+            style={{
+              fontSize: typography.bodyXs.fontSize,
+              color: colors.onSurface,
+              fontWeight: '600',
+              marginTop: 8,
+              lineHeight: 18,
+            }}
+            numberOfLines={2}
+          >
+            {movie.title}
+          </Text>
+
+          {/* Year • Genre */}
+          {metaText ? (
+            <Text
+              style={{
+                fontSize: typography.bodyXs.fontSize,
+                color: colors.onSurfaceVariant,
+                marginTop: spacing.unit,
+                opacity: 0.7,
+              }}
+              numberOfLines={1}
+            >
+              {metaText}
+            </Text>
+          ) : null}
+        </Pressable>
+      </View>
+    )
+  }, [colors])
+
   const renderItem = useCallback(
     ({ item }: { item: MovieWithUserData }) => {
       if (isGrid) {
@@ -166,7 +220,7 @@ function MoviesScreenContent() {
       }
       return <MovieListItem movie={item} onMarkWatched={handleToggleWatched} />
     },
-    [isGrid, handleToggleWatched]
+    [isGrid, handleToggleWatched, MovieCardGrid]
   )
 
   const keyExtractor = useCallback((item: MovieWithUserData) => item.id, [])
@@ -208,6 +262,119 @@ function MoviesScreenContent() {
     }
   }, [movies, activeSegment, searchQuery])
 
+  // ── Styles ──
+
+  const styles = useMemo(
+    () =>
+      StyleSheet.create({
+        container: {
+          flex: 1,
+          backgroundColor: colors.surface,
+        },
+        centered: {
+          justifyContent: 'center',
+          alignItems: 'center',
+        },
+        loadingText: {
+          fontSize: typography.bodySm.fontSize,
+          color: colors.outline,
+          marginTop: spacing.stackSm,
+        },
+
+        // ── AppBar (matches Shows tab) ──
+        appBar: {
+          flexDirection: 'row',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          paddingHorizontal: PAGE_PADDING,
+          height: 64,
+        },
+        appBarTitle: {
+          fontFamily: 'Inter',
+          fontSize: 24,
+          fontWeight: '700',
+          color: colors.primary,
+          letterSpacing: -0.02,
+        },
+        appBarRight: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: 4,
+        },
+        appBarBtn: {
+          width: 44,
+          height: 44,
+          borderRadius: borderRadius.full,
+          justifyContent: 'center',
+          alignItems: 'center',
+        },
+
+        // ── Search Bar ──
+        searchBar: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          marginHorizontal: PAGE_PADDING,
+          marginBottom: spacing.stackSm,
+          backgroundColor: colors.surfaceContainerLow,
+          borderRadius: borderRadius.full,
+          paddingHorizontal: spacing.gutter,
+          height: 44,
+          gap: spacing.stackSm,
+        },
+        searchInput: {
+          flex: 1,
+          fontSize: typography.bodyMd.fontSize,
+          color: colors.onSurface,
+          height: '100%',
+        },
+        appBarBtnActive: {
+          backgroundColor: colors.surfaceContainerHigh,
+        },
+
+        // ── Section ──
+        listHeader: {
+          paddingTop: 4,
+        },
+
+        // ── List ──
+        listContent: {
+          paddingHorizontal: spacing.marginMobile,
+          paddingBottom: 32,
+        },
+
+        // ── Empty State ──
+        emptyState: {
+          alignItems: 'center',
+          paddingHorizontal: 48,
+        },
+        emptyIconContainer: {
+          width: 88,
+          height: 88,
+          borderRadius: 44,
+          backgroundColor: colors.surfaceContainerHigh,
+          justifyContent: 'center',
+          alignItems: 'center',
+          marginBottom: 20,
+        },
+        emptyTitle: {
+          fontFamily: 'Inter',
+          fontSize: 18,
+          fontWeight: '700',
+          color: colors.onSurface,
+          marginBottom: 8,
+        },
+        emptySubtitle: {
+          fontFamily: 'Inter',
+          fontSize: 14,
+          fontWeight: '400',
+          color: colors.outline,
+          textAlign: 'center',
+          lineHeight: 20,
+        },
+      }),
+    [colors]
+  )
+
   // Empty state
   const emptyState = useMemo(() => {
     if (isLoading) return null
@@ -226,7 +393,7 @@ function MoviesScreenContent() {
         </Text>
       </View>
     )
-  }, [isLoading, activeSegment])
+  }, [isLoading, activeSegment, colors, styles])
 
   // Loading state
   if (isLoading) {
@@ -339,202 +506,6 @@ function MoviesScreenContent() {
     </View>
   )
 }
-
-// ── Styles ──
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.surface,
-  },
-  centered: {
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  loadingText: {
-    fontSize: typography.bodySm.fontSize,
-    color: colors.outline,
-    marginTop: spacing.stackSm,
-  },
-
-  // ── AppBar (matches Shows tab) ──
-  appBar: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: PAGE_PADDING,
-    height: 64,
-  },
-  appBarTitle: {
-    fontFamily: 'Inter',
-    fontSize: 24,
-    fontWeight: '700',
-    color: colors.primary,
-    letterSpacing: -0.02,
-  },
-  appBarRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  appBarBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: borderRadius.full,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-
-  // ── Search Bar ──
-  searchBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginHorizontal: PAGE_PADDING,
-    marginBottom: spacing.stackSm,
-    backgroundColor: colors.surfaceContainerLow,
-    borderRadius: borderRadius.full,
-    paddingHorizontal: spacing.gutter,
-    height: 44,
-    gap: spacing.stackSm,
-  },
-  searchInput: {
-    flex: 1,
-    fontSize: typography.bodyMd.fontSize,
-    color: colors.onSurface,
-    height: '100%',
-  },
-  appBarBtnActive: {
-    backgroundColor: colors.surfaceContainerHigh,
-  },
-
-  // ── Segmented Control ──
-  segmentOuter: {
-    paddingHorizontal: PAGE_PADDING,
-    marginBottom: 20,
-  },
-  segmentTrack: {
-    flexDirection: 'row',
-    backgroundColor: colors.surfaceContainerLow,
-    borderRadius: borderRadius.full,
-    padding: 4,
-  },
-  segmentBtn: {
-    flex: 1,
-    height: 44,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderRadius: borderRadius.full,
-  },
-  segmentBtnActive: {
-    backgroundColor: colors.primary,
-    shadowColor: colors.primary,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 6,
-  },
-  segmentLabel: {
-    fontFamily: 'Inter',
-    fontSize: 14,
-    fontWeight: '600',
-    color: colors.onSurfaceVariant,
-  },
-  segmentLabelActive: {
-    color: colors.onPrimary,
-    fontWeight: '700',
-  },
-
-  // ── Section ──
-  listHeader: {
-    paddingTop: 4,
-  },
-  sectionTitle: {
-    fontFamily: 'Inter',
-    fontSize: 22,
-    fontWeight: '700',
-    color: colors.onSurface,
-    paddingHorizontal: PAGE_PADDING,
-    marginBottom: 16,
-    letterSpacing: -0.01,
-  },
-
-  // ── Grid Card (same sizing as ShowCard) ──
-  gridCardWrapper: {
-    width: CARD_WIDTH,
-    marginBottom: 16,
-  },
-  gridCard: {
-    width: CARD_WIDTH,
-  },
-  gridCardPressed: {
-    opacity: 0.85,
-    transform: [{ scale: 0.97 }],
-  },
-  posterContainer: {
-    width: CARD_WIDTH,
-    height: CARD_WIDTH * 1.5, // 2:3 aspect ratio
-    borderRadius: 16,
-    overflow: 'hidden',
-    backgroundColor: colors.surfaceDim,
-    position: 'relative',
-    borderWidth: 1,
-    borderColor: colors.outlineVariant,
-    // Premium shadow
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.4,
-    shadowRadius: 12,
-    elevation: 8,
-  },
-  gridTitle: {
-    fontSize: typography.bodyXs.fontSize,
-    color: colors.onSurface,
-    fontWeight: '600',
-    marginTop: 8,
-    lineHeight: 18,
-  },
-  gridYear: {
-    fontSize: typography.bodyXs.fontSize,
-    color: colors.onSurfaceVariant,
-    marginTop: spacing.unit,
-    opacity: 0.7,
-  },
-
-  // ── List ──
-  listContent: {
-    paddingHorizontal: spacing.marginMobile,
-    paddingBottom: 32,
-  },
-  // ── Empty State ──
-  emptyState: {
-    alignItems: 'center',
-    paddingHorizontal: 48,
-  },
-  emptyIconContainer: {
-    width: 88,
-    height: 88,
-    borderRadius: 44,
-    backgroundColor: colors.surfaceContainerHigh,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  emptyTitle: {
-    fontFamily: 'Inter',
-    fontSize: 18,
-    fontWeight: '700',
-    color: colors.onSurface,
-    marginBottom: 8,
-  },
-  emptySubtitle: {
-    fontFamily: 'Inter',
-    fontSize: 14,
-    fontWeight: '400',
-    color: colors.outline,
-    textAlign: 'center',
-    lineHeight: 20,
-  },
-})
 
 export default function MoviesScreen() {
   return (

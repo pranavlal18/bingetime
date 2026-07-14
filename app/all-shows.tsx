@@ -1,6 +1,6 @@
 // ─── All Shows — full library from Profile with filter chips ───
 
-import { memo, useCallback, useMemo, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import {
   View,
   Text,
@@ -16,7 +16,8 @@ import { Ionicons } from '@expo/vector-icons'
 import { router, Stack } from 'expo-router'
 import { useShows } from '@/lib/queries/shows'
 import { useAppStore } from '@/stores/appStore'
-import { colors, typography, spacing, borderRadius } from '@/theme'
+import { typography, spacing, borderRadius } from '@/theme'
+import { useTheme } from '@/contexts/ThemeContext'
 import ShowCard from '@/components/shows/ShowCard'
 import ShowListItem from '@/components/shows/ShowListItem'
 import type { ShowWithUserData } from '@/lib/queries/shows'
@@ -30,14 +31,6 @@ interface FilterChip {
   label: string
   color: string
 }
-
-const FILTER_CHIPS: FilterChip[] = [
-  { key: 'all', label: 'All', color: colors.primary },
-  { key: 'watching', label: 'Watching', color: colors.statusWatching },
-  { key: 'not-started', label: "Haven't started", color: colors.onSurfaceVariant },
-  { key: 'up-to-date', label: 'Up to date', color: colors.statusUpToDate },
-  { key: 'finished', label: 'Finished', color: colors.statusFinished },
-]
 
 // ── Filter logic ──
 
@@ -64,55 +57,11 @@ interface FilterChipProps {
   onPress: () => void
 }
 
-const FilterChip = memo(function FilterChip({
-  chip,
-  isActive,
-  count,
-  onPress,
-}: FilterChipProps) {
-  return (
-    <Pressable
-      style={[
-        styles.chip,
-        isActive && { backgroundColor: chip.color, borderColor: chip.color },
-      ]}
-      onPress={onPress}
-    >
-      <Text
-        style={[
-          styles.chipLabel,
-          isActive
-            ? { color: colors.onPrimary }
-            : { color: chip.color },
-        ]}
-      >
-        {chip.label}
-      </Text>
-      <View
-        style={[
-          styles.chipCount,
-          isActive && { backgroundColor: 'rgba(0,0,0,0.2)' },
-        ]}
-      >
-        <Text
-          style={[
-            styles.chipCountText,
-            isActive
-              ? { color: colors.onPrimary }
-              : { color: chip.color },
-          ]}
-        >
-          {count}
-        </Text>
-      </View>
-    </Pressable>
-  )
-})
-
 // ── Main Screen ──
 
 export default function AllShowsScreen() {
   const insets = useSafeAreaInsets()
+  const { colors } = useTheme()
   const viewMode = useAppStore((s) => s.showsViewMode)
   const setViewMode = useAppStore((s) => s.setShowsViewMode)
 
@@ -122,12 +71,138 @@ export default function AllShowsScreen() {
 
   const isGrid = viewMode === 'poster-grid'
 
+  // ── Filter chips ──
+
+  const filterChips = useMemo((): FilterChip[] => [
+    { key: 'all', label: 'All', color: colors.primary },
+    { key: 'watching', label: 'Watching', color: colors.statusWatching },
+    { key: 'not-started', label: "Haven't started", color: colors.onSurfaceVariant },
+    { key: 'up-to-date', label: 'Up to date', color: colors.statusUpToDate },
+    { key: 'finished', label: 'Finished', color: colors.statusFinished },
+  ], [colors])
+
+  // ── Styles ──
+
+  const styles = useMemo(() => StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: colors.surface,
+    },
+    centered: {
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    loadingText: {
+      fontSize: typography.bodySm.fontSize,
+      color: colors.outline,
+      marginTop: spacing.stackSm,
+    },
+
+    // ── AppBar ──
+    appBar: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: spacing.marginMobile,
+      height: 56,
+      gap: 12,
+    },
+    backBtn: {
+      width: 40,
+      height: 40,
+      borderRadius: borderRadius.full,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    appBarTitle: {
+      flex: 1,
+      fontFamily: 'Inter',
+      fontSize: 22,
+      fontWeight: '700',
+      color: colors.onSurface,
+      letterSpacing: -0.01,
+    },
+    gridToggle: {
+      width: 40,
+      height: 40,
+      borderRadius: borderRadius.full,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+
+    // ── Filter Chips ──
+    chipsContainer: {
+      paddingVertical: spacing.stackSm,
+    },
+    chipsContent: {
+      paddingHorizontal: spacing.marginMobile,
+      gap: 8,
+    },
+    chip: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: 14,
+      height: 34,
+      borderRadius: borderRadius.full,
+      borderWidth: 1,
+      borderColor: colors.outlineVariant,
+      backgroundColor: colors.surfaceContainerLow,
+      gap: 6,
+    },
+    chipLabel: {
+      fontSize: 13,
+      fontWeight: '600',
+    },
+    chipCount: {
+      minWidth: 20,
+      height: 20,
+      borderRadius: 10,
+      justifyContent: 'center',
+      alignItems: 'center',
+      paddingHorizontal: 6,
+    },
+    chipCountText: {
+      fontSize: 11,
+      fontWeight: '700',
+    },
+
+    // ── List ──
+    listContent: {
+      paddingHorizontal: spacing.marginMobile,
+      paddingBottom: 32,
+      paddingTop: spacing.stackSm,
+    },
+    listContentEmpty: {
+      flex: 1,
+      justifyContent: 'center',
+    },
+
+    // ── Empty State ──
+    emptyState: {
+      alignItems: 'center',
+      paddingHorizontal: 48,
+    },
+    emptyTitle: {
+      fontFamily: 'Inter',
+      fontSize: 18,
+      fontWeight: '700',
+      color: colors.onSurface,
+      marginTop: 16,
+      marginBottom: 8,
+    },
+    emptySubtitle: {
+      fontSize: 14,
+      color: colors.outline,
+      textAlign: 'center',
+      lineHeight: 20,
+    },
+  }), [colors])
+
   // ── Derive counts per filter ──
 
   const filterCounts = useMemo(() => {
     if (!shows) return new Map<ShowFilter, number>()
     const counts = new Map<ShowFilter, number>()
-    for (const chip of FILTER_CHIPS) {
+    for (const chip of filterChips) {
       counts.set(chip.key, 0)
     }
     for (const show of shows) {
@@ -146,6 +221,48 @@ export default function AllShowsScreen() {
     if (activeFilter === 'all') return shows
     return shows.filter((s) => getShowStatus(s) === activeFilter)
   }, [shows, activeFilter])
+
+  // ── Filter Chip ──
+
+  function FilterChip({ chip, isActive, count, onPress }: FilterChipProps) {
+    return (
+      <Pressable
+        style={[
+          styles.chip,
+          isActive && { backgroundColor: chip.color, borderColor: chip.color },
+        ]}
+        onPress={onPress}
+      >
+        <Text
+          style={[
+            styles.chipLabel,
+            isActive
+              ? { color: colors.onPrimary }
+              : { color: chip.color },
+          ]}
+        >
+          {chip.label}
+        </Text>
+        <View
+          style={[
+            styles.chipCount,
+            isActive && { backgroundColor: 'rgba(0,0,0,0.2)' },
+          ]}
+        >
+          <Text
+            style={[
+              styles.chipCountText,
+              isActive
+                ? { color: colors.onPrimary }
+                : { color: chip.color },
+            ]}
+          >
+            {count}
+          </Text>
+        </View>
+      </Pressable>
+    )
+  }
 
   // ── Callbacks ──
 
@@ -178,7 +295,7 @@ export default function AllShowsScreen() {
   // ── Empty state ──
 
   const renderEmptyState = useCallback(() => {
-    const label = FILTER_CHIPS.find((c) => c.key === activeFilter)?.label ?? ''
+    const label = filterChips.find((c) => c.key === activeFilter)?.label ?? ''
     return (
       <View style={styles.emptyState}>
         <Ionicons name="tv-outline" size={48} color={colors.outline} />
@@ -190,7 +307,7 @@ export default function AllShowsScreen() {
         </Text>
       </View>
     )
-  }, [activeFilter])
+  }, [activeFilter, filterChips])
 
   // ── Loading ──
 
@@ -231,7 +348,7 @@ export default function AllShowsScreen() {
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.chipsContent}
         >
-          {FILTER_CHIPS.map((chip) => (
+          {filterChips.map((chip) => (
             <FilterChip
               key={chip.key}
               chip={chip}
@@ -268,119 +385,3 @@ export default function AllShowsScreen() {
     </View>
   )
 }
-
-// ── Styles ──
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.surface,
-  },
-  centered: {
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  loadingText: {
-    fontSize: typography.bodySm.fontSize,
-    color: colors.outline,
-    marginTop: spacing.stackSm,
-  },
-
-  // ── AppBar ──
-  appBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: spacing.marginMobile,
-    height: 56,
-    gap: 12,
-  },
-  backBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: borderRadius.full,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  appBarTitle: {
-    flex: 1,
-    fontFamily: 'Inter',
-    fontSize: 22,
-    fontWeight: '700',
-    color: colors.onSurface,
-    letterSpacing: -0.01,
-  },
-  gridToggle: {
-    width: 40,
-    height: 40,
-    borderRadius: borderRadius.full,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-
-  // ── Filter Chips ──
-  chipsContainer: {
-    paddingVertical: spacing.stackSm,
-  },
-  chipsContent: {
-    paddingHorizontal: spacing.marginMobile,
-    gap: 8,
-  },
-  chip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 14,
-    height: 34,
-    borderRadius: borderRadius.full,
-    borderWidth: 1,
-    borderColor: colors.outlineVariant,
-    backgroundColor: colors.surfaceContainerLow,
-    gap: 6,
-  },
-  chipLabel: {
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  chipCount: {
-    minWidth: 20,
-    height: 20,
-    borderRadius: 10,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 6,
-  },
-  chipCountText: {
-    fontSize: 11,
-    fontWeight: '700',
-  },
-
-  // ── List ──
-  listContent: {
-    paddingHorizontal: spacing.marginMobile,
-    paddingBottom: 32,
-    paddingTop: spacing.stackSm,
-  },
-  listContentEmpty: {
-    flex: 1,
-    justifyContent: 'center',
-  },
-
-  // ── Empty State ──
-  emptyState: {
-    alignItems: 'center',
-    paddingHorizontal: 48,
-  },
-  emptyTitle: {
-    fontFamily: 'Inter',
-    fontSize: 18,
-    fontWeight: '700',
-    color: colors.onSurface,
-    marginTop: 16,
-    marginBottom: 8,
-  },
-  emptySubtitle: {
-    fontSize: 14,
-    color: colors.outline,
-    textAlign: 'center',
-    lineHeight: 20,
-  },
-})

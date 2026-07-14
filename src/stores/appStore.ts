@@ -1,12 +1,12 @@
 import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
 import AsyncStorage from '@react-native-async-storage/async-storage'
-import type { AppSettings, ViewMode, Theme } from '@/types'
+import type { AppSettings, ViewMode, ThemeKey } from '@/types'
 
 interface AppState extends AppSettings {
   setShowsViewMode: (mode: ViewMode) => void
   setMoviesViewMode: (mode: ViewMode) => void
-  setTheme: (theme: Theme) => void
+  setTheme: (theme: ThemeKey) => void
   notificationsEnabled: boolean
   setNotificationsEnabled: (enabled: boolean) => void
   isImportComplete: boolean
@@ -21,7 +21,7 @@ export const useAppStore = create<AppState>()(
       // Defaults
       showsViewMode: 'poster-grid',
       moviesViewMode: 'poster-grid',
-      theme: 'system',
+      theme: 'cinematic-dark',
       notificationsEnabled: false,
       isImportComplete: false,
       importStarted: false,

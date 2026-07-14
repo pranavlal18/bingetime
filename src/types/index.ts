@@ -266,12 +266,23 @@ export interface ListsProdListRow {
 
 // ── App Settings ──
 export type ViewMode = 'poster-grid' | 'thumbnail-list'
-export type Theme = 'system' | 'light' | 'dark'
+
+/** Available theme keys — add new themes here and in src/themes/index.ts */
+export type ThemeKey =
+  | 'cinematic-dark'
+  | 'midnight-blue'
+  | 'forest'
+  | 'amber-glow'
+  | 'neon-cyber'
+  | 'luminescent'
+
+/** Legacy theme type kept for backward compat; maps to ThemeKey now */
+export type Theme = ThemeKey
 
 export interface AppSettings {
   showsViewMode: ViewMode
   moviesViewMode: ViewMode
-  theme: Theme
+  theme: ThemeKey
   notificationsEnabled: boolean
 }
 

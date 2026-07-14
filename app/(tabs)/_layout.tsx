@@ -1,26 +1,27 @@
+import { useMemo } from 'react'
 import { Tabs } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
-import { colors } from '@/theme'
+import { useTheme } from '@/contexts/ThemeContext'
 
 export default function TabLayout() {
-  // Cinematic Precision: dark-first design
+  const { colors, tabBar } = useTheme()
+
+  const screenOptions = useMemo(() => ({
+    headerShown: false,
+    tabBarActiveTintColor: colors.primary,
+    tabBarInactiveTintColor: colors.outlineVariant,
+    tabBarStyle: {
+      backgroundColor: colors.surfaceContainer,
+      borderTopColor: colors.outlineVariant,
+      borderTopWidth: 1,
+      paddingBottom: 4,
+      paddingTop: 4,
+      height: 64,
+    },
+  }), [colors, tabBar])
 
   return (
-    <Tabs
-      screenOptions={{
-        headerShown: false,
-        tabBarActiveTintColor: colors.primary,
-        tabBarInactiveTintColor: colors.outlineVariant,
-        tabBarStyle: {
-          backgroundColor: colors.surfaceContainer,
-          borderTopColor: colors.outlineVariant,
-          borderTopWidth: 1,
-          paddingBottom: 4,
-          paddingTop: 4,
-          height: 64,
-        },
-      }}
-    >
+    <Tabs screenOptions={screenOptions}>
       <Tabs.Screen
         name="shows/index"
         options={{

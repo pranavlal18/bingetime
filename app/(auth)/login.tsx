@@ -1,9 +1,10 @@
 // ─── Login Screen ───
 
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import {
   View,
   Text,
+  TextInput,
   Pressable,
   StyleSheet,
   ScrollView,
@@ -16,144 +17,13 @@ import { Image } from 'expo-image'
 import { Ionicons } from '@expo/vector-icons'
 import { router } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import { colors, typography, spacing, borderRadius } from '@/theme'
+import { typography, spacing, borderRadius } from '@/theme'
+import { useTheme } from '@/contexts/ThemeContext'
 import { supabase } from '@/lib/supabase'
 
 export default function LoginScreen() {
-  const insets = useSafeAreaInsets()
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-
-  const handleLogin = async () => {
-    if (!email || !password) {
-      setError('Please enter both email and password')
-      return
-    }
-    setError(null)
-    setLoading(true)
-
-    console.log('🔑 [LoginScreen] Attempting sign in:', { email })
-    const { error, data } = await supabase.auth.signInWithPassword({ email, password })
-    setLoading(false)
-
-    if (error) {
-      console.log('❌ [LoginScreen] Sign in error:', error.message)
-      setError(error.message)
-      return
-    }
-    console.log('✅ [LoginScreen] Sign in success:', { user: data.user?.email })
-    // Success - router will handle navigation via auth guard
-  }
-
-  const handleForgotPassword = async () => {
-    if (!email) {
-      Alert.alert('Enter your email first', 'Type your email above, then tap "Forgot password"')
-      return
-    }
-    const { error } = await supabase.auth.resetPasswordForEmail(email)
-    if (error) {
-      Alert.alert('Error', error.message)
-    } else {
-      Alert.alert('Reset email sent', 'Check your inbox for a password reset link')
-    }
-  }
-
-  return (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      style={styles.container}
-      keyboardVerticalOffset={insets.top}
-    >
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        {/* ── Logo ── */}
-        <View style={styles.logoContainer}>
-          <View style={styles.logo}>
-            <Ionicons name="tv-outline" size={40} color={colors.primary} />
-          </View>
-          <Text style={styles.title}>BingeTime</Text>
-          <Text style={styles.subtitle}>Track your shows & movies</Text>
-        </View>
-
-        {/* ── Form ── */}
-        <View style={styles.formContainer}>
-          <Text style={styles.formTitle}>Welcome back</Text>
-          <Text style={styles.formSubtitle}>Sign in to continue</Text>
-
-          {error && (
-            <View style={styles.errorContainer}>
-              <Ionicons name="alert-circle-outline" size={20} color={colors.onErrorContainer} />
-              <Text style={styles.errorText}>{error}</Text>
-            </View>
-          )}
-
-          <View style={styles.inputGroup}>
-            <View style={styles.inputWrapper}>
-              <Ionicons name="mail-outline" size={22} color={colors.onSurfaceVariant} style={styles.inputIcon} />
-              <View style={styles.inputInner}>
-                <Text style={styles.inputLabel}>Email</Text>
-                <TextInput
-                  style={styles.input}
-                  value={email}
-                  onChangeText={setEmail}
-                  placeholder="you@example.com"
-                  autoCapitalize="none"
-                  keyboardType="email-address"
-                  autoComplete="email"
-                  textContentType="emailAddress"
-                />
-              </View>
-            </View>
-          </View>
-
-          <View style={styles.inputGroup}>
-            <View style={styles.inputWrapper}>
-              <Ionicons name="lock-closed-outline" size={22} color={colors.onSurfaceVariant} style={styles.inputIcon} />
-              <View style={styles.inputInner}>
-                <Text style={styles.inputLabel}>Password</Text>
-                <TextInput
-                  style={styles.input}
-                  value={password}
-                  onChangeText={setPassword}
-                  placeholder="••••••••"
-                  secureTextEntry
-                  autoComplete="password"
-                  textContentType="password"
-                />
-              </View>
-            </View>
-          </View>
-
-          <Pressable style={styles.forgotButton} onPress={handleForgotPassword}>
-            <Text style={styles.forgotText}>Forgot password?</Text>
-          </Pressable>
-
-          <Pressable style={[styles.submitButton, loading && styles.submitButtonLoading]} onPress={handleLogin} disabled={loading}>
-            {loading ? (
-              <ActivityIndicator size="small" color={colors.onPrimary} />
-            ) : (
-              <Text style={styles.submitButtonText}>Sign In</Text>
-            )}
-          </Pressable>
-        </View>
-
-        {/* ── Footer ── */}
-        <View style={styles.footer}>
-          <Text style={styles.footerText}>Don't have an account?</Text>
-          <Pressable onPress={() => router.replace('/(auth)/register')}>
-            <Text style={styles.footerLink}>Create one</Text>
-          </Pressable>
-        </View>
-      </ScrollView>
-    </KeyboardAvoidingView>
-  )
-}
-
-// Import TextInput at top level
-import { TextInput } from 'react-native'
-
-const styles = StyleSheet.create({
+  const { colors } = useTheme()
+  const styles = useMemo(() => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
@@ -302,4 +172,135 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: colors.primary,
   },
-})
+}), [colors])
+  const insets = useSafeAreaInsets()
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const handleLogin = async () => {
+    if (!email || !password) {
+      setError('Please enter both email and password')
+      return
+    }
+    setError(null)
+    setLoading(true)
+
+    console.log('🔑 [LoginScreen] Attempting sign in:', { email })
+    const { error, data } = await supabase.auth.signInWithPassword({ email, password })
+    setLoading(false)
+
+    if (error) {
+      console.log('❌ [LoginScreen] Sign in error:', error.message)
+      setError('Invalid email or password. Please try again.')
+      return
+    }
+    console.log('✅ [LoginScreen] Sign in success:', { user: data.user?.email })
+    // Success - router will handle navigation via auth guard
+  }
+
+  const handleForgotPassword = async () => {
+    if (!email) {
+      Alert.alert('Enter your email first', 'Type your email above, then tap "Forgot password"')
+      return
+    }
+    const { error } = await supabase.auth.resetPasswordForEmail(email)
+    if (error) {
+      console.log('❌ [LoginScreen] Reset password error:', error.message)
+      Alert.alert('Error', 'Could not send reset email. Please try again.')
+    } else {
+      Alert.alert('Reset email sent', 'Check your inbox for a password reset link')
+    }
+  }
+
+  return (
+    <KeyboardAvoidingView
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      style={styles.container}
+      keyboardVerticalOffset={insets.top}
+    >
+      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+        {/* ── Logo ── */}
+        <View style={styles.logoContainer}>
+          <View style={styles.logo}>
+            <Ionicons name="tv-outline" size={40} color={colors.primary} />
+          </View>
+          <Text style={styles.title}>BingeTime</Text>
+          <Text style={styles.subtitle}>Track your shows & movies</Text>
+        </View>
+
+        {/* ── Form ── */}
+        <View style={styles.formContainer}>
+          <Text style={styles.formTitle}>Welcome back</Text>
+          <Text style={styles.formSubtitle}>Sign in to continue</Text>
+
+          {error && (
+            <View style={styles.errorContainer}>
+              <Ionicons name="alert-circle-outline" size={20} color={colors.onErrorContainer} />
+              <Text style={styles.errorText}>{error}</Text>
+            </View>
+          )}
+
+          <View style={styles.inputGroup}>
+            <View style={styles.inputWrapper}>
+              <Ionicons name="mail-outline" size={22} color={colors.onSurfaceVariant} style={styles.inputIcon} />
+              <View style={styles.inputInner}>
+                <Text style={styles.inputLabel}>Email</Text>
+                <TextInput
+                  style={styles.input}
+                  value={email}
+                  onChangeText={setEmail}
+                  placeholder="you@example.com"
+                  autoCapitalize="none"
+                  keyboardType="email-address"
+                  autoComplete="email"
+                  textContentType="emailAddress"
+                />
+              </View>
+            </View>
+          </View>
+
+          <View style={styles.inputGroup}>
+            <View style={styles.inputWrapper}>
+              <Ionicons name="lock-closed-outline" size={22} color={colors.onSurfaceVariant} style={styles.inputIcon} />
+              <View style={styles.inputInner}>
+                <Text style={styles.inputLabel}>Password</Text>
+                <TextInput
+                  style={styles.input}
+                  value={password}
+                  onChangeText={setPassword}
+                  placeholder="••••••••"
+                  secureTextEntry
+                  autoComplete="password"
+                  textContentType="password"
+                />
+              </View>
+            </View>
+          </View>
+
+          <Pressable style={styles.forgotButton} onPress={handleForgotPassword}>
+            <Text style={styles.forgotText}>Forgot password?</Text>
+          </Pressable>
+
+          <Pressable style={[styles.submitButton, loading && styles.submitButtonLoading]} onPress={handleLogin} disabled={loading}>
+            {loading ? (
+              <ActivityIndicator size="small" color={colors.onPrimary} />
+            ) : (
+              <Text style={styles.submitButtonText}>Sign In</Text>
+            )}
+          </Pressable>
+        </View>
+
+        {/* ── Footer ── */}
+        <View style={styles.footer}>
+          <Text style={styles.footerText}>Don't have an account?</Text>
+          <Pressable onPress={() => router.replace('/(auth)/register')}>
+            <Text style={styles.footerLink}>Create one</Text>
+          </Pressable>
+        </View>
+      </ScrollView>
+    </KeyboardAvoidingView>
+  )
+}
+

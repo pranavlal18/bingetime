@@ -1,6 +1,6 @@
 // ─── Profile Tab — TV Time style: user + horizontal carousels ───
 
-import { memo, useState, useMemo, useEffect } from 'react'
+import { memo, useState, useMemo, useCallback, useEffect } from 'react'
 import {
   View,
   Text,
@@ -27,13 +27,12 @@ import {
   useProfileStats,
   useFavorites,
 } from '@/lib/queries/profile'
-import { colors, typography, spacing, borderRadius } from '@/theme'
+import { useTheme } from '@/contexts/ThemeContext'
 import type { ShowWithUserData } from '@/lib/queries/shows'
 import type { MovieWithUserData } from '@/lib/queries/movies'
+import type { ThemeKey } from '@/types'
 
 const SCREEN_WIDTH = Dimensions.get('window').width
-// 2-column bento grid: (screen width - 2 × margin - 1 × gap) / 2
-const STAT_CARD_WIDTH = (SCREEN_WIDTH - spacing.marginMobile * 2 - spacing.gutter) / 2
 const POSTER_W = 100
 const POSTER_H = POSTER_W * 1.5
 const SIDE_OFFSET = 20
@@ -53,31 +52,53 @@ function getInitials(email: string): string {
     .join('')
 }
 
-// ── Stat Card (Bento style) ──
+// ── Sub-components (theme-aware via useTheme) ──
 
-interface StatCardProps {
-  label: string
-  value: string
-}
+// 2-column bento grid: (screen width - 2 × margin - 1 × gap) / 2
+const STAT_CARD_WIDTH = (SCREEN_WIDTH - 20 * 2 - 16) / 2
 
-const StatCard = memo(function StatCard({ label, value }: StatCardProps) {
+const StatCard = memo(function StatCard({ label, value }: { label: string; value: string }) {
+  const { colors } = useTheme()
   return (
-    <View style={styles.statCard}>
-      <Text style={styles.statValue}>{value}</Text>
-      <Text style={styles.statLabel}>{label}</Text>
+    <View
+      style={{
+        width: STAT_CARD_WIDTH,
+        backgroundColor: colors.surfaceContainer,
+        borderRadius: 16,
+        paddingVertical: 20,
+        paddingHorizontal: 12,
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.05)',
+      }}
+    >
+      <Text
+        style={{
+          fontFamily: 'Inter',
+          fontSize: 24,
+          fontWeight: '600',
+          color: colors.primary,
+        }}
+      >
+        {value}
+      </Text>
+      <Text
+        style={{
+          fontFamily: 'Inter',
+          fontSize: 12,
+          fontWeight: '500',
+          letterSpacing: 0.08,
+          textTransform: 'uppercase' as const,
+          color: colors.secondary,
+          marginTop: 4,
+        }}
+      >
+        {label}
+      </Text>
     </View>
   )
 })
-
-// ── Section Header ──
-
-interface SectionHeaderProps {
-  title: string
-  icon?: keyof typeof Ionicons.glyphMap
-  iconColor?: string
-  count?: number
-  onPress?: () => void
-}
 
 const SectionHeader = memo(function SectionHeader({
   title,
@@ -85,14 +106,49 @@ const SectionHeader = memo(function SectionHeader({
   iconColor,
   count,
   onPress,
-}: SectionHeaderProps) {
+}: {
+  title: string
+  icon?: keyof typeof Ionicons.glyphMap
+  iconColor?: string
+  count?: number
+  onPress?: () => void
+}) {
+  const { colors } = useTheme()
   return (
-    <Pressable style={styles.sectionHeader} onPress={onPress}>
-      <View style={styles.sectionHeaderLeft}>
+    <Pressable
+      style={{
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingHorizontal: SIDE_OFFSET,
+        marginBottom: 12,
+      }}
+      onPress={onPress}
+    >
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
         {icon && <Ionicons name={icon} size={18} color={iconColor ?? colors.primary} />}
-        <Text style={styles.sectionTitle}>{title}</Text>
+        <Text
+          style={{
+            fontFamily: 'Inter',
+            fontSize: 20,
+            fontWeight: '700',
+            color: colors.onSurface,
+            letterSpacing: -0.01,
+          }}
+        >
+          {title}
+        </Text>
         {count !== undefined && (
-          <Text style={styles.sectionCount}>{count}</Text>
+          <Text
+            style={{
+              fontFamily: 'Inter',
+              fontSize: 14,
+              fontWeight: '500',
+              color: colors.outlineVariant,
+            }}
+          >
+            {count}
+          </Text>
         )}
       </View>
       <Ionicons name="chevron-forward" size={16} color={colors.outlineVariant} />
@@ -100,47 +156,60 @@ const SectionHeader = memo(function SectionHeader({
   )
 })
 
-// ── Poster Carousel Item ──
-
-interface PosterItemProps {
+const PosterItem = memo(function PosterItem({
+  posterPath,
+  title,
+  onPress,
+}: {
   posterPath: string | null
   title: string
   onPress: () => void
-}
-
-const PosterItem = memo(function PosterItem({ posterPath, title, onPress }: PosterItemProps) {
+}) {
+  const { colors } = useTheme()
   const posterUrl = getImageUrl(posterPath, 'w185')
 
   return (
-    <Pressable style={styles.posterItem} onPress={onPress}>
-      <View style={styles.posterContainer}>
+    <Pressable style={{ width: POSTER_W }} onPress={onPress}>
+      <View
+        style={{
+          width: POSTER_W,
+          height: POSTER_H,
+          borderRadius: 12,
+          overflow: 'hidden',
+          backgroundColor: colors.surfaceDim,
+          borderWidth: 1,
+          borderColor: colors.outlineVariant,
+        }}
+      >
         {posterUrl ? (
           <Image
             source={{ uri: posterUrl }}
-            style={styles.posterImage}
+            style={{ width: '100%', height: '100%' }}
             contentFit="cover"
             cachePolicy="memory-disk"
           />
         ) : (
-          <View style={styles.posterPlaceholder}>
+          <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
             <Ionicons name="film-outline" size={24} color={colors.outlineVariant} />
           </View>
         )}
       </View>
-      <Text style={styles.posterTitle} numberOfLines={2}>{title}</Text>
+      <Text
+        style={{
+          fontFamily: 'Inter',
+          fontSize: 11,
+          fontWeight: '600',
+          color: colors.onSurface,
+          marginTop: 6,
+          lineHeight: 14,
+        }}
+        numberOfLines={2}
+      >
+        {title}
+      </Text>
     </Pressable>
   )
 })
-
-// ── Settings Row ──
-
-interface SettingsRowProps {
-  icon: keyof typeof Ionicons.glyphMap
-  label: string
-  rightLabel?: string
-  showChevron?: boolean
-  onPress?: () => void
-}
 
 const SettingsRow = memo(function SettingsRow({
   icon,
@@ -148,23 +217,60 @@ const SettingsRow = memo(function SettingsRow({
   rightLabel,
   showChevron = true,
   onPress,
-}: SettingsRowProps) {
+}: {
+  icon: keyof typeof Ionicons.glyphMap
+  label: string
+  rightLabel?: string
+  showChevron?: boolean
+  onPress?: () => void
+}) {
+  const { colors } = useTheme()
   const [pressed, setPressed] = useState(false)
 
   return (
     <Pressable
-      style={[styles.settingsRow, pressed && styles.settingsRowPressed]}
+      style={[
+        {
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          paddingHorizontal: 20,
+          paddingVertical: 16,
+          borderBottomWidth: 1,
+          borderBottomColor: 'rgba(255,255,255,0.05)',
+        },
+        pressed && { backgroundColor: 'rgba(255,255,255,0.05)' },
+      ]}
       onPress={onPress}
       onPressIn={() => setPressed(true)}
       onPressOut={() => setPressed(false)}
     >
-      <View style={styles.settingsRowLeft}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 16 }}>
         <Ionicons name={icon} size={20} color={colors.secondary} />
-        <Text style={styles.settingsLabel}>{label}</Text>
+        <Text
+          style={{
+            fontFamily: 'Inter',
+            fontSize: 16,
+            fontWeight: '400',
+            color: colors.onSurface,
+          }}
+        >
+          {label}
+        </Text>
       </View>
-      <View style={styles.settingsRowRight}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
         {rightLabel ? (
-          <Text style={styles.settingsRightLabel}>{rightLabel}</Text>
+          <Text
+            style={{
+              fontFamily: 'Inter',
+              fontSize: 14,
+              fontWeight: '600',
+              letterSpacing: 0.01,
+              color: colors.onSurfaceVariant,
+            }}
+          >
+            {rightLabel}
+          </Text>
         ) : null}
         {showChevron && (
           <Ionicons name="chevron-forward" size={16} color={colors.outlineVariant} />
@@ -174,26 +280,42 @@ const SettingsRow = memo(function SettingsRow({
   )
 })
 
-// ── Settings Toggle Row ──
-
-interface SettingsToggleProps {
-  icon: keyof typeof Ionicons.glyphMap
-  label: string
-  value: boolean
-  onValueChange: (value: boolean) => void
-}
-
 const SettingsToggle = memo(function SettingsToggle({
   icon,
   label,
   value,
   onValueChange,
-}: SettingsToggleProps) {
+}: {
+  icon: keyof typeof Ionicons.glyphMap
+  label: string
+  value: boolean
+  onValueChange: (value: boolean) => void
+}) {
+  const { colors } = useTheme()
   return (
-    <View style={styles.settingsRow}>
-      <View style={styles.settingsRowLeft}>
+    <View
+      style={{
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingHorizontal: 20,
+        paddingVertical: 16,
+        borderBottomWidth: 1,
+        borderBottomColor: 'rgba(255,255,255,0.05)',
+      }}
+    >
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 16 }}>
         <Ionicons name={icon} size={20} color={colors.secondary} />
-        <Text style={styles.settingsLabel}>{label}</Text>
+        <Text
+          style={{
+            fontFamily: 'Inter',
+            fontSize: 16,
+            fontWeight: '400',
+            color: colors.onSurface,
+          }}
+        >
+          {label}
+        </Text>
       </View>
       <Switch
         value={value}
@@ -205,16 +327,45 @@ const SettingsToggle = memo(function SettingsToggle({
   )
 })
 
+const ThemeSwatchPreview = memo(function ThemeSwatchPreview({
+  swatches,
+  size = 'default',
+}: {
+  swatches: readonly [string, string, string] | string[]
+  size?: 'default' | 'small'
+}) {
+  const circleSize = size === 'small' ? 16 : 24
+  const borderW = size === 'small' ? 1 : 2
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+      {swatches.slice(0, 3).map((color, i) => (
+        <View
+          key={i}
+          style={{
+            width: circleSize,
+            height: circleSize,
+            borderRadius: circleSize / 2,
+            backgroundColor: color,
+            borderWidth: borderW,
+            borderColor: 'rgba(255,255,255,0.15)',
+          }}
+        />
+      ))}
+    </View>
+  )
+})
+
 // ── Main Screen ──
 
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets()
-  const theme = useAppStore((s) => s.theme)
-  const setTheme = useAppStore((s) => s.setTheme)
   const notificationsEnabled = useAppStore((s) => s.notificationsEnabled)
   const setNotificationsEnabled = useAppStore((s) => s.setNotificationsEnabled)
   const setImportComplete = useAppStore((s) => s.setImportComplete)
-  
+
+  const { colors, themeKey, setTheme, availableThemes } = useTheme()
+  const [showThemePicker, setShowThemePicker] = useState(false)
+
   useEffect(() => {
     async function checkPermission() {
       const { status } = await getPermissionStatus()
@@ -232,8 +383,7 @@ export default function ProfileScreen() {
   const { data: favoriteMovies } = useFavoriteMovies()
 
   // Theme label
-  const themeLabel =
-    theme === 'dark' ? 'Deep Dark' : theme === 'light' ? 'Light' : 'System'
+  const currentThemeMeta = availableThemes.find((t) => t.key === themeKey)
 
   // Derived sections — only active shows (started) and watched movies
   const activeShows = useMemo(() => {
@@ -248,6 +398,153 @@ export default function ProfileScreen() {
 
   const isLoading_ = statsLoading || showsLoading || moviesLoading || authLoading
 
+  const handleSignOut = useCallback(async () => {
+    Alert.alert('Sign out', 'Are you sure you want to sign out?', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Sign out', style: 'destructive', onPress: () => signOut() },
+    ])
+  }, [signOut])
+
+  const handleImport = useCallback(() => {
+    setImportComplete(false)
+    router.push('/import')
+  }, [setImportComplete])
+
+  // Dynamic styles that depend on theme
+  const styles = useMemo(
+    () =>
+      StyleSheet.create({
+        container: {
+          flex: 1,
+          backgroundColor: colors.background,
+        },
+        centered: {
+          justifyContent: 'center',
+          alignItems: 'center',
+        },
+        scrollContent: {
+          paddingBottom: 32,
+        },
+        // User Header
+        userHeader: {
+          alignItems: 'center',
+          paddingVertical: 32,
+          paddingHorizontal: 20,
+        },
+        avatarRing: {
+          width: 96,
+          height: 96,
+          borderRadius: 100,
+          borderWidth: 2,
+          borderColor: 'rgba(208,188,255,0.2)',
+          padding: 4,
+          marginBottom: 16,
+        },
+        avatarContainer: {
+          width: '100%',
+          height: '100%',
+          borderRadius: 100,
+          overflow: 'hidden',
+          backgroundColor: colors.surfaceContainerHigh,
+          borderWidth: 1,
+          borderColor: 'rgba(255,255,255,0.1)',
+          justifyContent: 'center',
+          alignItems: 'center',
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: 4 },
+          shadowOpacity: 0.3,
+          shadowRadius: 8,
+          elevation: 8,
+        },
+        avatarInitials: {
+          fontFamily: 'Inter',
+          fontSize: 28,
+          fontWeight: '700',
+          color: colors.onSurface,
+          opacity: 0.8,
+        },
+        userName: {
+          fontFamily: 'Inter',
+          fontSize: 24,
+          fontWeight: '600',
+          color: colors.onSurface,
+          marginBottom: 4,
+        },
+        userBadge: {
+          fontFamily: 'Inter',
+          fontSize: 14,
+          fontWeight: '600',
+          letterSpacing: 0.01,
+          color: colors.onSurfaceVariant,
+        },
+        // Bento Stats Grid
+        statsGrid: {
+          flexDirection: 'row',
+          flexWrap: 'wrap',
+          paddingHorizontal: 20,
+          gap: 16,
+          marginBottom: 32,
+        },
+        // Carousel Section
+        carouselSection: {
+          marginBottom: 16,
+        },
+        carouselContent: {
+          paddingLeft: SIDE_OFFSET,
+          paddingRight: 8,
+          gap: 12,
+        },
+        // Settings List
+        settingsContainer: {
+          marginHorizontal: 20,
+          marginTop: 8,
+          backgroundColor: colors.surfaceContainer,
+          borderRadius: 16,
+          borderWidth: 1,
+          borderColor: 'rgba(255,255,255,0.05)',
+          overflow: 'hidden',
+        },
+        // Theme Picker
+        themePickerContainer: {
+          paddingHorizontal: 20,
+          paddingBottom: 8,
+          gap: 4,
+        },
+        themeOption: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: 12,
+          paddingVertical: 12,
+          paddingHorizontal: 12,
+          borderRadius: 12,
+        },
+        themeOptionActive: {
+          backgroundColor: 'rgba(255,255,255,0.06)',
+        },
+        themeOptionInfo: {
+          flex: 1,
+        },
+        themeOptionName: {
+          fontFamily: 'Inter',
+          fontSize: 16,
+          fontWeight: '500',
+          color: colors.onSurface,
+        },
+        themeOptionNameActive: {
+          color: colors.primary,
+          fontWeight: '600',
+        },
+        themeOptionDesc: {
+          fontFamily: 'Inter',
+          fontSize: 12,
+          fontWeight: '400',
+          color: colors.onSurfaceVariant,
+          marginTop: 2,
+        },
+      }),
+    [colors]
+  )
+
   // ── Loading ──
   if (isLoading_) {
     return (
@@ -255,18 +552,6 @@ export default function ProfileScreen() {
         <ActivityIndicator size="large" color={colors.primary} />
       </View>
     )
-  }
-
-  const handleSignOut = async () => {
-    Alert.alert('Sign out', 'Are you sure you want to sign out?', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Sign out', style: 'destructive', onPress: () => signOut() },
-    ])
-  }
-
-  const handleImport = () => {
-    setImportComplete(false)
-    router.push('/import')
   }
 
   return (
@@ -279,10 +564,14 @@ export default function ProfileScreen() {
         <View style={styles.userHeader}>
           <View style={styles.avatarRing}>
             <View style={styles.avatarContainer}>
-              <Text style={styles.avatarInitials}>{user ? getInitials(user.email || '') : 'AT'}</Text>
+              <Text style={styles.avatarInitials}>
+                {user ? getInitials(user.email || '') : 'AT'}
+              </Text>
             </View>
           </View>
-          <Text style={styles.userName}>{user?.email?.split('@')[0] || 'Alex Thorne'}</Text>
+          <Text style={styles.userName}>
+            {user?.email?.split('@')[0] || 'Alex Thorne'}
+          </Text>
           <Text style={styles.userBadge}>{user?.email || 'Premium Member'}</Text>
         </View>
 
@@ -296,7 +585,7 @@ export default function ProfileScreen() {
           </View>
         )}
 
-        {/* ── Shows Carousel (started/active shows) ── */}
+        {/* ── Shows Carousel ── */}
         {activeShows.length > 0 && (
           <View style={styles.carouselSection}>
             <SectionHeader
@@ -348,7 +637,7 @@ export default function ProfileScreen() {
           </View>
         )}
 
-        {/* ── Movies Carousel (watched movies) ── */}
+        {/* ── Movies Carousel ── */}
         {watchedMoviesList.length > 0 && (
           <View style={styles.carouselSection}>
             <SectionHeader
@@ -402,27 +691,85 @@ export default function ProfileScreen() {
 
         {/* ── Settings List ── */}
         <View style={styles.settingsContainer}>
-          <SettingsRow
-            icon="color-palette-outline"
-            label="Theme"
-            rightLabel={themeLabel}
-            onPress={() => {
-              const themes: Array<'system' | 'light' | 'dark'> = ['system', 'dark', 'light']
-              const idx = themes.indexOf(theme)
-              setTheme(themes[(idx + 1) % themes.length])
+          {/* ── Theme picker (expandable) ── */}
+          <Pressable
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              paddingHorizontal: 20,
+              paddingVertical: 16,
+              borderBottomWidth: 1,
+              borderBottomColor: 'rgba(255,255,255,0.05)',
             }}
-          />
-          <SettingsRow
+            onPress={() => setShowThemePicker(!showThemePicker)}
+          >
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 16 }}>
+              <Ionicons name="color-palette-outline" size={20} color={colors.secondary} />
+              <Text
+                style={{
+                  fontFamily: 'Inter',
+                  fontSize: 16,
+                  fontWeight: '400',
+                  color: colors.onSurface,
+                }}
+              >
+                Theme
+              </Text>
+            </View>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <ThemeSwatchPreview
+                swatches={currentThemeMeta?.swatches ?? ['#d0bcff', '#8b5cf6', '#15121b']}
+              />
+              <Ionicons
+                name={showThemePicker ? 'chevron-up' : 'chevron-forward'}
+                size={16}
+                color={colors.outlineVariant}
+              />
+            </View>
+          </Pressable>
+
+          {/* ── Theme options (collapsible) ── */}
+          {showThemePicker && (
+            <View style={styles.themePickerContainer}>
+              {availableThemes.map((t) => {
+                const isActive = t.key === themeKey
+                return (
+                  <Pressable
+                    key={t.key}
+                    style={[styles.themeOption, isActive && styles.themeOptionActive]}
+                    onPress={() => {
+                      setTheme(t.key as ThemeKey)
+                      setShowThemePicker(false)
+                    }}
+                  >
+                    <ThemeSwatchPreview swatches={t.swatches} size="small" />
+                    <View style={styles.themeOptionInfo}>
+                      <Text style={[styles.themeOptionName, isActive && styles.themeOptionNameActive]}>
+                        {t.name}
+                      </Text>
+                      <Text style={styles.themeOptionDesc}>{t.description}</Text>
+                    </View>
+                    {isActive && (
+                      <Ionicons name="checkmark-circle" size={20} color={colors.primary} />
+                    )}
+                  </Pressable>
+                )
+              })}
+            </View>
+          )}
+
+          <SettingsToggle
             icon="notifications-outline"
             label="Notifications"
-            rightLabel={notificationsEnabled ? 'On' : 'Off'}
-            onPress={async () => {
-              if (notificationsEnabled) {
-                setNotificationsEnabled(false)
-                await cancelAllReminders()
-              } else {
+            value={notificationsEnabled}
+            onValueChange={async (value) => {
+              if (value) {
                 const granted = await requestNotificationPermissions()
                 setNotificationsEnabled(granted)
+              } else {
+                setNotificationsEnabled(false)
+                await cancelAllReminders()
               }
             }}
           />
@@ -446,222 +793,3 @@ export default function ProfileScreen() {
     </View>
   )
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
-  centered: {
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  scrollContent: {
-    paddingBottom: spacing.stackLg,
-  },
-
-  // User Header
-  userHeader: {
-    alignItems: 'center',
-    paddingVertical: spacing.stackLg,
-    paddingHorizontal: spacing.marginMobile,
-  },
-  avatarRing: {
-    width: 96,
-    height: 96,
-    borderRadius: borderRadius.full,
-    borderWidth: 2,
-    borderColor: 'rgba(208,188,255,0.2)',
-    padding: 4,
-    marginBottom: 16,
-  },
-  avatarContainer: {
-    width: '100%',
-    height: '100%',
-    borderRadius: borderRadius.full,
-    overflow: 'hidden',
-    backgroundColor: colors.surfaceContainerHigh,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 8,
-  },
-  avatarInitials: {
-    fontFamily: 'Inter',
-    fontSize: 28,
-    fontWeight: '700',
-    color: colors.onSurface,
-    opacity: 0.8,
-  },
-  userName: {
-    fontFamily: 'Inter',
-    fontSize: typography.headlineMd.fontSize,
-    fontWeight: '600',
-    lineHeight: typography.headlineMd.lineHeight,
-    color: colors.onSurface,
-    marginBottom: 4,
-  },
-  userBadge: {
-    fontFamily: 'Inter',
-    fontSize: typography.labelMd.fontSize,
-    fontWeight: '600',
-    lineHeight: typography.labelMd.lineHeight,
-    letterSpacing: typography.labelMd.letterSpacing,
-    color: colors.onSurfaceVariant,
-  },
-
-  // Bento Stats Grid
-  statsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    paddingHorizontal: spacing.marginMobile,
-    gap: spacing.gutter,
-    marginBottom: spacing.stackLg,
-  },
-  statCard: {
-    width: STAT_CARD_WIDTH,
-    backgroundColor: colors.surfaceContainer,
-    borderRadius: borderRadius.lg,
-    paddingVertical: 20,
-    paddingHorizontal: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.05)',
-  },
-  statValue: {
-    fontFamily: 'Inter',
-    fontSize: typography.headlineMd.fontSize,
-    fontWeight: '600',
-    lineHeight: typography.headlineMd.lineHeight,
-    color: colors.primary,
-  },
-  statLabel: {
-    fontFamily: 'Inter',
-    fontSize: typography.labelSm.fontSize,
-    fontWeight: '500',
-    lineHeight: typography.labelSm.lineHeight,
-    letterSpacing: 0.08,
-    textTransform: 'uppercase',
-    color: colors.secondary,
-    marginTop: 4,
-  },
-
-  // Carousel Section
-  carouselSection: {
-    marginBottom: spacing.stackMd,
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: SIDE_OFFSET,
-    marginBottom: 12,
-  },
-  sectionHeaderLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  sectionTitle: {
-    fontFamily: 'Inter',
-    fontSize: 20,
-    fontWeight: '700',
-    color: colors.onSurface,
-    letterSpacing: -0.01,
-  },
-  sectionCount: {
-    fontFamily: 'Inter',
-    fontSize: 14,
-    fontWeight: '500',
-    color: colors.outlineVariant,
-  },
-  carouselContent: {
-    paddingLeft: SIDE_OFFSET,
-    paddingRight: 8,
-    gap: 12,
-  },
-  posterItem: {
-    width: POSTER_W,
-  },
-  posterContainer: {
-    width: POSTER_W,
-    height: POSTER_H,
-    borderRadius: 12,
-    overflow: 'hidden',
-    backgroundColor: colors.surfaceDim,
-    borderWidth: 1,
-    borderColor: colors.outlineVariant,
-  },
-  posterImage: {
-    width: '100%',
-    height: '100%',
-  },
-  posterPlaceholder: {
-    width: '100%',
-    height: '100%',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  posterTitle: {
-    fontFamily: 'Inter',
-    fontSize: 11,
-    fontWeight: '600',
-    color: colors.onSurface,
-    marginTop: 6,
-    lineHeight: 14,
-  },
-
-  // Settings List
-  settingsContainer: {
-    marginHorizontal: spacing.marginMobile,
-    marginTop: spacing.stackSm,
-    backgroundColor: colors.surfaceContainer,
-    borderRadius: borderRadius.lg,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.05)',
-    overflow: 'hidden',
-  },
-  settingsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: spacing.marginMobile,
-    paddingVertical: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255,255,255,0.05)',
-  },
-  settingsRowPressed: {
-    backgroundColor: 'rgba(255,255,255,0.05)',
-  },
-  settingsRowLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 16,
-  },
-  settingsLabel: {
-    fontFamily: 'Inter',
-    fontSize: typography.bodyMd.fontSize,
-    fontWeight: '400',
-    lineHeight: typography.bodyMd.lineHeight,
-    color: colors.onSurface,
-  },
-  settingsRowRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  settingsRightLabel: {
-    fontFamily: 'Inter',
-    fontSize: typography.labelMd.fontSize,
-    fontWeight: '600',
-    lineHeight: typography.labelMd.lineHeight,
-    letterSpacing: typography.labelMd.letterSpacing,
-    color: colors.onSurfaceVariant,
-  },
-})

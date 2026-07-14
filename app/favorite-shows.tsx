@@ -18,7 +18,8 @@ import { Ionicons } from '@expo/vector-icons'
 import { router, Stack } from 'expo-router'
 import { useFavorites } from '@/lib/queries/profile'
 import { getImageUrl } from '@/lib/tmdb'
-import { colors, typography, spacing, borderRadius } from '@/theme'
+import { typography, spacing, borderRadius } from '@/theme'
+import { useTheme } from '@/contexts/ThemeContext'
 import type { FavoriteShow } from '@/lib/queries/profile'
 
 const SCREEN_WIDTH = Dimensions.get('window').width
@@ -59,9 +60,41 @@ interface SortChipProps {
 }
 
 const SortChip = memo(function SortChip({ label, icon, isActive, onPress }: SortChipProps) {
+  const { colors } = useTheme()
+
+  const chipStyles = useMemo(
+    () =>
+      StyleSheet.create({
+        chip: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          paddingHorizontal: 14,
+          height: 34,
+          borderRadius: borderRadius.full,
+          borderWidth: 1,
+          borderColor: colors.outlineVariant,
+          backgroundColor: colors.surfaceContainerLow,
+          gap: 6,
+        },
+        chipActive: {
+          backgroundColor: colors.primary,
+          borderColor: colors.primary,
+        },
+        chipLabel: {
+          fontSize: 13,
+          fontWeight: '600',
+          color: colors.onSurfaceVariant,
+        },
+        chipLabelActive: {
+          color: colors.onPrimary,
+        },
+      }),
+    [colors],
+  )
+
   return (
     <Pressable
-      style={[styles.chip, isActive && styles.chipActive]}
+      style={[chipStyles.chip, isActive && chipStyles.chipActive]}
       onPress={onPress}
     >
       <Ionicons
@@ -69,7 +102,7 @@ const SortChip = memo(function SortChip({ label, icon, isActive, onPress }: Sort
         size={14}
         color={isActive ? colors.onPrimary : colors.onSurfaceVariant}
       />
-      <Text style={[styles.chipLabel, isActive && styles.chipLabelActive]}>
+      <Text style={[chipStyles.chipLabel, isActive && chipStyles.chipLabelActive]}>
         {label}
       </Text>
     </Pressable>
@@ -86,26 +119,72 @@ interface GridItemProps {
 }
 
 const GridItem = memo(function GridItem({ name, posterPath, favoritedAt, onPress }: GridItemProps) {
+  const { colors } = useTheme()
   const posterUrl = getImageUrl(posterPath, 'w185')
+
+  const gridStyles = useMemo(
+    () =>
+      StyleSheet.create({
+        gridItem: {
+          width: GRID_POSTER_W,
+          marginBottom: GRID_GAP,
+          marginRight: GRID_GAP,
+        },
+        gridPosterContainer: {
+          width: GRID_POSTER_W,
+          height: GRID_POSTER_H,
+          borderRadius: borderRadius.md,
+          overflow: 'hidden',
+          backgroundColor: colors.surfaceContainer,
+          borderWidth: 1,
+          borderColor: colors.outlineVariant,
+        },
+        gridPoster: {
+          width: '100%',
+          height: '100%',
+        },
+        gridPosterPlaceholder: {
+          justifyContent: 'center',
+          alignItems: 'center',
+        },
+        gridTitle: {
+          fontFamily: 'Inter',
+          fontSize: 12,
+          fontWeight: '600',
+          color: colors.onSurface,
+          marginTop: 6,
+          lineHeight: 16,
+        },
+        gridDate: {
+          fontFamily: 'Inter',
+          fontSize: 11,
+          fontWeight: '500',
+          color: colors.onSurfaceVariant,
+          marginTop: 2,
+        },
+      }),
+    [colors],
+  )
+
   return (
-    <Pressable style={styles.gridItem} onPress={onPress}>
-      <View style={styles.gridPosterContainer}>
+    <Pressable style={gridStyles.gridItem} onPress={onPress}>
+      <View style={gridStyles.gridPosterContainer}>
         {posterUrl ? (
           <Image
             source={{ uri: posterUrl }}
-            style={styles.gridPoster}
+            style={gridStyles.gridPoster}
             contentFit="cover"
             cachePolicy="memory-disk"
           />
         ) : (
-          <View style={[styles.gridPoster, styles.gridPosterPlaceholder]}>
+          <View style={[gridStyles.gridPoster, gridStyles.gridPosterPlaceholder]}>
             <Ionicons name="tv-outline" size={24} color={colors.outlineVariant} />
           </View>
         )}
       </View>
-      <Text style={styles.gridTitle} numberOfLines={2}>{name}</Text>
+      <Text style={gridStyles.gridTitle} numberOfLines={2}>{name}</Text>
       {favoritedAt && (
-        <Text style={styles.gridDate}>{formatFavDate(favoritedAt)}</Text>
+        <Text style={gridStyles.gridDate}>{formatFavDate(favoritedAt)}</Text>
       )}
     </Pressable>
   )
@@ -125,38 +204,104 @@ interface ListItemProps {
 const ListItem = memo(function ListItem({
   name, posterPath, episodesSeen, totalEpisodes, favoritedAt, onPress,
 }: ListItemProps) {
+  const { colors } = useTheme()
   const posterUrl = getImageUrl(posterPath, 'w92')
   const progress = totalEpisodes && totalEpisodes > 0
     ? Math.min(episodesSeen / totalEpisodes, 1)
     : 0
   const progressPercent = Math.round(progress * 100)
 
+  const listStyles = useMemo(
+    () =>
+      StyleSheet.create({
+        listItem: {
+          flexDirection: 'row',
+          gap: 14,
+          paddingVertical: 10,
+          borderBottomWidth: 1,
+          borderBottomColor: 'rgba(255,255,255,0.04)',
+        },
+        listPosterContainer: {
+          width: 56,
+          height: 84,
+          borderRadius: borderRadius.sm,
+          overflow: 'hidden',
+          backgroundColor: colors.surfaceContainer,
+        },
+        listPoster: {
+          width: '100%',
+          height: '100%',
+        },
+        listPosterPlaceholder: {
+          justifyContent: 'center',
+          alignItems: 'center',
+        },
+        listInfo: {
+          flex: 1,
+          justifyContent: 'center',
+          gap: 4,
+        },
+        listTitle: {
+          fontFamily: 'Inter',
+          fontSize: 15,
+          fontWeight: '600',
+          color: colors.onSurface,
+        },
+        listMeta: {
+          fontFamily: 'Inter',
+          fontSize: 12,
+          fontWeight: '500',
+          color: colors.onSurfaceVariant,
+        },
+        listProgressTrack: {
+          height: 4,
+          backgroundColor: colors.surfaceContainerHighest,
+          borderRadius: borderRadius.full,
+          overflow: 'hidden',
+          width: '70%',
+        },
+        listProgressFill: {
+          height: '100%',
+          backgroundColor: colors.primary,
+          borderRadius: borderRadius.full,
+        },
+        listDate: {
+          fontFamily: 'Inter',
+          fontSize: 11,
+          fontWeight: '500',
+          color: colors.onSurfaceVariant,
+          marginTop: 2,
+        },
+      }),
+    [colors],
+  )
+
   return (
-    <Pressable style={styles.listItem} onPress={onPress}>
-      <View style={styles.listPosterContainer}>
+    <Pressable style={listStyles.listItem} onPress={onPress}>
+      <View style={listStyles.listPosterContainer}>
         {posterUrl ? (
           <Image
             source={{ uri: posterUrl }}
-            style={styles.listPoster}
+            style={listStyles.listPoster}
             contentFit="cover"
             cachePolicy="memory-disk"
           />
         ) : (
-          <View style={[styles.listPoster, styles.listPosterPlaceholder]}>
+          <View style={[listStyles.listPoster, listStyles.listPosterPlaceholder]}>
             <Ionicons name="tv-outline" size={20} color={colors.outlineVariant} />
           </View>
         )}
       </View>
-      <View style={styles.listInfo}>
-        <Text style={styles.listTitle} numberOfLines={1}>{name}</Text>
-        <Text style={styles.listMeta}>
+      <View style={listStyles.listInfo}>
+        <Text style={listStyles.listTitle} numberOfLines={1}>{name}</Text>
+        <Text style={listStyles.listMeta}>
           {episodesSeen}{totalEpisodes ? ` / ${totalEpisodes}` : ''} episodes
         </Text>
-        <View style={styles.listProgressTrack}>
-          <View style={[styles.listProgressFill, { width: `${progressPercent}%` }]} />
+        <View style={listStyles.listProgressTrack}>
+          <View style={[listStyles.listProgressFill, { width: `${progressPercent}%` }]} />
         </View>
         {favoritedAt && (
-          <Text style={styles.listDate}>Favorited {formatFavDate(favoritedAt)}</Text>
+          <Text style={listStyles.listDate}>Favorited {formatFavDate(favoritedAt)}</Text>
         )}
       </View>
     </Pressable>
@@ -167,9 +312,99 @@ const ListItem = memo(function ListItem({
 
 export default function FavoriteShowsScreen() {
   const insets = useSafeAreaInsets()
+  const { colors } = useTheme()
   const { data: shows, isLoading, isRefetching, refetch } = useFavorites()
   const [sortMode, setSortMode] = useState<SortMode>('recent')
   const [isGrid, setIsGrid] = useState(true)
+
+  // ── Styles ──
+
+  const styles = useMemo(
+    () =>
+      StyleSheet.create({
+        container: {
+          flex: 1,
+          backgroundColor: colors.surface,
+        },
+        centered: {
+          justifyContent: 'center',
+          alignItems: 'center',
+        },
+
+        // ── AppBar ──
+        appBar: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          paddingHorizontal: spacing.marginMobile,
+          height: 56,
+          gap: 12,
+        },
+        backBtn: {
+          width: 40,
+          height: 40,
+          borderRadius: borderRadius.full,
+          justifyContent: 'center',
+          alignItems: 'center',
+        },
+        appBarTitle: {
+          flex: 1,
+          fontFamily: 'Inter',
+          fontSize: 22,
+          fontWeight: '700',
+          color: colors.onSurface,
+          letterSpacing: -0.01,
+        },
+        gridToggle: {
+          width: 40,
+          height: 40,
+          borderRadius: borderRadius.full,
+          justifyContent: 'center',
+          alignItems: 'center',
+        },
+
+        // ── Sort Chips ──
+        chipsContainer: {
+          paddingVertical: spacing.stackSm,
+        },
+        chipsContent: {
+          paddingHorizontal: spacing.marginMobile,
+          gap: 8,
+          flexDirection: 'row',
+        },
+
+        // ── List ──
+        listContent: {
+          paddingHorizontal: spacing.marginMobile,
+          paddingBottom: 32,
+          paddingTop: spacing.stackSm,
+        },
+        listContentEmpty: {
+          flex: 1,
+          justifyContent: 'center',
+        },
+
+        // ── Empty State ──
+        emptyState: {
+          alignItems: 'center',
+          paddingHorizontal: 48,
+        },
+        emptyTitle: {
+          fontFamily: 'Inter',
+          fontSize: 18,
+          fontWeight: '700',
+          color: colors.onSurface,
+          marginTop: 16,
+          marginBottom: 8,
+        },
+        emptySubtitle: {
+          fontSize: 14,
+          color: colors.outline,
+          textAlign: 'center',
+          lineHeight: 20,
+        },
+      }),
+    [colors],
+  )
 
   // ── Sort ──
 
@@ -179,7 +414,6 @@ export default function FavoriteShowsScreen() {
     if (sortMode === 'alpha') {
       list.sort((a, b) => a.name.localeCompare(b.name))
     }
-    // 'recent' is default from the query (favorited_at DESC)
     return list
   }, [shows, sortMode])
 
@@ -198,7 +432,7 @@ export default function FavoriteShowsScreen() {
         onPress={() => router.push(`/show/${item.id}`)}
       />
     ),
-    []
+    [],
   )
 
   const renderListItem = useCallback(
@@ -212,20 +446,23 @@ export default function FavoriteShowsScreen() {
         onPress={() => router.push(`/show/${item.id}`)}
       />
     ),
-    []
+    [],
   )
 
   const keyExtractor = useCallback((item: FavoriteShow) => item.id, [])
 
-  const renderEmptyState = useCallback(() => (
-    <View style={styles.emptyState}>
-      <Ionicons name="heart-outline" size={48} color={colors.outline} />
-      <Text style={styles.emptyTitle}>No favorite shows</Text>
-      <Text style={styles.emptySubtitle}>
-        Tap the heart icon on a show to add it here.
-      </Text>
-    </View>
-  ), [])
+  const renderEmptyState = useCallback(
+    () => (
+      <View style={styles.emptyState}>
+        <Ionicons name="heart-outline" size={48} color={colors.outline} />
+        <Text style={styles.emptyTitle}>No favorite shows</Text>
+        <Text style={styles.emptySubtitle}>
+          Tap the heart icon on a show to add it here.
+        </Text>
+      </View>
+    ),
+    [colors, styles],
+  )
 
   // ── Loading ──
 
@@ -305,210 +542,3 @@ export default function FavoriteShowsScreen() {
     </View>
   )
 }
-
-// ── Styles ──
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.surface,
-  },
-  centered: {
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-
-  // ── AppBar ──
-  appBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: spacing.marginMobile,
-    height: 56,
-    gap: 12,
-  },
-  backBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: borderRadius.full,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  appBarTitle: {
-    flex: 1,
-    fontFamily: 'Inter',
-    fontSize: 22,
-    fontWeight: '700',
-    color: colors.onSurface,
-    letterSpacing: -0.01,
-  },
-  gridToggle: {
-    width: 40,
-    height: 40,
-    borderRadius: borderRadius.full,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-
-  // ── Sort Chips ──
-  chipsContainer: {
-    paddingVertical: spacing.stackSm,
-  },
-  chipsContent: {
-    paddingHorizontal: spacing.marginMobile,
-    gap: 8,
-    flexDirection: 'row',
-  },
-  chip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 14,
-    height: 34,
-    borderRadius: borderRadius.full,
-    borderWidth: 1,
-    borderColor: colors.outlineVariant,
-    backgroundColor: colors.surfaceContainerLow,
-    gap: 6,
-  },
-  chipActive: {
-    backgroundColor: colors.primary,
-    borderColor: colors.primary,
-  },
-  chipLabel: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: colors.onSurfaceVariant,
-  },
-  chipLabelActive: {
-    color: colors.onPrimary,
-  },
-
-  // ── List ──
-  listContent: {
-    paddingHorizontal: spacing.marginMobile,
-    paddingBottom: 32,
-    paddingTop: spacing.stackSm,
-  },
-  listContentEmpty: {
-    flex: 1,
-    justifyContent: 'center',
-  },
-
-  // ── Grid Item ──
-  gridItem: {
-    width: GRID_POSTER_W,
-    marginBottom: GRID_GAP,
-    marginRight: GRID_GAP,
-  },
-  gridPosterContainer: {
-    width: GRID_POSTER_W,
-    height: GRID_POSTER_H,
-    borderRadius: borderRadius.md,
-    overflow: 'hidden',
-    backgroundColor: colors.surfaceContainer,
-    borderWidth: 1,
-    borderColor: colors.outlineVariant,
-  },
-  gridPoster: {
-    width: '100%',
-    height: '100%',
-  },
-  gridPosterPlaceholder: {
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  gridTitle: {
-    fontFamily: 'Inter',
-    fontSize: 12,
-    fontWeight: '600',
-    color: colors.onSurface,
-    marginTop: 6,
-    lineHeight: 16,
-  },
-  gridDate: {
-    fontFamily: 'Inter',
-    fontSize: 11,
-    fontWeight: '500',
-    color: colors.onSurfaceVariant,
-    marginTop: 2,
-  },
-
-  // ── List Item ──
-  listItem: {
-    flexDirection: 'row',
-    gap: 14,
-    paddingVertical: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255,255,255,0.04)',
-  },
-  listPosterContainer: {
-    width: 56,
-    height: 84,
-    borderRadius: borderRadius.sm,
-    overflow: 'hidden',
-    backgroundColor: colors.surfaceContainer,
-  },
-  listPoster: {
-    width: '100%',
-    height: '100%',
-  },
-  listPosterPlaceholder: {
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  listInfo: {
-    flex: 1,
-    justifyContent: 'center',
-    gap: 4,
-  },
-  listTitle: {
-    fontFamily: 'Inter',
-    fontSize: 15,
-    fontWeight: '600',
-    color: colors.onSurface,
-  },
-  listMeta: {
-    fontFamily: 'Inter',
-    fontSize: 12,
-    fontWeight: '500',
-    color: colors.onSurfaceVariant,
-  },
-  listProgressTrack: {
-    height: 4,
-    backgroundColor: colors.surfaceContainerHighest,
-    borderRadius: borderRadius.full,
-    overflow: 'hidden',
-    width: '70%',
-  },
-  listProgressFill: {
-    height: '100%',
-    backgroundColor: colors.primary,
-    borderRadius: borderRadius.full,
-  },
-  listDate: {
-    fontFamily: 'Inter',
-    fontSize: 11,
-    fontWeight: '500',
-    color: colors.onSurfaceVariant,
-    marginTop: 2,
-  },
-
-  // ── Empty State ──
-  emptyState: {
-    alignItems: 'center',
-    paddingHorizontal: 48,
-  },
-  emptyTitle: {
-    fontFamily: 'Inter',
-    fontSize: 18,
-    fontWeight: '700',
-    color: colors.onSurface,
-    marginTop: 16,
-    marginBottom: 8,
-  },
-  emptySubtitle: {
-    fontSize: 14,
-    color: colors.outline,
-    textAlign: 'center',
-    lineHeight: 20,
-  },
-})

@@ -1,6 +1,6 @@
 // ─── Movie Detail — Stitch-aligned ───
 
-import { useCallback, useRef } from 'react'
+import { useCallback, useRef, useMemo } from 'react'
 import {
   View,
   Text,
@@ -22,7 +22,8 @@ import { getMovieDetails, getImageUrl } from '@/lib/tmdb'
 import { useQuery } from '@tanstack/react-query'
 import LibraryToggle from '@/components/ui/LibraryToggle'
 import FavoriteToggle from '@/components/ui/FavoriteToggle'
-import { colors, typography, spacing, borderRadius } from '@/theme'
+import { typography, spacing, borderRadius } from '@/theme'
+import { useTheme } from '@/contexts/ThemeContext'
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window')
 const BACKDROP_HEIGHT = 320
@@ -31,6 +32,199 @@ export default function MovieDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>()
   const insets = useSafeAreaInsets()
   const scrollY = useRef(new Animated.Value(0)).current
+  const { colors } = useTheme()
+
+  const styles = useMemo(() => StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: colors.surface,
+  },
+  centered: {
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  errorText: {
+    fontSize: typography.bodyMd.fontSize,
+    color: colors.onSurfaceVariant,
+    marginTop: 12,
+    marginBottom: 16,
+  },
+  goBackButton: {
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    backgroundColor: colors.surfaceContainer,
+    borderRadius: borderRadius.md,
+    borderWidth: 1,
+    borderColor: colors.outlineVariant,
+  },
+  goBackText: {
+    color: colors.primary,
+    fontSize: typography.bodySm.fontSize,
+    fontWeight: '600',
+  },
+  scroll: {
+    flex: 1,
+  },
+  scrollContent: {
+    paddingBottom: 40,
+  },
+
+  // ── Backdrop ──
+  backdropContainer: {
+    width: SCREEN_WIDTH,
+    height: BACKDROP_HEIGHT,
+    position: 'relative',
+  },
+  backdrop: {
+    width: '100%',
+    height: '100%',
+  },
+  backdropPlaceholder: {
+    width: '100%',
+    height: '100%',
+    backgroundColor: colors.surfaceContainer,
+  },
+  gradient: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 160,
+  },
+  backButton: {
+    position: 'absolute',
+    top: 8,
+    left: spacing.marginMobile,
+    width: 44,
+    height: 44,
+    borderRadius: borderRadius.full,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 10,
+  },
+  actionOverlay: {
+    position: 'absolute',
+    right: spacing.marginMobile,
+    zIndex: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+
+  // ── Info ──
+  infoSection: {
+    marginTop: -40,
+    paddingHorizontal: spacing.marginMobile,
+  },
+  titleRow: {
+    flexDirection: 'row',
+    gap: 16,
+    marginBottom: 16,
+  },
+  posterThumb: {
+    width: 90,
+    height: 135,
+    borderRadius: borderRadius.lg,
+    backgroundColor: colors.surfaceContainer,
+  },
+  posterPlaceholder: {
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  titleMeta: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    paddingBottom: 4,
+  },
+  title: {
+    fontSize: typography.headlineSm.fontSize,
+    fontWeight: '700',
+    color: colors.onSurface,
+    lineHeight: typography.headlineSm.lineHeight,
+    marginBottom: 6,
+  },
+  metaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    flexWrap: 'wrap',
+  },
+  metaText: {
+    fontSize: typography.labelMd.fontSize,
+    fontWeight: '500',
+    letterSpacing: typography.labelMd.letterSpacing,
+    color: colors.onSurfaceVariant,
+  },
+  metaDot: {
+    width: 3,
+    height: 3,
+    borderRadius: borderRadius.full,
+    backgroundColor: colors.onSurfaceVariant,
+    opacity: 0.5,
+  },
+
+  // ── Watch / Watched ──
+  watchButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: colors.primary,
+    borderRadius: borderRadius.full,
+    paddingVertical: 14,
+    paddingHorizontal: 24,
+    marginBottom: 24,
+    shadowColor: colors.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  watchButtonPressed: {
+    transform: [{ scale: 0.98 }],
+  },
+  watchButtonText: {
+    fontSize: typography.bodyMd.fontSize,
+    fontWeight: '700',
+    color: colors.onPrimary,
+  },
+  watchedButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: 'rgba(76, 175, 80, 0.1)',
+    borderRadius: borderRadius.full,
+    paddingVertical: 14,
+    paddingHorizontal: 24,
+    marginBottom: 24,
+    borderWidth: 1,
+    borderColor: 'rgba(76, 175, 80, 0.3)',
+  },
+  watchedText: {
+    fontSize: typography.labelMd.fontSize,
+    fontWeight: '600',
+    letterSpacing: typography.labelMd.letterSpacing,
+    color: colors.success,
+  },
+
+  // ── Section ──
+  section: {
+    marginBottom: 24,
+  },
+  sectionTitle: {
+    fontSize: typography.bodyLg.fontSize,
+    fontWeight: '700',
+    color: colors.onSurface,
+    marginBottom: 12,
+  },
+  overviewText: {
+    fontSize: typography.bodyMd.fontSize,
+    color: colors.onSurfaceVariant,
+    lineHeight: typography.bodyMd.lineHeight,
+  },
+}), [colors])
 
   // Detect if the id param is a TMDb ID (numeric) vs a UUID
   const isTmdbIdParam = /^\d+$/.test(id)
@@ -237,194 +431,4 @@ export default function MovieDetailScreen() {
   )
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.surface,
-  },
-  centered: {
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  errorText: {
-    fontSize: typography.bodyMd.fontSize,
-    color: colors.onSurfaceVariant,
-    marginTop: 12,
-    marginBottom: 16,
-  },
-  goBackButton: {
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    backgroundColor: colors.surfaceContainer,
-    borderRadius: borderRadius.md,
-    borderWidth: 1,
-    borderColor: colors.outlineVariant,
-  },
-  goBackText: {
-    color: colors.primary,
-    fontSize: typography.bodySm.fontSize,
-    fontWeight: '600',
-  },
-  scroll: {
-    flex: 1,
-  },
-  scrollContent: {
-    paddingBottom: 40,
-  },
 
-  // ── Backdrop ──
-  backdropContainer: {
-    width: SCREEN_WIDTH,
-    height: BACKDROP_HEIGHT,
-    position: 'relative',
-  },
-  backdrop: {
-    width: '100%',
-    height: '100%',
-  },
-  backdropPlaceholder: {
-    width: '100%',
-    height: '100%',
-    backgroundColor: colors.surfaceContainer,
-  },
-  gradient: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    height: 160,
-  },
-  backButton: {
-    position: 'absolute',
-    top: 8,
-    left: spacing.marginMobile,
-    width: 44,
-    height: 44,
-    borderRadius: borderRadius.full,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 10,
-  },
-  actionOverlay: {
-    position: 'absolute',
-    right: spacing.marginMobile,
-    zIndex: 10,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-
-  // ── Info ──
-  infoSection: {
-    marginTop: -40,
-    paddingHorizontal: spacing.marginMobile,
-  },
-  titleRow: {
-    flexDirection: 'row',
-    gap: 16,
-    marginBottom: 16,
-  },
-  posterThumb: {
-    width: 90,
-    height: 135,
-    borderRadius: borderRadius.lg,
-    backgroundColor: colors.surfaceContainer,
-  },
-  posterPlaceholder: {
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  titleMeta: {
-    flex: 1,
-    justifyContent: 'flex-end',
-    paddingBottom: 4,
-  },
-  title: {
-    fontSize: typography.headlineSm.fontSize,
-    fontWeight: '700',
-    color: colors.onSurface,
-    lineHeight: typography.headlineSm.lineHeight,
-    marginBottom: 6,
-  },
-  metaRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    flexWrap: 'wrap',
-  },
-  metaText: {
-    fontSize: typography.labelMd.fontSize,
-    fontWeight: '500',
-    letterSpacing: typography.labelMd.letterSpacing,
-    color: colors.onSurfaceVariant,
-  },
-  metaDot: {
-    width: 3,
-    height: 3,
-    borderRadius: borderRadius.full,
-    backgroundColor: colors.onSurfaceVariant,
-    opacity: 0.5,
-  },
-
-  // ── Watch / Watched ──
-  watchButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    backgroundColor: colors.primary,
-    borderRadius: borderRadius.full,
-    paddingVertical: 14,
-    paddingHorizontal: 24,
-    marginBottom: 24,
-    shadowColor: colors.primary,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  watchButtonPressed: {
-    transform: [{ scale: 0.98 }],
-  },
-  watchButtonText: {
-    fontSize: typography.bodyMd.fontSize,
-    fontWeight: '700',
-    color: colors.onPrimary,
-  },
-  watchedButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    backgroundColor: 'rgba(76, 175, 80, 0.1)',
-    borderRadius: borderRadius.full,
-    paddingVertical: 14,
-    paddingHorizontal: 24,
-    marginBottom: 24,
-    borderWidth: 1,
-    borderColor: 'rgba(76, 175, 80, 0.3)',
-  },
-  watchedText: {
-    fontSize: typography.labelMd.fontSize,
-    fontWeight: '600',
-    letterSpacing: typography.labelMd.letterSpacing,
-    color: colors.success,
-  },
-
-  // ── Section ──
-  section: {
-    marginBottom: 24,
-  },
-  sectionTitle: {
-    fontSize: typography.bodyLg.fontSize,
-    fontWeight: '700',
-    color: colors.onSurface,
-    marginBottom: 12,
-  },
-  overviewText: {
-    fontSize: typography.bodyMd.fontSize,
-    color: colors.onSurfaceVariant,
-    lineHeight: typography.bodyMd.lineHeight,
-  },
-})

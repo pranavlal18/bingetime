@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import {
   View,
   Text,
@@ -14,116 +14,12 @@ import {
 import { router } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
 import { useAuth } from '@/contexts/AuthContext'
-import { colors, typography, spacing, borderRadius } from '@/theme'
+import { typography, spacing, borderRadius } from '@/theme'
+import { useTheme } from '@/contexts/ThemeContext'
 
 export default function ForgotPasswordScreen() {
-  const { resetPassword, loading: authLoading } = useAuth()
-  const [email, setEmail] = useState('')
-  const [loading, setLoading] = useState(false)
-  const [sent, setSent] = useState(false)
-  const [error, setError] = useState('')
-
-  const handleSubmit = async () => {
-    if (!email) {
-      setError('Please enter your email')
-      return
-    }
-    setError('')
-    setLoading(true)
-    const { error } = await resetPassword(email)
-    setLoading(false)
-    if (error) {
-      setError(error.message)
-    } else {
-      setSent(true)
-    }
-  }
-
-  return (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      style={styles.container}
-      keyboardVerticalOffset={80}
-    >
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        <View style={styles.logoContainer}>
-          <View style={styles.logo}>
-            <Ionicons name="tv-outline" size={48} color={colors.primary} />
-          </View>
-          <Text style={styles.title}>BingeTime</Text>
-        </View>
-
-        <View style={styles.formContainer}>
-          {!sent ? (
-            <>
-              <Text style={styles.formTitle}>Reset password</Text>
-              <Text style={styles.formSubtitle}>
-                Enter your email and we'll send you a link to reset your password
-              </Text>
-
-              {error && (
-                <View style={styles.errorContainer}>
-                  <Ionicons name="alert-circle-outline" size={18} color={colors.error} />
-                  <Text style={styles.errorText}>{error}</Text>
-                </View>
-              )}
-
-              <View style={styles.inputGroup}>
-                <View style={styles.inputWrapper}>
-                  <Ionicons name="mail-outline" size={20} color={colors.outlineVariant} style={styles.inputIcon} />
-<TextInput
-                style={styles.input}
-                placeholder="Email"
-                value={email}
-                onChangeText={setEmail}
-                autoCapitalize="none"
-                autoComplete="email"
-                keyboardType="email-address"
-                textContentType="emailAddress"
-                returnKeyType="go"
-                onSubmitEditing={handleSubmit}
-                editable={!loading}
-              />
-                </View>
-              </View>
-
-              <Pressable style={styles.submitButton} onPress={handleSubmit} disabled={loading || authLoading}>
-                {loading || authLoading ? (
-                  <ActivityIndicator size="small" color={colors.onPrimary} />
-                ) : (
-                  <Text style={styles.submitButtonText}>Send reset link</Text>
-                )}
-              </Pressable>
-            </>
-          ) : (
-            <>
-              <View style={styles.successContainer}>
-                <View style={styles.successIcon}>
-                  <Ionicons name="checkmark-circle-outline" size={48} color={colors.primary} />
-                </View>
-                <Text style={styles.successTitle}>Check your email</Text>
-                <Text style={styles.successText}>
-                  We've sent a password reset link to <Text style={styles.emailHighlight}>{email}</Text>
-                </Text>
-              </View>
-              <Pressable style={styles.submitButton} onPress={() => router.replace('/(auth)/login')}>
-                <Text style={styles.submitButtonText}>Back to sign in</Text>
-              </Pressable>
-            </>
-          )}
-        </View>
-
-        <View style={styles.footer}>
-          <Pressable onPress={() => router.replace('/(auth)/login')}>
-            <Text style={styles.footerLink}>← Back to sign in</Text>
-          </Pressable>
-        </View>
-      </ScrollView>
-    </KeyboardAvoidingView>
-  )
-}
-
-const styles = StyleSheet.create({
+  const { colors } = useTheme()
+  const styles = useMemo(() => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
@@ -267,4 +163,110 @@ const styles = StyleSheet.create({
     color: colors.primary,
     textAlign: 'center',
   },
-})
+}), [colors])
+  const { resetPassword, loading: authLoading } = useAuth()
+  const [email, setEmail] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [sent, setSent] = useState(false)
+  const [error, setError] = useState('')
+
+  const handleSubmit = async () => {
+    if (!email) {
+      setError('Please enter your email')
+      return
+    }
+    setError('')
+    setLoading(true)
+    const { error } = await resetPassword(email)
+    setLoading(false)
+    if (error) {
+      console.log('❌ [ForgotPassword] Reset error:', error.message)
+      setError('Could not send reset email. Please try again.')
+    } else {
+      setSent(true)
+    }
+  }
+
+  return (
+    <KeyboardAvoidingView
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      style={styles.container}
+      keyboardVerticalOffset={80}
+    >
+      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+        <View style={styles.logoContainer}>
+          <View style={styles.logo}>
+            <Ionicons name="tv-outline" size={48} color={colors.primary} />
+          </View>
+          <Text style={styles.title}>BingeTime</Text>
+        </View>
+
+        <View style={styles.formContainer}>
+          {!sent ? (
+            <>
+              <Text style={styles.formTitle}>Reset password</Text>
+              <Text style={styles.formSubtitle}>
+                Enter your email and we'll send you a link to reset your password
+              </Text>
+
+              {error && (
+                <View style={styles.errorContainer}>
+                  <Ionicons name="alert-circle-outline" size={18} color={colors.error} />
+                  <Text style={styles.errorText}>{error}</Text>
+                </View>
+              )}
+
+              <View style={styles.inputGroup}>
+                <View style={styles.inputWrapper}>
+                  <Ionicons name="mail-outline" size={20} color={colors.outlineVariant} style={styles.inputIcon} />
+<TextInput
+                style={styles.input}
+                placeholder="Email"
+                value={email}
+                onChangeText={setEmail}
+                autoCapitalize="none"
+                autoComplete="email"
+                keyboardType="email-address"
+                textContentType="emailAddress"
+                returnKeyType="go"
+                onSubmitEditing={handleSubmit}
+                editable={!loading}
+              />
+                </View>
+              </View>
+
+              <Pressable style={styles.submitButton} onPress={handleSubmit} disabled={loading || authLoading}>
+                {loading || authLoading ? (
+                  <ActivityIndicator size="small" color={colors.onPrimary} />
+                ) : (
+                  <Text style={styles.submitButtonText}>Send reset link</Text>
+                )}
+              </Pressable>
+            </>
+          ) : (
+            <>
+              <View style={styles.successContainer}>
+                <View style={styles.successIcon}>
+                  <Ionicons name="checkmark-circle-outline" size={48} color={colors.primary} />
+                </View>
+                <Text style={styles.successTitle}>Check your email</Text>
+                <Text style={styles.successText}>
+                  We've sent a password reset link to <Text style={styles.emailHighlight}>{email}</Text>
+                </Text>
+              </View>
+              <Pressable style={styles.submitButton} onPress={() => router.replace('/(auth)/login')}>
+                <Text style={styles.submitButtonText}>Back to sign in</Text>
+              </Pressable>
+            </>
+          )}
+        </View>
+
+        <View style={styles.footer}>
+          <Pressable onPress={() => router.replace('/(auth)/login')}>
+            <Text style={styles.footerLink}>← Back to sign in</Text>
+          </Pressable>
+        </View>
+      </ScrollView>
+    </KeyboardAvoidingView>
+  )
+}

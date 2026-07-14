@@ -1,6 +1,6 @@
 // ─── ShowListItem — thumbnail + title + progress + episode info ───
 
-import { useRef, useCallback } from 'react'
+import { useRef, useCallback, useMemo } from 'react'
 import {
   View,
   Text,
@@ -13,7 +13,8 @@ import { Ionicons } from '@expo/vector-icons'
 import { router } from 'expo-router'
 import { getImageUrl } from '@/lib/queries/shows'
 import ProgressBar from './ProgressBar'
-import { colors, typography, borderRadius, spacing } from '@/theme'
+import { typography, borderRadius, spacing } from '@/theme'
+import { useTheme } from '@/contexts/ThemeContext'
 import type { ShowWithUserData } from '@/lib/queries/shows'
 
 interface ShowListItemProps {
@@ -22,6 +23,7 @@ interface ShowListItemProps {
 }
 
 export default function ShowListItem({ show, onMarkWatched }: ShowListItemProps) {
+  const { colors } = useTheme()
   const swipeableRef = useRef<Swipeable>(null)
 
   const handlePress = useCallback(() => {
@@ -41,6 +43,90 @@ export default function ShowListItem({ show, onMarkWatched }: ShowListItemProps)
   const isUpToDate = allCaughtUp && !isComplete
 
   const hasProgress = seenEps > 0 || (totalEps !== null && totalEps > 0)
+
+  const styles = useMemo(() => StyleSheet.create({
+  container: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.surfaceContainer,
+    borderRadius: borderRadius.lg,
+    padding: 12,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: colors.outlineVariant,
+  },
+  thumbnailContainer: {
+    width: 48,
+    height: 72,
+    borderRadius: 8,
+    overflow: 'hidden',
+    backgroundColor: colors.surfaceDim,
+  },
+  thumbnail: {
+    width: '100%',
+    height: '100%',
+  },
+  thumbnailPlaceholder: {
+    width: '100%',
+    height: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  info: {
+    flex: 1,
+    marginLeft: 12,
+  },
+  title: {
+    fontSize: typography.bodyMd.fontSize,
+    fontWeight: '600',
+    color: colors.onSurface,
+    marginBottom: spacing.unit,
+  },
+  episodeInfo: {
+    fontSize: typography.bodyXs.fontSize,
+    color: colors.onSurfaceVariant,
+    marginBottom: spacing.unit,
+  },
+  progressRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 4,
+  },
+  count: {
+    fontSize: typography.bodyXs.fontSize,
+    color: colors.onSurfaceVariant,
+    minWidth: 40,
+    textAlign: 'right',
+  },
+  completeIcon: {
+    marginLeft: 8,
+  },
+  rightActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginLeft: 8,
+  },
+  progressBarWrapper: {
+    flex: 1,
+  },
+  swipeAction: {
+    backgroundColor: colors.primary,
+    justifyContent: 'center',
+    alignItems: 'center',
+    width: 64,
+    borderRadius: borderRadius.lg,
+    marginLeft: 8,
+    marginBottom: 8,
+  },
+  swipeLabel: {
+    color: colors.onPrimary,
+    fontSize: typography.bodyXs.fontSize,
+    fontWeight: '600',
+    marginTop: spacing.unit,
+  },
+}), [colors])
 
   const lastEpisodeLabel = show.last_watched_episode_data
     ? (() => {
@@ -141,86 +227,3 @@ export default function ShowListItem({ show, onMarkWatched }: ShowListItemProps)
   )
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.surfaceContainer,
-    borderRadius: borderRadius.lg,
-    padding: 12,
-    marginBottom: 8,
-    borderWidth: 1,
-    borderColor: colors.outlineVariant,
-  },
-  thumbnailContainer: {
-    width: 48,
-    height: 72,
-    borderRadius: 8,
-    overflow: 'hidden',
-    backgroundColor: colors.surfaceDim,
-  },
-  thumbnail: {
-    width: '100%',
-    height: '100%',
-  },
-  thumbnailPlaceholder: {
-    width: '100%',
-    height: '100%',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  info: {
-    flex: 1,
-    marginLeft: 12,
-  },
-  title: {
-    fontSize: typography.bodyMd.fontSize,
-    fontWeight: '600',
-    color: colors.onSurface,
-    marginBottom: spacing.unit,
-  },
-  episodeInfo: {
-    fontSize: typography.bodyXs.fontSize,
-    color: colors.onSurfaceVariant,
-    marginBottom: spacing.unit,
-  },
-  progressRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginTop: 4,
-  },
-  count: {
-    fontSize: typography.bodyXs.fontSize,
-    color: colors.onSurfaceVariant,
-    minWidth: 40,
-    textAlign: 'right',
-  },
-  completeIcon: {
-    marginLeft: 8,
-  },
-  rightActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    marginLeft: 8,
-  },
-  progressBarWrapper: {
-    flex: 1,
-  },
-  swipeAction: {
-    backgroundColor: colors.primary,
-    justifyContent: 'center',
-    alignItems: 'center',
-    width: 64,
-    borderRadius: borderRadius.lg,
-    marginLeft: 8,
-    marginBottom: 8,
-  },
-  swipeLabel: {
-    color: colors.onPrimary,
-    fontSize: typography.bodyXs.fontSize,
-    fontWeight: '600',
-    marginTop: spacing.unit,
-  },
-})

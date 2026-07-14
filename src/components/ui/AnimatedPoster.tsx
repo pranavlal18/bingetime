@@ -1,11 +1,12 @@
 // ─── AnimatedPoster — expo-image with FadeIn + shimmer skeleton ───
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useMemo } from 'react'
 import { View, StyleSheet } from 'react-native'
 import { Image } from 'expo-image'
 import Animated, { FadeIn } from 'react-native-reanimated'
 import { Ionicons } from '@expo/vector-icons'
-import { colors, borderRadius } from '@/theme'
+import { borderRadius } from '@/theme'
+import { useTheme } from '@/contexts/ThemeContext'
 import { PosterSkeleton } from '@/components/ui/ShimmerSkeleton'
 
 interface AnimatedPosterProps {
@@ -16,6 +17,24 @@ interface AnimatedPosterProps {
 export default function AnimatedPoster({ uri, style }: AnimatedPosterProps) {
   const [loaded, setLoaded] = useState(false)
   const [error, setError] = useState(false)
+  const { colors } = useTheme()
+
+  const styles = useMemo(() => StyleSheet.create({
+    container: {
+      backgroundColor: colors.surfaceContainer,
+      overflow: 'hidden',
+    },
+    placeholder: {
+      ...StyleSheet.absoluteFill,
+      justifyContent: 'center',
+      alignItems: 'center',
+      backgroundColor: colors.surfaceContainer,
+    },
+    image: {
+      width: '100%',
+      height: '100%',
+    },
+  }), [colors])
 
   if (!uri || error) {
     return (
@@ -46,20 +65,3 @@ export default function AnimatedPoster({ uri, style }: AnimatedPosterProps) {
     </View>
   )
 }
-
-const styles = StyleSheet.create({
-  container: {
-    backgroundColor: colors.surfaceContainer,
-    overflow: 'hidden',
-  },
-  placeholder: {
-    ...StyleSheet.absoluteFill,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: colors.surfaceContainer,
-  },
-  image: {
-    width: '100%',
-    height: '100%',
-  },
-})

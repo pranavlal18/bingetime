@@ -28,44 +28,9 @@ import { getImageUrl } from '@/lib/tmdb'
 import DiscoverCard from '@/components/discover/DiscoverCard'
 import TrendingSection from '@/components/discover/TrendingSection'
 import RecommendedSection from '@/components/discover/RecommendedSection'
-import { colors, typography, spacing, borderRadius } from '@/theme'
+import { useTheme } from '@/contexts/ThemeContext'
+import { typography, spacing, borderRadius } from '@/theme'
 import type { DiscoverResult, MediaFilter } from '@/lib/queries/discover'
-
-// ── Stable search bar — memo'd outside component prevents remount on parent re-render ──
-
-interface SearchBarProps {
-  visible: boolean
-  value: string
-  onChangeText: (text: string) => void
-  onClear: () => void
-  inputRef: { current: TextInput | null }
-}
-
-function SearchBar({ visible, value, onChangeText, onClear, inputRef }: SearchBarProps) {
-  if (!visible) return null
-  return (
-    <View style={styles.compactSearchBar}>
-      <Ionicons name="search" size={18} color={colors.onSurfaceVariant} />
-      <TextInput
-        ref={inputRef}
-        style={styles.compactSearchInput}
-        placeholder="Movies, shows and more..."
-        placeholderTextColor={colors.outline}
-        value={value}
-        onChangeText={onChangeText}
-        autoFocus
-        autoCapitalize="none"
-        autoCorrect={false}
-        returnKeyType="search"
-      />
-      {value.length > 0 && (
-        <Pressable onPress={onClear} hitSlop={8}>
-          <Ionicons name="close-circle" size={18} color={colors.onSurfaceVariant} />
-        </Pressable>
-      )}
-    </View>
-  )
-}
 
 // ── Main Screen ──
 
@@ -79,6 +44,7 @@ export default function DiscoverScreen() {
   const localLibraryRef = useRef<Map<number, 'added' | 'removed'>>(new Map())
   const inputRef = useRef<TextInput>(null)
   const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const { colors } = useTheme()
 
   // Debounce search
   useEffect(() => {
@@ -129,7 +95,6 @@ export default function DiscoverScreen() {
   }, [trending])
 
   // Split trending into two sets for visual variety
-  // NOTE: data array reference stays stable during session (setQueriesData removed)
   const trendingForYou = useMemo(() => {
     return filteredTrending.slice(0, Math.ceil(filteredTrending.length / 2))
   }, [filteredTrending])
@@ -140,7 +105,6 @@ export default function DiscoverScreen() {
 
   const handleAdd = useCallback(
     (item: DiscoverResult) => {
-      // Track in session so it stays visible until tab switch (mutating ref — no re-render)
       localLibraryRef.current.set(item.tmdbId, 'added')
       setAddingIds((prev) => new Set(prev).add(item.tmdbId))
       addMutation.mutate(item, {
@@ -166,7 +130,6 @@ export default function DiscoverScreen() {
 
   const handleRemove = useCallback(
     (item: DiscoverResult) => {
-      // Track removal locally — show item without checkmark even though cache says inLibrary
       localLibraryRef.current.set(item.tmdbId, 'removed')
       setRemovingIds((prev) => new Set(prev).add(item.tmdbId))
       removeMutation.mutate(item, {
@@ -198,6 +161,61 @@ export default function DiscoverScreen() {
     Keyboard.dismiss()
   }, [])
 
+  // ── Search bar (inline, theme-aware) ──
+
+  const SearchBar = useCallback(function SearchBar({
+    visible,
+    value,
+    onChangeText,
+    onClear,
+  }: {
+    visible: boolean
+    value: string
+    onChangeText: (text: string) => void
+    onClear: () => void
+  }) {
+    if (!visible) return null
+    return (
+      <View
+        style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          marginHorizontal: spacing.marginMobile,
+          marginBottom: spacing.stackSm,
+          backgroundColor: colors.surfaceContainerLow,
+          borderRadius: borderRadius.full,
+          paddingHorizontal: spacing.gutter,
+          height: 44,
+          gap: spacing.stackSm,
+        }}
+      >
+        <Ionicons name="search" size={18} color={colors.onSurfaceVariant} />
+        <TextInput
+          ref={inputRef}
+          style={{
+            flex: 1,
+            fontSize: typography.bodyMd.fontSize,
+            color: colors.onSurface,
+            height: '100%',
+          }}
+          placeholder="Movies, shows and more..."
+          placeholderTextColor={colors.outline}
+          value={value}
+          onChangeText={onChangeText}
+          autoFocus
+          autoCapitalize="none"
+          autoCorrect={false}
+          returnKeyType="search"
+        />
+        {value.length > 0 && (
+          <Pressable onPress={onClear} hitSlop={8}>
+            <Ionicons name="close-circle" size={18} color={colors.onSurfaceVariant} />
+          </Pressable>
+        )}
+      </View>
+    )
+  }, [colors])
+
   // ── Search results render ──
 
   const addingRef = useRef(addingIds)
@@ -227,9 +245,6 @@ export default function DiscoverScreen() {
   const searchKeyExtractor = useCallback((item: DiscoverResult) => item.tmdbId.toString(), [])
 
   // ── Footer: trending/recommended sections (only when not searching) ──
-  // IMPORTANT: useMemo returns a JSX *element* (not a component function).
-  // Passing an element to ListFooterComponent lets React reconcile the same
-  // tree without remounting — so inner horizontal FlashLists keep scroll position.
   const listFooterElement = useMemo(() => {
     if (isSearching) return null
     return (
@@ -254,6 +269,65 @@ export default function DiscoverScreen() {
       </>
     )
   }, [isSearching, trendingForYou, recommended, handleAdd, handleRemove, addingIds, removingIds])
+
+  // ── Styles ──
+
+  const styles = useMemo(
+    () =>
+      StyleSheet.create({
+        container: {
+          flex: 1,
+          backgroundColor: colors.background,
+        },
+        centered: {
+          justifyContent: 'center',
+          alignItems: 'center',
+        },
+
+        // TopAppBar
+        topAppBar: {
+          flexDirection: 'row',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          paddingHorizontal: spacing.marginMobile,
+          height: 64,
+          backgroundColor: colors.surfaceContainer,
+        },
+        topAppBarTitle: {
+          fontFamily: 'Inter',
+          fontSize: 24,
+          fontWeight: '700',
+          color: colors.primary,
+        },
+        iconButton: {
+          padding: 8,
+          borderRadius: borderRadius.full,
+          justifyContent: 'center',
+          alignItems: 'center',
+        },
+        iconButtonActive: {
+          backgroundColor: colors.surfaceContainerHigh,
+        },
+
+        // Loading
+        loadingContainer: {
+          flex: 1,
+          justifyContent: 'center',
+          alignItems: 'center',
+        },
+        loadingText: {
+          fontSize: 14,
+          color: colors.outline,
+          marginTop: spacing.stackSm,
+        },
+
+        // Search list
+        listContent: {
+          paddingBottom: 24,
+        },
+      }),
+    [colors]
+  )
 
   // ── Loading state ──
 
@@ -295,7 +369,6 @@ export default function DiscoverScreen() {
         value={searchText}
         onChangeText={setSearchText}
         onClear={() => setSearchText('')}
-        inputRef={inputRef}
       />
 
       {/* Single FlashList — Search/genre above, trending in footer */}
@@ -331,127 +404,3 @@ export default function DiscoverScreen() {
     </View>
   )
 }
-
-// ── Styles ──
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
-  centered: {
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-
-  // TopAppBar
-  topAppBar: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: spacing.marginMobile,
-    height: 64,
-    backgroundColor: 'rgba(21,18,27,0.8)',
-  },
-  topAppBarTitle: {
-    fontFamily: 'Inter',
-    fontSize: 24,
-    fontWeight: '700',
-    color: colors.primary,
-  },
-  iconButton: {
-    padding: 8,
-    borderRadius: borderRadius.full,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  iconButtonActive: {
-    backgroundColor: colors.surfaceContainerHigh,
-  },
-
-  // ── Compact Search Bar (Movies tab style) ──
-  compactSearchBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginHorizontal: spacing.marginMobile,
-    marginBottom: spacing.stackSm,
-    backgroundColor: colors.surfaceContainerLow,
-    borderRadius: borderRadius.full,
-    paddingHorizontal: spacing.gutter,
-    height: 44,
-    gap: spacing.stackSm,
-  },
-  compactSearchInput: {
-    flex: 1,
-    fontSize: typography.bodyMd.fontSize,
-    color: colors.onSurface,
-    height: '100%',
-  },
-  genreChipsContainer: {
-    paddingHorizontal: spacing.marginMobile,
-    gap: 12,
-    paddingBottom: spacing.stackMd,
-  },
-  genreChip: {
-    paddingHorizontal: 20,
-    paddingVertical: 8,
-    borderRadius: borderRadius.full,
-    backgroundColor: colors.surfaceContainer,
-    borderWidth: 1,
-    borderColor: 'rgba(148,142,160,0.3)',
-  },
-  genreChipActive: {
-    backgroundColor: colors.primary,
-    borderColor: colors.primary,
-  },
-  genreChipText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: colors.onSurfaceVariant,
-  },
-  genreChipTextActive: {
-    color: colors.onPrimary,
-  },
-
-  // Loading
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  loadingText: {
-    fontSize: 14,
-    color: colors.outline,
-    marginTop: spacing.stackSm,
-  },
-
-  // Search list
-  listContent: {
-    paddingBottom: 24,
-  },
-  listContentEmpty: {
-    flex: 1,
-    justifyContent: 'center',
-  },
-
-  // Empty
-  emptyState: {
-    alignItems: 'center',
-    paddingHorizontal: 40,
-    paddingTop: 60,
-  },
-  emptyTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: colors.onSurface,
-    marginTop: 16,
-    marginBottom: 8,
-    textAlign: 'center',
-  },
-  emptySubtitle: {
-    fontSize: 14,
-    color: colors.outline,
-    textAlign: 'center',
-    lineHeight: 20,
-  },
-})

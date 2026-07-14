@@ -20,7 +20,8 @@ import { getSeasonDetails, getShowBasicDetails } from '@/lib/tmdb'
 import { useWatchedEpisodesHistory } from '@/lib/queries/episodes'
 import { useUpcomingEpisodes } from '@/lib/queries/upcoming'
 import { useAppStore } from '@/stores/appStore'
-import { colors, typography, spacing, borderRadius } from '@/theme'
+import { useTheme } from '@/contexts/ThemeContext'
+import { typography, spacing, borderRadius } from '@/theme'
 import ShowCard from '@/components/shows/ShowCard'
 import EpisodeCard from '@/components/shows/EpisodeCard'
 import EpisodeSection from '@/components/shows/EpisodeSection'
@@ -36,6 +37,7 @@ export default function ShowsScreen() {
   const [activeTab, setActiveTab] = useState<ShowsTabKind>('watchlist')
   const viewMode = useAppStore((s) => s.showsViewMode)
   const setViewMode = useAppStore((s) => s.setShowsViewMode)
+  const { colors } = useTheme()
 
   // Data hooks
   const { data: shows, isLoading: showsLoading, isRefetching, refetch } = useShows()
@@ -53,6 +55,7 @@ export default function ShowsScreen() {
   // Refetch when navigating back
   const pathname = usePathname()
   const prevPathname = useRef(pathname)
+  const watchListRef = useRef<any>(null)
   useEffect(() => {
     if (prevPathname.current !== pathname) {
       prevPathname.current = pathname
@@ -277,6 +280,15 @@ export default function ShowsScreen() {
     return items
   }, [watchedHistory, watchNextEpisodes, haventWatchedEpisodes, isGrid])
 
+  // Auto-scroll to top when Watch Next data first loads (fresh login / cold cache)
+  const prevWatchNextLength = useRef(0)
+  useEffect(() => {
+    if (prevWatchNextLength.current === 0 && watchNextEpisodes.length > 0) {
+      watchListRef.current?.scrollToOffset({ offset: 0, animated: true })
+    }
+    prevWatchNextLength.current = watchNextEpisodes.length
+  }, [watchNextEpisodes.length])
+
   // Build flattened list for Upcoming tab
   const upcomingItems: ShowsListItem[] = useMemo(() => {
     if (!upcomingSections || upcomingSections.length === 0) return []
@@ -374,7 +386,80 @@ export default function ShowsScreen() {
         </Text>
       </View>
     )
-  }, [activeTab])
+  }, [activeTab, colors])
+
+  // ── Styles ──
+
+  const styles = useMemo(
+    () =>
+      StyleSheet.create({
+        container: {
+          flex: 1,
+          backgroundColor: colors.surface,
+        },
+        centered: {
+          justifyContent: 'center',
+          alignItems: 'center',
+        },
+        loadingText: {
+          fontSize: 14,
+          color: colors.outline,
+          marginTop: spacing.stackSm,
+        },
+
+        // TopAppBar
+        topAppBar: {
+          position: 'relative',
+          backgroundColor: colors.surfaceContainer,
+        },
+        gridToggle: {
+          position: 'absolute',
+          right: spacing.marginMobile,
+          top: spacing.stackSm + 4,
+          width: 44,
+          height: 44,
+          borderRadius: borderRadius.full,
+          justifyContent: 'center',
+          alignItems: 'center',
+          zIndex: 10,
+        },
+
+        // List
+        listContent: {
+          paddingHorizontal: spacing.marginMobile,
+          paddingBottom: 24,
+          paddingTop: spacing.unit,
+        },
+        listContentTight: {
+          paddingBottom: 24,
+          paddingTop: spacing.unit,
+        },
+        listContentEmpty: {
+          flex: 1,
+          justifyContent: 'center',
+        },
+
+        // Empty
+        emptyState: {
+          alignItems: 'center',
+          paddingHorizontal: 40,
+        },
+        emptyTitle: {
+          fontSize: 18,
+          fontWeight: '700',
+          color: colors.onSurface,
+          marginTop: 16,
+          marginBottom: 8,
+        },
+        emptySubtitle: {
+          fontSize: 14,
+          color: colors.outline,
+          textAlign: 'center',
+          lineHeight: 20,
+        },
+      }),
+    [colors]
+  )
 
   // ── Loading state ──
 
@@ -442,6 +527,7 @@ export default function ShowsScreen() {
           />
         ) : (
           <FlashList
+            ref={watchListRef}
             data={watchListItems}
             keyExtractor={episodeKeyExtractor}
             renderItem={renderEpisodeItem}
@@ -489,72 +575,3 @@ export default function ShowsScreen() {
     </View>
   )
 }
-
-// ── Styles ──
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.surface,
-  },
-  centered: {
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  loadingText: {
-    fontSize: 14,
-    color: colors.outline,
-    marginTop: spacing.stackSm,
-  },
-
-  // TopAppBar
-  topAppBar: {
-    position: 'relative',
-    backgroundColor: 'rgba(21,18,27,0.8)',
-  },
-  gridToggle: {
-    position: 'absolute',
-    right: spacing.marginMobile,
-    top: spacing.stackSm + 4,
-    width: 44,
-    height: 44,
-    borderRadius: borderRadius.full,
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 10,
-  },
-
-  // List
-  listContent: {
-    paddingHorizontal: spacing.marginMobile,
-    paddingBottom: 24,
-    paddingTop: spacing.unit,
-  },
-  listContentTight: {
-    paddingBottom: 24,
-    paddingTop: spacing.unit,
-  },
-  listContentEmpty: {
-    flex: 1,
-    justifyContent: 'center',
-  },
-
-  // Empty
-  emptyState: {
-    alignItems: 'center',
-    paddingHorizontal: 40,
-  },
-  emptyTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: colors.onSurface,
-    marginTop: 16,
-    marginBottom: 8,
-  },
-  emptySubtitle: {
-    fontSize: 14,
-    color: colors.outline,
-    textAlign: 'center',
-    lineHeight: 20,
-  },
-})

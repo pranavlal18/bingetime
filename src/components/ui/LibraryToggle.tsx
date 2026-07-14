@@ -1,10 +1,10 @@
 // ─── LibraryToggle — Add (+ inLibrary=false) / Remove (✓ inLibrary=true) ───
 
-import { memo, useCallback } from 'react'
+import { memo, useCallback, useMemo } from 'react'
 import { Pressable, ActivityIndicator, StyleSheet } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import { useAddToLibrary, useRemoveFromLibrary } from '@/lib/queries/discover'
-import { colors } from '@/theme'
+import { useTheme } from '@/contexts/ThemeContext'
 import type { DiscoverResult } from '@/lib/queries/discover'
 
 interface LibraryToggleProps {
@@ -30,6 +30,7 @@ const LibraryToggle = memo(function LibraryToggle({
 }: LibraryToggleProps) {
   const addMutation = useAddToLibrary()
   const removeMutation = useRemoveFromLibrary()
+  const { colors } = useTheme()
 
   const isLoading = addMutation.isPending || removeMutation.isPending
 
@@ -53,6 +54,20 @@ const LibraryToggle = memo(function LibraryToggle({
 
   const iconSize = Math.round(size * 0.57)
 
+  const styles = useMemo(() => StyleSheet.create({
+    button: {
+      backgroundColor: 'rgba(0,0,0,0.55)',
+      justifyContent: 'center',
+      alignItems: 'center',
+      borderWidth: 1.5,
+      borderColor: 'rgba(255,255,255,0.25)',
+    },
+    buttonActive: {
+      backgroundColor: colors.primary,
+      borderColor: colors.primary,
+    },
+  }), [colors])
+
   return (
     <Pressable
       style={[
@@ -74,20 +89,6 @@ const LibraryToggle = memo(function LibraryToggle({
       )}
     </Pressable>
   )
-})
-
-const styles = StyleSheet.create({
-  button: {
-    backgroundColor: 'rgba(0,0,0,0.55)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1.5,
-    borderColor: 'rgba(255,255,255,0.25)',
-  },
-  buttonActive: {
-    backgroundColor: colors.primary,
-    borderColor: colors.primary,
-  },
 })
 
 export default LibraryToggle

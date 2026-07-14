@@ -16,7 +16,8 @@ import { Ionicons } from '@expo/vector-icons'
 import { router, Stack } from 'expo-router'
 import { useMovies, useToggleMovieWatched } from '@/lib/queries/movies'
 import { useAppStore } from '@/stores/appStore'
-import { colors, typography, spacing, borderRadius } from '@/theme'
+import { typography, spacing, borderRadius } from '@/theme'
+import { useTheme } from '@/contexts/ThemeContext'
 import MovieCard from '@/components/movies/MovieCard'
 import MovieListItem from '@/components/movies/MovieListItem'
 import type { MovieWithUserData } from '@/lib/queries/movies'
@@ -31,12 +32,6 @@ interface FilterChip {
   color: string
 }
 
-const FILTER_CHIPS: FilterChip[] = [
-  { key: 'all', label: 'All', color: colors.primary },
-  { key: 'watched', label: 'Watched', color: colors.statusFinished },
-  { key: 'not-watched', label: 'Not watched', color: colors.onSurfaceVariant },
-]
-
 // ── Filter Chip Component ──
 
 interface FilterChipProps {
@@ -45,51 +40,6 @@ interface FilterChipProps {
   count: number
   onPress: () => void
 }
-
-const FilterChip = memo(function FilterChip({
-  chip,
-  isActive,
-  count,
-  onPress,
-}: FilterChipProps) {
-  return (
-    <Pressable
-      style={[
-        styles.chip,
-        isActive && { backgroundColor: chip.color, borderColor: chip.color },
-      ]}
-      onPress={onPress}
-    >
-      <Text
-        style={[
-          styles.chipLabel,
-          isActive
-            ? { color: colors.onPrimary }
-            : { color: chip.color },
-        ]}
-      >
-        {chip.label}
-      </Text>
-      <View
-        style={[
-          styles.chipCount,
-          isActive && { backgroundColor: 'rgba(0,0,0,0.2)' },
-        ]}
-      >
-        <Text
-          style={[
-            styles.chipCountText,
-            isActive
-              ? { color: colors.onPrimary }
-              : { color: chip.color },
-          ]}
-        >
-          {count}
-        </Text>
-      </View>
-    </Pressable>
-  )
-})
 
 // ── Main Screen ──
 
@@ -103,7 +53,160 @@ export default function AllMoviesScreen() {
 
   const [activeFilter, setActiveFilter] = useState<MovieFilter>('all')
 
+  const { colors } = useTheme()
   const isGrid = viewMode === 'poster-grid'
+
+  const FILTER_CHIPS = useMemo<FilterChip[]>(() => [
+    { key: 'all', label: 'All', color: colors.primary },
+    { key: 'watched', label: 'Watched', color: colors.statusFinished },
+    { key: 'not-watched', label: 'Not watched', color: colors.onSurfaceVariant },
+  ], [colors])
+
+  function FilterChip({ chip, isActive, count, onPress }: FilterChipProps) {
+    return (
+      <Pressable
+        style={[
+          styles.chip,
+          isActive && { backgroundColor: chip.color, borderColor: chip.color },
+        ]}
+        onPress={onPress}
+      >
+        <Text
+          style={[
+            styles.chipLabel,
+            isActive
+              ? { color: colors.onPrimary }
+              : { color: chip.color },
+          ]}
+        >
+          {chip.label}
+        </Text>
+        <View
+          style={[
+            styles.chipCount,
+            isActive && { backgroundColor: 'rgba(0,0,0,0.2)' },
+          ]}
+        >
+          <Text
+            style={[
+              styles.chipCountText,
+              isActive
+                ? { color: colors.onPrimary }
+                : { color: chip.color },
+            ]}
+          >
+            {count}
+          </Text>
+        </View>
+      </Pressable>
+    )
+  }
+
+  const styles = useMemo(() => StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: colors.surface,
+    },
+    centered: {
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    loadingText: {
+      fontSize: typography.bodySm.fontSize,
+      color: colors.outline,
+      marginTop: spacing.stackSm,
+    },
+    appBar: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: spacing.marginMobile,
+      height: 56,
+      gap: 12,
+    },
+    backBtn: {
+      width: 40,
+      height: 40,
+      borderRadius: borderRadius.full,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    appBarTitle: {
+      flex: 1,
+      fontFamily: 'Inter',
+      fontSize: 22,
+      fontWeight: '700',
+      color: colors.onSurface,
+      letterSpacing: -0.01,
+    },
+    gridToggle: {
+      width: 40,
+      height: 40,
+      borderRadius: borderRadius.full,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    chipsContainer: {
+      paddingVertical: spacing.stackSm,
+    },
+    chipsContent: {
+      paddingHorizontal: spacing.marginMobile,
+      gap: 8,
+    },
+    chip: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: 14,
+      height: 34,
+      borderRadius: borderRadius.full,
+      borderWidth: 1,
+      borderColor: colors.outlineVariant,
+      backgroundColor: colors.surfaceContainerLow,
+      gap: 6,
+    },
+    chipLabel: {
+      fontSize: 13,
+      fontWeight: '600',
+    },
+    chipCount: {
+      minWidth: 20,
+      height: 20,
+      borderRadius: 10,
+      justifyContent: 'center',
+      alignItems: 'center',
+      paddingHorizontal: 6,
+    },
+    chipCountText: {
+      fontSize: 11,
+      fontWeight: '700',
+    },
+    listContent: {
+      paddingHorizontal: spacing.marginMobile,
+      paddingBottom: 32,
+      paddingTop: spacing.stackSm,
+    },
+    listContentEmpty: {
+      flex: 1,
+      justifyContent: 'center',
+    },
+    emptyState: {
+      alignItems: 'center',
+      paddingHorizontal: 48,
+    },
+    emptyTitle: {
+      fontFamily: 'Inter',
+      fontSize: 18,
+      fontWeight: '700',
+      color: colors.onSurface,
+      marginTop: 16,
+      marginBottom: 8,
+    },
+    emptySubtitle: {
+      fontSize: 14,
+      color: colors.outline,
+      textAlign: 'center',
+      lineHeight: 20,
+    },
+  }), [colors])
 
   // ── Derive counts per filter ──
 
@@ -256,119 +359,3 @@ export default function AllMoviesScreen() {
     </View>
   )
 }
-
-// ── Styles ──
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.surface,
-  },
-  centered: {
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  loadingText: {
-    fontSize: typography.bodySm.fontSize,
-    color: colors.outline,
-    marginTop: spacing.stackSm,
-  },
-
-  // ── AppBar ──
-  appBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: spacing.marginMobile,
-    height: 56,
-    gap: 12,
-  },
-  backBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: borderRadius.full,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  appBarTitle: {
-    flex: 1,
-    fontFamily: 'Inter',
-    fontSize: 22,
-    fontWeight: '700',
-    color: colors.onSurface,
-    letterSpacing: -0.01,
-  },
-  gridToggle: {
-    width: 40,
-    height: 40,
-    borderRadius: borderRadius.full,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-
-  // ── Filter Chips ──
-  chipsContainer: {
-    paddingVertical: spacing.stackSm,
-  },
-  chipsContent: {
-    paddingHorizontal: spacing.marginMobile,
-    gap: 8,
-  },
-  chip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 14,
-    height: 34,
-    borderRadius: borderRadius.full,
-    borderWidth: 1,
-    borderColor: colors.outlineVariant,
-    backgroundColor: colors.surfaceContainerLow,
-    gap: 6,
-  },
-  chipLabel: {
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  chipCount: {
-    minWidth: 20,
-    height: 20,
-    borderRadius: 10,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 6,
-  },
-  chipCountText: {
-    fontSize: 11,
-    fontWeight: '700',
-  },
-
-  // ── List ──
-  listContent: {
-    paddingHorizontal: spacing.marginMobile,
-    paddingBottom: 32,
-    paddingTop: spacing.stackSm,
-  },
-  listContentEmpty: {
-    flex: 1,
-    justifyContent: 'center',
-  },
-
-  // ── Empty State ──
-  emptyState: {
-    alignItems: 'center',
-    paddingHorizontal: 48,
-  },
-  emptyTitle: {
-    fontFamily: 'Inter',
-    fontSize: 18,
-    fontWeight: '700',
-    color: colors.onSurface,
-    marginTop: 16,
-    marginBottom: 8,
-  },
-  emptySubtitle: {
-    fontSize: 14,
-    color: colors.outline,
-    textAlign: 'center',
-    lineHeight: 20,
-  },
-})

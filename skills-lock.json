@@ -1,6 +1,24 @@
 {
   "version": 1,
   "skills": {
+    "expo-data-fetching": {
+      "source": "expo/skills",
+      "sourceType": "github",
+      "skillPath": "plugins/expo/skills/expo-data-fetching/SKILL.md",
+      "computedHash": "29fa5750a72aa0cf7b76b6a890d296eba96f0c8de43c97dfb354c3fc4c908f3a"
+    },
+    "security-review": {
+      "source": "getsentry/skills",
+      "sourceType": "github",
+      "skillPath": "skills/security-review/SKILL.md",
+      "computedHash": "1eee1e41aa0a0e75dbbe0cac387e3d61bedf51af1888f184301a173731e6973e"
+    },
+    "shopify-liquid": {
+      "source": "shopify/shopify-ai-toolkit",
+      "sourceType": "github",
+      "skillPath": "skills/shopify-liquid/SKILL.md",
+      "computedHash": "93ad9ea8f9a7466d21dbea8aa4f8d105c99c4972422b87eb34fc6e93c79e98a4"
+    },
     "stitch::react-native": {
       "source": "google-labs-code/stitch-skills",
       "sourceType": "github",

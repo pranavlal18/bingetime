@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import {
   View,
   Text,
@@ -14,155 +14,12 @@ import {
 import { router } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
 import { useAuth } from '@/contexts/AuthContext'
-import { colors, typography, spacing, borderRadius } from '@/theme'
+import { typography, spacing, borderRadius } from '@/theme'
+import { useTheme } from '@/contexts/ThemeContext'
 
 export default function RegisterScreen() {
-  const { signUp, loading: authLoading } = useAuth()
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [confirmPassword, setConfirmPassword] = useState('')
-  const [error, setError] = useState('')
-  const [loading, setLoading] = useState(false)
-
-  const handleSubmit = async () => {
-    if (!email || !password || !confirmPassword) {
-      setError('Please fill in all fields')
-      return
-    }
-    if (password !== confirmPassword) {
-      setError('Passwords do not match')
-      return
-    }
-    if (password.length < 6) {
-      setError('Password must be at least 6 characters')
-      return
-    }
-    setError('')
-    setLoading(true)
-    console.log('📝 [RegisterScreen] Attempting sign up:', { email })
-    const { error, data } = await signUp(email, password)
-    setLoading(false)
-    if (error) {
-      console.log('❌ [RegisterScreen] Sign up error:', error.message)
-      setError(error.message)
-    } else {
-      console.log('✅ [RegisterScreen] Sign up success:', { user: data.user?.email })
-      Alert.alert(
-        'Account created!',
-        'Please check your email to verify your account, then sign in.',
-        [{ text: 'OK', onPress: () => router.replace('/(auth)/login') }],
-        { cancelable: false }
-      )
-    }
-  }
-
-  return (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      style={styles.container}
-      keyboardVerticalOffset={80}
-    >
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        <View style={styles.logoContainer}>
-          <View style={styles.logo}>
-            <Ionicons name="tv-outline" size={48} color={colors.primary} />
-          </View>
-          <Text style={styles.title}>BingeTime</Text>
-          <Text style={styles.subtitle}>Track your shows & movies</Text>
-        </View>
-
-        <View style={styles.formContainer}>
-          <Text style={styles.formTitle}>Create account</Text>
-          <Text style={styles.formSubtitle}>Start tracking what you watch</Text>
-
-          {error && (
-            <View style={styles.errorContainer}>
-              <Ionicons name="alert-circle-outline" size={18} color={colors.error} />
-              <Text style={styles.errorText}>{error}</Text>
-            </View>
-          )}
-
-          <View style={styles.inputGroup}>
-            <View style={styles.inputWrapper}>
-              <Ionicons name="mail-outline" size={20} color={colors.outlineVariant} style={styles.inputIcon} />
-<TextInput
-                style={styles.input}
-                placeholder="Email"
-                value={email}
-                onChangeText={setEmail}
-                autoCapitalize="none"
-                autoComplete="email"
-                keyboardType="email-address"
-                textContentType="emailAddress"
-                returnKeyType="next"
-                editable={!loading}
-              />
-            </View>
-          </View>
-
-          <View style={styles.inputGroup}>
-            <View style={styles.inputWrapper}>
-              <Ionicons name="lock-closed-outline" size={20} color={colors.outlineVariant} style={styles.inputIcon} />
-<TextInput
-                style={styles.input}
-                placeholder="Password (min 6 chars)"
-                value={password}
-                onChangeText={setPassword}
-                secureTextEntry
-                autoComplete="new-password"
-                textContentType="newPassword"
-                returnKeyType="next"
-                onSubmitEditing={() => setConfirmPassword('')}
-                editable={!loading}
-              />
-            </View>
-          </View>
-
-          <View style={styles.inputGroup}>
-            <View style={styles.inputWrapper}>
-              <Ionicons name="lock-closed-outline" size={20} color={colors.outlineVariant} style={styles.inputIcon} />
-<TextInput
-                style={styles.input}
-                placeholder="Confirm password"
-                value={confirmPassword}
-                onChangeText={setConfirmPassword}
-                secureTextEntry
-                autoComplete="new-password"
-                textContentType="newPassword"
-                returnKeyType="go"
-                onSubmitEditing={handleSubmit}
-                editable={!loading}
-              />
-            </View>
-          </View>
-
-          <Pressable style={styles.submitButton} onPress={handleSubmit} disabled={loading || authLoading}>
-            {loading || authLoading ? (
-              <ActivityIndicator size="small" color={colors.onPrimary} />
-            ) : (
-              <Text style={styles.submitButtonText}>Create Account</Text>
-            )}
-          </Pressable>
-        </View>
-
-        <View style={styles.divider}>
-          <View style={styles.dividerLine} />
-          <Text style={styles.dividerText}>or</Text>
-          <View style={styles.dividerLine} />
-        </View>
-
-        <View style={styles.footer}>
-          <Text style={styles.footerText}>Already have an account?</Text>
-          <Pressable onPress={() => router.replace('/(auth)/login')}>
-            <Text style={styles.footerLink}>Sign in</Text>
-          </Pressable>
-        </View>
-      </ScrollView>
-    </KeyboardAvoidingView>
-  )
-}
-
-const styles = StyleSheet.create({
+  const { colors } = useTheme()
+  const styles = useMemo(() => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
@@ -307,4 +164,149 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: colors.primary,
   },
-})
+}), [colors])
+  const { signUp, loading: authLoading } = useAuth()
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [error, setError] = useState('')
+  const [loading, setLoading] = useState(false)
+
+  const handleSubmit = async () => {
+    if (!email || !password || !confirmPassword) {
+      setError('Please fill in all fields')
+      return
+    }
+    if (password !== confirmPassword) {
+      setError('Passwords do not match')
+      return
+    }
+    if (password.length < 6) {
+      setError('Password must be at least 6 characters')
+      return
+    }
+    setError('')
+    setLoading(true)
+    console.log('📝 [RegisterScreen] Attempting sign up:', { email })
+    const { error, data } = await signUp(email, password)
+    setLoading(false)
+    if (error) {
+      console.log('❌ [RegisterScreen] Sign up error:', error.message)
+      setError('An error occurred during registration. Please try again.')
+    } else {
+      console.log('✅ [RegisterScreen] Sign up success:', { user: data.user?.email })
+      Alert.alert(
+        'Account created!',
+        'Please check your email to verify your account, then sign in.',
+        [{ text: 'OK', onPress: () => router.replace('/(auth)/login') }],
+        { cancelable: false }
+      )
+    }
+  }
+
+  return (
+    <KeyboardAvoidingView
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      style={styles.container}
+      keyboardVerticalOffset={80}
+    >
+      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+        <View style={styles.logoContainer}>
+          <View style={styles.logo}>
+            <Ionicons name="tv-outline" size={48} color={colors.primary} />
+          </View>
+          <Text style={styles.title}>BingeTime</Text>
+          <Text style={styles.subtitle}>Track your shows & movies</Text>
+        </View>
+
+        <View style={styles.formContainer}>
+          <Text style={styles.formTitle}>Create account</Text>
+          <Text style={styles.formSubtitle}>Start tracking what you watch</Text>
+
+          {error && (
+            <View style={styles.errorContainer}>
+              <Ionicons name="alert-circle-outline" size={18} color={colors.error} />
+              <Text style={styles.errorText}>{error}</Text>
+            </View>
+          )}
+
+          <View style={styles.inputGroup}>
+            <View style={styles.inputWrapper}>
+              <Ionicons name="mail-outline" size={20} color={colors.outlineVariant} style={styles.inputIcon} />
+<TextInput
+                style={styles.input}
+                placeholder="Email"
+                value={email}
+                onChangeText={setEmail}
+                autoCapitalize="none"
+                autoComplete="email"
+                keyboardType="email-address"
+                textContentType="emailAddress"
+                returnKeyType="next"
+                editable={!loading}
+              />
+            </View>
+          </View>
+
+          <View style={styles.inputGroup}>
+            <View style={styles.inputWrapper}>
+              <Ionicons name="lock-closed-outline" size={20} color={colors.outlineVariant} style={styles.inputIcon} />
+<TextInput
+                style={styles.input}
+                placeholder="Password (min 6 chars)"
+                value={password}
+                onChangeText={setPassword}
+                secureTextEntry
+                autoComplete="new-password"
+                textContentType="newPassword"
+                returnKeyType="next"
+                onSubmitEditing={() => setConfirmPassword('')}
+                editable={!loading}
+              />
+            </View>
+          </View>
+
+          <View style={styles.inputGroup}>
+            <View style={styles.inputWrapper}>
+              <Ionicons name="lock-closed-outline" size={20} color={colors.outlineVariant} style={styles.inputIcon} />
+<TextInput
+                style={styles.input}
+                placeholder="Confirm password"
+                value={confirmPassword}
+                onChangeText={setConfirmPassword}
+                secureTextEntry
+                autoComplete="new-password"
+                textContentType="newPassword"
+                returnKeyType="go"
+                onSubmitEditing={handleSubmit}
+                editable={!loading}
+              />
+            </View>
+          </View>
+
+          <Pressable style={styles.submitButton} onPress={handleSubmit} disabled={loading || authLoading}>
+            {loading || authLoading ? (
+              <ActivityIndicator size="small" color={colors.onPrimary} />
+            ) : (
+              <Text style={styles.submitButtonText}>Create Account</Text>
+            )}
+          </Pressable>
+        </View>
+
+        <View style={styles.divider}>
+          <View style={styles.dividerLine} />
+          <Text style={styles.dividerText}>or</Text>
+          <View style={styles.dividerLine} />
+        </View>
+
+        <View style={styles.footer}>
+          <Text style={styles.footerText}>Already have an account?</Text>
+          <Pressable onPress={() => router.replace('/(auth)/login')}>
+            <Text style={styles.footerLink}>Sign in</Text>
+          </Pressable>
+        </View>
+      </ScrollView>
+    </KeyboardAvoidingView>
+  )
+}
+

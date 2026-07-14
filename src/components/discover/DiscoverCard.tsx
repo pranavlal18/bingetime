@@ -1,12 +1,13 @@
 // ─── DiscoverCard — poster + info + add/remove toggle ───
 
-import { memo, useCallback } from 'react'
+import { memo, useCallback, useMemo } from 'react'
 import { View, Text, StyleSheet, Pressable, ActivityIndicator } from 'react-native'
 import { Image } from 'expo-image'
 import { Ionicons } from '@expo/vector-icons'
 import { router } from 'expo-router'
 import { getImageUrl } from '@/lib/tmdb'
-import { colors, typography, borderRadius, spacing } from '@/theme'
+import { typography, borderRadius, spacing } from '@/theme'
+import { useTheme } from '@/contexts/ThemeContext'
 import type { DiscoverResult } from '@/lib/queries/discover'
 
 interface DiscoverCardProps {
@@ -26,6 +27,8 @@ const DiscoverCard = memo(function DiscoverCard({
   isRemoving,
   isInLibrary,
 }: DiscoverCardProps) {
+  const { colors } = useTheme()
+
   const posterUrl = getImageUrl(item.poster_path, 'w92')
 
   const handlePress = useCallback(() => {
@@ -38,63 +41,7 @@ const DiscoverCard = memo(function DiscoverCard({
 
   const isLoading = isAdding || isRemoving
 
-  return (
-    <Pressable style={styles.card} onPress={handlePress}>
-      <View style={styles.posterContainer}>
-        {posterUrl ? (
-          <Image
-            source={{ uri: posterUrl }}
-            style={styles.poster}
-            contentFit="cover"
-            cachePolicy="memory-disk"
-          />
-        ) : (
-          <View style={styles.posterPlaceholder}>
-            <Ionicons name="film-outline" size={24} color={colors.onSurfaceVariant} />
-          </View>
-        )}
-      </View>
-
-      <View style={styles.info}>
-        <View style={item.mediaType === 'tv' ? styles.tvBadge : styles.movieBadge}>
-          <Text style={styles.badgeText}>
-            {item.mediaType === 'tv' ? 'TV' : 'Movie'}
-          </Text>
-        </View>
-
-        <Text style={styles.title} numberOfLines={2}>
-          {item.title}
-        </Text>
-
-        {item.year ? (
-          <Text style={styles.year}>{item.year}</Text>
-        ) : null}
-      </View>
-
-      <Pressable
-        style={[
-          styles.toggleButton,
-          isInLibrary && styles.toggleButtonActive,
-        ]}
-        onPress={() => (isInLibrary ? onRemove(item) : onAdd(item))}
-        disabled={isLoading}
-      >
-          {isLoading ? (
-            <ActivityIndicator size="small" color="#fff" />
-          ) : (
-            <Ionicons
-              name={isInLibrary ? 'checkmark' : 'add'}
-              size={20}
-              color="#fff"
-            />
-          )}
-      </Pressable>
-    </Pressable>
-  )
-})
-
-
-const styles = StyleSheet.create({
+  const styles = useMemo(() => StyleSheet.create({
   card: {
     flexDirection: 'row',
     backgroundColor: colors.surfaceContainer,
@@ -181,6 +128,61 @@ const styles = StyleSheet.create({
     backgroundColor: colors.primary,
     borderColor: colors.primary,
   },
+}), [colors])
+
+  return (
+    <Pressable style={styles.card} onPress={handlePress}>
+      <View style={styles.posterContainer}>
+        {posterUrl ? (
+          <Image
+            source={{ uri: posterUrl }}
+            style={styles.poster}
+            contentFit="cover"
+            cachePolicy="memory-disk"
+          />
+        ) : (
+          <View style={styles.posterPlaceholder}>
+            <Ionicons name="film-outline" size={24} color={colors.onSurfaceVariant} />
+          </View>
+        )}
+      </View>
+
+      <View style={styles.info}>
+        <View style={item.mediaType === 'tv' ? styles.tvBadge : styles.movieBadge}>
+          <Text style={styles.badgeText}>
+            {item.mediaType === 'tv' ? 'TV' : 'Movie'}
+          </Text>
+        </View>
+
+        <Text style={styles.title} numberOfLines={2}>
+          {item.title}
+        </Text>
+
+        {item.year ? (
+          <Text style={styles.year}>{item.year}</Text>
+        ) : null}
+      </View>
+
+      <Pressable
+        style={[
+          styles.toggleButton,
+          isInLibrary && styles.toggleButtonActive,
+        ]}
+        onPress={() => (isInLibrary ? onRemove(item) : onAdd(item))}
+        disabled={isLoading}
+      >
+          {isLoading ? (
+            <ActivityIndicator size="small" color="#fff" />
+          ) : (
+            <Ionicons
+              name={isInLibrary ? 'checkmark' : 'add'}
+              size={20}
+              color="#fff"
+            />
+          )}
+      </Pressable>
+    </Pressable>
+  )
 })
 
 export default DiscoverCard

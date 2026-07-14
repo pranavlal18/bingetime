@@ -1,6 +1,6 @@
 // ─── ShimmerSkeleton — loading placeholder with animated gradient ───
 
-import { useEffect } from 'react'
+import { useEffect, useMemo } from 'react'
 import { View, StyleSheet } from 'react-native'
 import Animated, {
   useSharedValue,
@@ -10,7 +10,8 @@ import Animated, {
   interpolate,
 } from 'react-native-reanimated'
 import { LinearGradient } from 'expo-linear-gradient'
-import { colors, borderRadius } from '@/theme'
+import { borderRadius } from '@/theme'
+import { useTheme } from '@/contexts/ThemeContext'
 
 interface ShimmerSkeletonProps {
   width: number | string
@@ -25,7 +26,23 @@ export default function ShimmerSkeleton({
   borderRadius: radius = borderRadius.md,
   style,
 }: ShimmerSkeletonProps) {
+  const { colors } = useTheme()
   const shimmerX = useSharedValue(-1)
+
+  const styles = useMemo(() => StyleSheet.create({
+    container: {
+      overflow: 'hidden',
+      backgroundColor: colors.surfaceContainer,
+    },
+    base: {
+      ...StyleSheet.absoluteFill,
+      backgroundColor: colors.surfaceContainer,
+    },
+    shimmerOverlay: {
+      ...StyleSheet.absoluteFill,
+      width: 200,
+    },
+  }), [colors])
 
   useEffect(() => {
     shimmerX.value = withRepeat(
@@ -87,17 +104,4 @@ export function PosterSkeleton({ style }: { style?: object }) {
   )
 }
 
-const styles = StyleSheet.create({
-  container: {
-    overflow: 'hidden',
-    backgroundColor: colors.surfaceContainer,
-  },
-  base: {
-    ...StyleSheet.absoluteFill,
-    backgroundColor: colors.surfaceContainer,
-  },
-  shimmerOverlay: {
-    ...StyleSheet.absoluteFill,
-    width: 200,
-  },
-})
+

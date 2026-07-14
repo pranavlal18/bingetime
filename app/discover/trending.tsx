@@ -22,7 +22,8 @@ import {
   useRemoveFromLibrary,
 } from '@/lib/queries/discover'
 import { getImageUrl } from '@/lib/tmdb'
-import { colors, typography, spacing, borderRadius } from '@/theme'
+import { typography, spacing, borderRadius } from '@/theme'
+import { useTheme } from '@/contexts/ThemeContext'
 import type { DiscoverResult, MediaFilter } from '@/lib/queries/discover'
 
 const SCREEN_WIDTH = Dimensions.get('window').width
@@ -49,8 +50,68 @@ interface GridCardProps {
 }
 
 const GridCard = memo(function GridCard({ item, onAdd, onRemove, isAdding, isRemoving, isInLibrary }: GridCardProps) {
+  const { colors } = useTheme()
   const posterUrl = getImageUrl(item.poster_path, 'w342')
   const isLoading = isAdding || isRemoving
+
+  const cardStyles = useMemo(() => StyleSheet.create({
+    card: {
+      width: CARD_WIDTH,
+      marginBottom: GAP,
+    },
+    posterContainer: {
+      width: CARD_WIDTH,
+      height: CARD_HEIGHT,
+      borderRadius: borderRadius.md,
+      overflow: 'hidden',
+      backgroundColor: colors.surfaceDim,
+      borderWidth: 1,
+      borderColor: colors.outlineVariant,
+    },
+    poster: {
+      width: '100%',
+      height: '100%',
+    },
+    posterPlaceholder: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+      backgroundColor: colors.surfaceDim,
+    },
+    toggleButton: {
+      position: 'absolute',
+      top: 8,
+      right: 8,
+      width: 26,
+      height: 26,
+      borderRadius: 13,
+      backgroundColor: 'rgba(0,0,0,0.55)',
+      justifyContent: 'center',
+      alignItems: 'center',
+      borderWidth: 1.5,
+      borderColor: 'rgba(255,255,255,0.25)',
+    },
+    toggleButtonActive: {
+      backgroundColor: colors.primary,
+      borderColor: colors.primary,
+    },
+    title: {
+      fontFamily: 'Inter',
+      fontSize: 13,
+      fontWeight: '600',
+      color: colors.onSurface,
+      marginTop: 8,
+      lineHeight: 18,
+    },
+    subtitle: {
+      fontFamily: 'Inter',
+      fontSize: 11,
+      fontWeight: '400',
+      color: colors.onSurfaceVariant,
+      marginTop: 2,
+      opacity: 0.7,
+    },
+  }), [colors])
 
   const handlePress = useCallback(() => {
     if (item.mediaType === 'tv') {
@@ -61,25 +122,25 @@ const GridCard = memo(function GridCard({ item, onAdd, onRemove, isAdding, isRem
   }, [item])
 
   return (
-    <Pressable style={styles.card} onPress={handlePress}>
-      <View style={styles.posterContainer}>
+    <Pressable style={cardStyles.card} onPress={handlePress}>
+      <View style={cardStyles.posterContainer}>
         {posterUrl ? (
           <Image
             source={{ uri: posterUrl }}
-            style={styles.poster}
+            style={cardStyles.poster}
             contentFit="cover"
             cachePolicy="memory-disk"
           />
         ) : (
-          <View style={styles.posterPlaceholder}>
+          <View style={cardStyles.posterPlaceholder}>
             <Ionicons name="film-outline" size={28} color={colors.outlineVariant} />
           </View>
         )}
 
         <Pressable
           style={[
-            styles.toggleButton,
-            isInLibrary && styles.toggleButtonActive,
+            cardStyles.toggleButton,
+            isInLibrary && cardStyles.toggleButtonActive,
           ]}
           onPress={() => (isInLibrary ? onRemove(item) : onAdd(item))}
           disabled={isLoading}
@@ -96,10 +157,10 @@ const GridCard = memo(function GridCard({ item, onAdd, onRemove, isAdding, isRem
         </Pressable>
       </View>
 
-      <Text style={styles.title} numberOfLines={1}>
+      <Text style={cardStyles.title} numberOfLines={1}>
         {item.title}
       </Text>
-      <Text style={styles.subtitle} numberOfLines={1}>
+      <Text style={cardStyles.subtitle} numberOfLines={1}>
         {item.mediaType === 'tv' ? 'TV Series' : 'Movie'}
         {item.year ? ` • ${item.year}` : ''}
       </Text>
@@ -110,6 +171,7 @@ const GridCard = memo(function GridCard({ item, onAdd, onRemove, isAdding, isRem
 // ── Screen ──
 
 export default function TrendingScreen() {
+  const { colors } = useTheme()
   const insets = useSafeAreaInsets()
   const [filter, setFilter] = useState<MediaFilter>('all')
 
@@ -191,6 +253,100 @@ export default function TrendingScreen() {
 
   const keyExtractor = useCallback((item: DiscoverResult) => item.tmdbId.toString(), [])
 
+  const styles = useMemo(() => StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: colors.background,
+    },
+    centered: {
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+
+    // ── Header ──
+    header: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: spacing.marginMobile,
+      height: 56,
+    },
+    backButton: {
+      padding: 4,
+    },
+    headerTitle: {
+      fontFamily: 'Inter',
+      fontSize: 20,
+      fontWeight: '700',
+      color: colors.onSurface,
+    },
+    headerRight: {
+      width: 32,
+    },
+
+    // ── Filter chips ──
+    filterRow: {
+      flexDirection: 'row',
+      paddingHorizontal: spacing.marginMobile,
+      gap: 8,
+      marginBottom: 16,
+    },
+    filterChip: {
+      paddingHorizontal: 20,
+      paddingVertical: 8,
+      borderRadius: borderRadius.full,
+      backgroundColor: colors.surfaceContainer,
+      borderWidth: 1,
+      borderColor: colors.outlineVariant,
+    },
+    filterChipActive: {
+      backgroundColor: colors.primary,
+      borderColor: colors.primary,
+    },
+    filterChipText: {
+      fontFamily: 'Inter',
+      fontSize: 14,
+      fontWeight: '600',
+      color: colors.onSurfaceVariant,
+    },
+    filterChipTextActive: {
+      color: colors.onPrimary,
+    },
+
+    // ── Grid ──
+    gridContent: {
+      paddingHorizontal: SIDE_OFFSET,
+      paddingBottom: 24,
+    },
+
+    // ── Loading ──
+    loadingText: {
+      fontFamily: 'Inter',
+      fontSize: 14,
+      color: colors.outline,
+      marginTop: spacing.stackSm,
+    },
+
+    // ── Empty ──
+    emptyState: {
+      paddingTop: 80,
+      alignItems: 'center',
+      gap: 12,
+    },
+    emptyTitle: {
+      fontFamily: 'Inter',
+      fontSize: 18,
+      fontWeight: '700',
+      color: colors.onSurface,
+    },
+    emptySubtitle: {
+      fontFamily: 'Inter',
+      fontSize: 14,
+      color: colors.outline,
+      textAlign: 'center',
+    },
+  }), [colors])
+
   if (isLoading) {
     return (
       <View style={[styles.container, styles.centered, { paddingTop: insets.top }]}>
@@ -260,158 +416,3 @@ export default function TrendingScreen() {
   )
 }
 
-// ── Styles ──
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
-  centered: {
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-
-  // ── Header ──
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: spacing.marginMobile,
-    height: 56,
-  },
-  backButton: {
-    padding: 4,
-  },
-  headerTitle: {
-    fontFamily: 'Inter',
-    fontSize: 20,
-    fontWeight: '700',
-    color: colors.onSurface,
-  },
-  headerRight: {
-    width: 32,
-  },
-
-  // ── Filter chips ──
-  filterRow: {
-    flexDirection: 'row',
-    paddingHorizontal: spacing.marginMobile,
-    gap: 8,
-    marginBottom: 16,
-  },
-  filterChip: {
-    paddingHorizontal: 20,
-    paddingVertical: 8,
-    borderRadius: borderRadius.full,
-    backgroundColor: colors.surfaceContainer,
-    borderWidth: 1,
-    borderColor: colors.outlineVariant,
-  },
-  filterChipActive: {
-    backgroundColor: colors.primary,
-    borderColor: colors.primary,
-  },
-  filterChipText: {
-    fontFamily: 'Inter',
-    fontSize: 14,
-    fontWeight: '600',
-    color: colors.onSurfaceVariant,
-  },
-  filterChipTextActive: {
-    color: colors.onPrimary,
-  },
-
-  // ── Grid ──
-  gridContent: {
-    paddingHorizontal: SIDE_OFFSET,
-    paddingBottom: 24,
-  },
-
-  // ── Card ──
-  card: {
-    width: CARD_WIDTH,
-    marginBottom: GAP,
-  },
-  posterContainer: {
-    width: CARD_WIDTH,
-    height: CARD_HEIGHT,
-    borderRadius: borderRadius.md,
-    overflow: 'hidden',
-    backgroundColor: colors.surfaceDim,
-    borderWidth: 1,
-    borderColor: colors.outlineVariant,
-  },
-  poster: {
-    width: '100%',
-    height: '100%',
-  },
-  posterPlaceholder: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: colors.surfaceDim,
-  },
-  toggleButton: {
-    position: 'absolute',
-    top: 8,
-    right: 8,
-    width: 26,
-    height: 26,
-    borderRadius: 13,
-    backgroundColor: 'rgba(0,0,0,0.55)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1.5,
-    borderColor: 'rgba(255,255,255,0.25)',
-  },
-  toggleButtonActive: {
-    backgroundColor: colors.primary,
-    borderColor: colors.primary,
-  },
-
-  // ── Labels ──
-  title: {
-    fontFamily: 'Inter',
-    fontSize: 13,
-    fontWeight: '600',
-    color: colors.onSurface,
-    marginTop: 8,
-    lineHeight: 18,
-  },
-  subtitle: {
-    fontFamily: 'Inter',
-    fontSize: 11,
-    fontWeight: '400',
-    color: colors.onSurfaceVariant,
-    marginTop: 2,
-    opacity: 0.7,
-  },
-
-  // ── Loading ──
-  loadingText: {
-    fontFamily: 'Inter',
-    fontSize: 14,
-    color: colors.outline,
-    marginTop: spacing.stackSm,
-  },
-
-  // ── Empty ──
-  emptyState: {
-    paddingTop: 80,
-    alignItems: 'center',
-    gap: 12,
-  },
-  emptyTitle: {
-    fontFamily: 'Inter',
-    fontSize: 18,
-    fontWeight: '700',
-    color: colors.onSurface,
-  },
-  emptySubtitle: {
-    fontFamily: 'Inter',
-    fontSize: 14,
-    color: colors.outline,
-    textAlign: 'center',
-  },
-})
