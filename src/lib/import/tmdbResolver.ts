@@ -1,6 +1,6 @@
 // ─── TMDb Resolver — resolves TVDB IDs to TMDb IDs (shows) and searches movies by title ───
 
-import { findByExternalId, searchMovie, getShowDetails, getImageUrl } from '@/lib/tmdb'
+import { findByExternalId, searchMovieAgnostic, getShowDetails, getImageUrl } from '@/lib/tmdb'
 import type { ShowResolution, MovieResolution } from './types'
 
 /**
@@ -33,8 +33,17 @@ export async function resolveShowByTvdbId(tvdbId: number): Promise<ShowResolutio
         status: null,
         total_episodes: null,
         last_air_date: match.first_air_date,
+        average_runtime: null,
         seasons: [],
       }
+    }
+
+    // Calculate average runtime from episode_run_time array (TMDb returns minutes, convert to seconds)
+    let averageRuntime: number | null = null
+    if (details.episode_run_time && details.episode_run_time.length > 0) {
+      const sum = details.episode_run_time.reduce((acc, val) => acc + val, 0)
+      const avgMinutes = sum / details.episode_run_time.length
+      averageRuntime = Math.round(avgMinutes * 60) // convert to seconds
     }
 
     return {
@@ -45,6 +54,7 @@ export async function resolveShowByTvdbId(tvdbId: number): Promise<ShowResolutio
       status: details.status,
       total_episodes: details.number_of_episodes,
       last_air_date: details.last_air_date,
+      average_runtime: averageRuntime,
       seasons: (details.seasons || [])
         .filter((s) => s.season_number > 0) // exclude specials (season 0)
         .map((s) => ({
@@ -61,13 +71,14 @@ export async function resolveShowByTvdbId(tvdbId: number): Promise<ShowResolutio
 /**
    * Search TMDb for a movie by title + optional year.
    * Returns the best match, or null if no good match found.
+   * Uses language-agnostic search to handle non-English titles.
    */
   export async function resolveMovieByTitle(
     title: string,
     year?: string
   ): Promise<MovieResolution | null> {
     try {
-      const searchResult = await searchMovie(title, year)
+      const searchResult = await searchMovieAgnostic(title, year)
 
       if (!searchResult.results || searchResult.results.length === 0) {
         console.warn(`No TMDb match for movie: "${title}" (${year || 'no year'})`)
@@ -170,4 +181,4 @@ export async function resolveMoviesBatch(
   return result
 }
 
-export { getImageUrl }
+export { getImageUrl, searchMovieAgnostic }

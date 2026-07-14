@@ -264,14 +264,28 @@ async function removeMovieFromLibrary(movieId: string, userId: string) {
 }
 
 async function addShowToLibrary(item: DiscoverResult, userId: string): Promise<string> {
-  // 1. Get TVDB ID + show details (number_of_episodes) from TMDb
+  // 1. Get TVDB ID + show details (number_of_episodes, episode_run_time) from TMDb
   const [external, details] = await Promise.all([
     tmdb.getExternalIds(item.tmdbId, 'tv'),
-    tmdb.getShowDetails(item.tmdbId).catch(() => null),
+    tmdb.getShowDetails(item.tmdbId).catch((err) => {
+      console.warn(`[addShowToLibrary] getShowDetails failed for ${item.title}:`, err)
+      return null
+    }),
   ])
 
-  // 2. Upsert show record (tvdb_id is unique NOT NULL)
-  console.log('🔍 [addShowToLibrary] Upserting show:', { tmdbId: item.tmdbId, tvdbId: external.tvdb_id, title: item.title, totalEps: details?.number_of_episodes })
+  // 2. Calculate average runtime from episode_run_time array (TMDb returns minutes, convert to seconds)
+  let averageRuntime: number | null = null
+  if (details?.episode_run_time && details.episode_run_time.length > 0) {
+    const sum = details.episode_run_time.reduce((acc, val) => acc + val, 0)
+    const avgMinutes = sum / details.episode_run_time.length
+    averageRuntime = Math.round(avgMinutes * 60) // convert to seconds
+    console.log(`[addShowToLibrary] ${item.title}: episode_run_time = ${details.episode_run_time}, avgRuntime = ${averageRuntime}s`)
+  } else {
+    console.warn(`[addShowToLibrary] ${item.title}: NO episode_run_time data from TMDb`)
+  }
+
+  // 3. Upsert show record (tvdb_id is unique NOT NULL)
+  console.log('🔍 [addShowToLibrary] Upserting show:', { tmdbId: item.tmdbId, tvdbId: external.tvdb_id, title: item.title, totalEps: details?.number_of_episodes, averageRuntime })
   const { data: show, error: showError } = await supabase
     .from('shows')
     .upsert(
@@ -282,6 +296,7 @@ async function addShowToLibrary(item: DiscoverResult, userId: string): Promise<s
         poster_path: item.poster_path,
         last_air_date: item.year ? `${item.year}-01-01` : null,
         total_episodes: details?.number_of_episodes ?? null,
+        average_runtime: averageRuntime,
       },
       { onConflict: 'tvdb_id' }
     )
@@ -295,7 +310,7 @@ async function addShowToLibrary(item: DiscoverResult, userId: string): Promise<s
   console.log('🔍 [addShowToLibrary] Show upserted:', { showId: show?.id })
   const showId = show?.id
 
-  // 3. Upsert into user_shows (mark as following + watchlist)
+  // 4. Upsert into user_shows (mark as following + watchlist)
   console.log('🔍 [addShowToLibrary] Upserting user_shows:', { showId, is_watchlist: true })
   const { error: usError } = await supabase.from('user_shows').upsert(
     {

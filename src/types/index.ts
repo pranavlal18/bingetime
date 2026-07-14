@@ -10,6 +10,7 @@ export interface Show {
   poster_path: string | null
   total_episodes: number | null
   last_air_date: string | null
+  average_runtime: number | null // in seconds
 }
 
 export interface Season {
@@ -165,6 +166,8 @@ export interface TMDbShowDetails {
   last_air_date: string | null
   number_of_episodes: number
   number_of_seasons: number
+  episode_run_time: number[] | null
+  genres?: Array<{ id: number; name: string }>
   seasons: Array<{
     id: number
     season_number: number

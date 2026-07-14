@@ -855,6 +855,7 @@ async function updateShowsWithTmdbData(
       .map(([tvdbId, resolution]) => {
         const showUuid = showUuidMap.get(tvdbId)
         if (!showUuid) return null
+
         return {
           id: showUuid,
           tvdb_id: tvdbId, // include to avoid NOT NULL violation on insert
@@ -864,6 +865,7 @@ async function updateShowsWithTmdbData(
           status: resolution.status,
           total_episodes: resolution.total_episodes,
           last_air_date: resolution.last_air_date,
+          average_runtime: resolution.average_runtime ?? null,
         }
       })
       .filter(Boolean) as Array<{
@@ -875,6 +877,7 @@ async function updateShowsWithTmdbData(
         status: string | null
         total_episodes: number | null
         last_air_date: string | null
+        average_runtime: number | null
       }>
 
     if (showUpdates.length > 0) {

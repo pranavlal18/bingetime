@@ -21,6 +21,7 @@ const CARD_WIDTH = (SCREEN_WIDTH - 40 - 16) / 2 // 40 outer margins, 16 gap = 2 
 
 interface ShowCardProps {
   show: ShowWithUserData
+  onMarkWatched?: (showId: string) => void
 }
 
 export default function ShowCard({ show }: ShowCardProps) {

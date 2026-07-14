@@ -32,6 +32,7 @@ function mapRow(row: any): ShowWithUserData {
     poster_path: row.poster_path,
     total_episodes: row.total_episodes,
     last_air_date: row.last_air_date,
+    average_runtime: row.average_runtime ?? null,
     // User show data
     user_shows: us,
     episodes_seen: us.episodes_seen ?? 0,
@@ -567,6 +568,29 @@ export function useToggleFavorite() {
       if (user) {
         queryClient.invalidateQueries({ queryKey: profileKeys.favorites(user.id) })
       }
+    },
+  })
+}
+
+// ── Update show average_runtime ──
+
+async function updateShowRuntime(showId: string, averageRuntime: number): Promise<void> {
+  const { error } = await supabase
+    .from('shows')
+    .update({ average_runtime: averageRuntime })
+    .eq('id', showId)
+
+  if (error) throw new Error(`Failed to update show runtime: ${error.message}`)
+}
+
+export function useUpdateShowRuntime() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: ({ showId, averageRuntime }: { showId: string; averageRuntime: number }) =>
+      updateShowRuntime(showId, averageRuntime),
+    onSuccess: (_data, { showId }) => {
+      queryClient.invalidateQueries({ queryKey: showKeys.detail(showId) })
     },
   })
 }

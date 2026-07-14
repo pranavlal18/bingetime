@@ -15,6 +15,18 @@ async function tmdbFetch<T>(path: string, params: Record<string, string> = {}): 
   return res.json()
 }
 
+/** TMDb fetch WITHOUT forced 'en-US' language — for searching non-English titles */
+async function tmdbFetchAgnostic<T>(path: string, params: Record<string, string> = {}): Promise<T> {
+  const url = new URL(`${TMDB_BASE}${path}`)
+  url.searchParams.set('api_key', TMDB_API_KEY)
+  // No language param = API returns results in the title's native language
+  Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v))
+
+  const res = await fetch(url.toString())
+  if (!res.ok) throw new Error(`TMDb error ${res.status}: ${res.statusText}`)
+  return res.json()
+}
+
 /** Resolve a TheTVDB ID → TMDb show/movie result */
 export async function findByExternalId(tvdbId: number) {
   return tmdbFetch<TMDbFindResponse>(`/find/${tvdbId}`, { external_source: 'tvdb_id' })
@@ -27,11 +39,19 @@ export async function searchMulti(query: string, year?: string) {
   return tmdbFetch<TMDbSearchResponse>('/search/multi', params)
 }
 
-/** Search movies by title + year */
+/** Search movies by title + year (with language constraint for standard searches) */
 export async function searchMovie(query: string, year?: string) {
   const params: Record<string, string> = { query }
   if (year) params.year = year
   return tmdbFetch<TMDbSearchResponse>('/search/movie', params)
+}
+
+/** Search movies by title + year WITHOUT language constraint — for non-English titles */
+export async function searchMovieAgnostic(query: string, year?: string) {
+  const params: Record<string, string> = { query }
+  if (year) params.year = year
+  // Use a custom fetch that doesn't force 'en-US' language
+  return tmdbFetchAgnostic<TMDbSearchResponse>('/search/movie', params)
 }
 
 /** Search TV shows by title */

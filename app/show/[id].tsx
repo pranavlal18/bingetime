@@ -1,6 +1,6 @@
 // ─── Show Detail Screen — All-in-one: hero + synopsis + season tabs + episode list ───
 
-import { useCallback, useState, useRef, useMemo } from 'react'
+import { useCallback, useState, useRef, useMemo, useEffect } from 'react'
 import {
   View,
   Text,
@@ -15,7 +15,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Image } from 'expo-image'
 import { Ionicons } from '@expo/vector-icons'
 import { LinearGradient } from 'expo-linear-gradient'
-import { useShow, useMarkWatched, useToggleFavorite } from '@/lib/queries/shows'
+import { useShow, useMarkWatched, useToggleFavorite, useUpdateShowRuntime } from '@/lib/queries/shows'
 import { useSeasonEpisodes, useToggleEpisodeWatched, useBatchMarkWatched } from '@/lib/queries/episodes'
 import { getShowDetails, getImageUrl } from '@/lib/tmdb'
 import { useQuery } from '@tanstack/react-query'
@@ -23,7 +23,7 @@ import LibraryToggle from '@/components/ui/LibraryToggle'
 import FavoriteToggle from '@/components/ui/FavoriteToggle'
 import { colors, typography, spacing, borderRadius } from '@/theme'
 import EpisodeDetailModal from '@/components/episodes/EpisodeDetailModal'
-import { isAired, getDaysUntilAiring, isNew } from '@/utils'
+import { isAired, getDaysUntilAiring, isNew, formatRuntime } from '@/utils'
 import type { EpisodeWithStatus } from '@/lib/queries/episodes'
 import type { TMDbShowDetails } from '@/types'
 
@@ -44,6 +44,7 @@ export default function ShowDetailScreen() {
   const { data: show, isLoading, error } = useShow(id)
   const markWatchedMutation = useMarkWatched()
   const toggleFavoriteMutation = useToggleFavorite()
+  const updateShowRuntimeMutation = useUpdateShowRuntime()
 
   // Resolve TMDb ID — either from the DB record or directly from the param
   const resolvedTmdbId = show?.tmdb_id ?? (isTmdbIdParam ? parseInt(id, 10) : null)
@@ -54,6 +55,30 @@ export default function ShowDetailScreen() {
     enabled: !!resolvedTmdbId,
     staleTime: 1000 * 60 * 60,
   })
+
+  // Calculate average runtime from TMDb episode_run_time (minutes) -> convert to seconds
+  const tmdbAverageRuntime = tmdbDetails?.episode_run_time && tmdbDetails.episode_run_time.length > 0
+    ? Math.round((tmdbDetails.episode_run_time.reduce((a, b) => a + b, 0) / tmdbDetails.episode_run_time.length) * 60)
+    : null
+
+  // ── Auto-fetch & save average_runtime if missing from DB but available from TMDb ──
+  useEffect(() => {
+    if (!show || !tmdbDetails) return
+    // If DB has no runtime but TMDb does, save it
+    if (!show.average_runtime && tmdbAverageRuntime) {
+      updateShowRuntimeMutation.mutate(
+        { showId: show.id, averageRuntime: tmdbAverageRuntime },
+        {
+          onSuccess: () => {
+            console.log('✅ [ShowDetail] Saved average_runtime to DB:', tmdbAverageRuntime)
+          },
+          onError: (err) => {
+            console.error('❌ [ShowDetail] Failed to save average_runtime:', err)
+          },
+        }
+      )
+    }
+  }, [show, tmdbDetails, tmdbAverageRuntime, updateShowRuntimeMutation])
 
   // ── Derived ──
   const posterUrl = getImageUrl(show?.poster_path ?? null, 'w342')
@@ -81,6 +106,9 @@ export default function ShowDetailScreen() {
 
   const overview = tmdbDetails?.overview || 'No overview available.'
   const seasons = tmdbDetails?.seasons?.filter((s) => s.season_number > 0) || []
+
+  // Use database average_runtime if available, otherwise fall back to TMDb
+  const averageRuntime = show?.average_runtime ?? tmdbAverageRuntime
 
   const statusLabel = isFinished
     ? 'Finished'
@@ -355,6 +383,41 @@ export default function ShowDetailScreen() {
             <Text style={styles.sectionLabel}>Synopsis</Text>
             <Text style={styles.synopsisText}>{overview}</Text>
           </View>
+
+          {/* Details */}
+          {((tmdbDetails?.networks && tmdbDetails.networks.length > 0) ||
+            (tmdbDetails?.genres && tmdbDetails.genres.length > 0) ||
+            averageRuntime) && (
+            <View style={styles.detailsSection}>
+              <Text style={styles.sectionLabel}>Details</Text>
+              <View style={styles.detailsGrid}>
+                {tmdbDetails?.networks && tmdbDetails.networks.length > 0 && (
+                  <View style={styles.detailItem}>
+                    <Text style={styles.detailLabel}>Network</Text>
+                    <Text style={styles.detailValue}>
+                      {tmdbDetails.networks.map((n) => n.name).join(', ')}
+                    </Text>
+                  </View>
+                )}
+                {tmdbDetails?.genres && tmdbDetails.genres.length > 0 && (
+                  <View style={styles.detailItem}>
+                    <Text style={styles.detailLabel}>Genres</Text>
+                    <Text style={styles.detailValue}>
+                      {tmdbDetails.genres.map((g) => g.name).join(', ')}
+                    </Text>
+                  </View>
+                )}
+                {averageRuntime && (
+                  <View style={styles.detailItem}>
+                    <Text style={styles.detailLabel}>Avg. Runtime</Text>
+                    <Text style={styles.detailValue}>
+                      {formatRuntime(averageRuntime)}
+                    </Text>
+                  </View>
+                )}
+              </View>
+            </View>
+          )}
 
           {/* Season Tabs */}
           {seasons.length > 0 && (
@@ -788,6 +851,36 @@ const styles = StyleSheet.create({
     opacity: 0.85,
   },
 
+  // Details section
+  detailsSection: {
+    paddingVertical: spacing.stackMd,
+  },
+  detailsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.stackMd,
+  },
+  detailItem: {
+    flex: 1,
+    minWidth: 120,
+    gap: 4,
+  },
+  detailLabel: {
+    fontFamily: 'Inter',
+    fontSize: typography.bodyXs.fontSize,
+    fontWeight: '600',
+    lineHeight: typography.bodyXs.lineHeight,
+    color: colors.outline,
+    textTransform: 'uppercase',
+  },
+  detailValue: {
+    fontFamily: 'Inter',
+    fontSize: typography.bodyMd.fontSize,
+    fontWeight: '500',
+    lineHeight: typography.bodyMd.lineHeight,
+    color: colors.onSurface,
+  },
+
   // Season selector
   seasonSelector: {
     flexDirection: 'row',
@@ -899,30 +992,6 @@ const styles = StyleSheet.create({
     lineHeight: typography.labelSm.lineHeight,
     letterSpacing: typography.labelSm.letterSpacing,
     color: colors.primary,
-  },
-
-  episodeTitleContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  newBadge: {
-    backgroundColor: colors.primary,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
-  },
-  newBadgeText: {
-    fontFamily: 'Inter',
-    fontSize: 10,
-    fontWeight: '800',
-    color: colors.onPrimary,
-  },
-  daysUntilText: {
-    fontFamily: 'Inter',
-    fontSize: typography.bodySm.fontSize,
-    fontWeight: '600',
-    color: colors.onSurfaceVariant,
   },
 
   // Episode list

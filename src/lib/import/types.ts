@@ -52,6 +52,7 @@ export interface ShowResolution {
   status: string | null
   total_episodes: number | null
   last_air_date: string | null
+  average_runtime: number | null // in seconds
   seasons: Array<{
     season_number: number
     episode_count: number

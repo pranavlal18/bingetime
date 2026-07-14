@@ -22,10 +22,12 @@ export interface ProfileStats {
 export interface FavoriteShow extends Show {
   episodes_seen: number
   favorited_at: string | null
+  average_runtime: number | null
 }
 
 export interface WatchlistShow extends Show {
   episodes_seen: number
+  average_runtime: number | null
 }
 
 export interface WatchlistMovie extends Movie {
@@ -44,26 +46,62 @@ export const profileKeys = {
 // ── Fetch stats ──
 
 async function fetchStats(userId: string): Promise<ProfileStats> {
-  const [showsResult, moviesResult, listsResult] = await Promise.all([
-    supabase.from('user_shows').select('episodes_seen, is_favorited, is_watchlist').eq('user_id', userId),
-    supabase.from('user_movies').select('watched, is_watchlist').eq('user_id', userId),
-    supabase.from('lists').select('id', { count: 'exact', head: true }),
-  ])
+  // Fetch user_shows with show details including average_runtime
+  const { data: userShows, error: showsError } = await supabase
+    .from('user_shows')
+    .select(`
+      episodes_seen,
+      is_favorited,
+      is_watchlist,
+      shows!inner(average_runtime)
+    `)
+    .eq('user_id', userId)
 
-  if (showsResult.error) throw new Error(showsResult.error.message)
-  if (moviesResult.error) throw new Error(moviesResult.error.message)
+  const { data: userMovies, error: moviesError } = await supabase
+    .from('user_movies')
+    .select('watched, is_watchlist')
+    .eq('user_id', userId)
 
-  const totalShows = showsResult.data.length
-  const totalEpisodes = showsResult.data.reduce((sum, s) => sum + (s.episodes_seen ?? 0), 0)
-  const favoritedShows = showsResult.data.filter((s) => s.is_favorited).length
-  const watchlistShows = showsResult.data.filter((s) => s.is_watchlist).length
-  const totalMovies = moviesResult.data.length
-  const watchedMovies = moviesResult.data.filter((m) => m.watched).length
-  const watchlistMovies = moviesResult.data.filter((m) => m.is_watchlist).length
-  const customLists = listsResult.count ?? 0
+  const { count: listsCount, error: listsError } = await supabase
+    .from('lists')
+    .select('id', { count: 'exact', head: true })
 
-  // Estimate watched hours: episodes avg 25min (0.42h) + movies avg 2h
-  const totalHours = Math.round(totalEpisodes * 0.42 + watchedMovies * 2)
+  if (showsError) throw new Error(showsError.message)
+  if (moviesError) throw new Error(moviesError.message)
+  if (listsError) throw new Error(listsError.message)
+
+  const totalShows = userShows?.length ?? 0
+  const favoritedShows = userShows?.filter((s) => s.is_favorited).length ?? 0
+  const watchlistShows = userShows?.filter((s) => s.is_watchlist).length ?? 0
+
+  // Calculate total episodes and total watch time using actual average_runtime per show
+  let totalEpisodes = 0
+  let totalShowSeconds = 0
+
+  if (userShows) {
+    for (const us of userShows) {
+      const episodesSeen = us.episodes_seen ?? 0
+      totalEpisodes += episodesSeen
+
+      // PostgREST returns to-many relationships as arrays, even with !inner
+      const show = Array.isArray(us.shows) ? us.shows[0] : us.shows
+      const showRuntime = show?.average_runtime ?? null
+      if (showRuntime && episodesSeen > 0) {
+        totalShowSeconds += showRuntime * episodesSeen
+      }
+    }
+  }
+
+  const totalMovies = userMovies?.length ?? 0
+  const watchedMovies = userMovies?.filter((m) => m.watched).length ?? 0
+  const watchlistMovies = userMovies?.filter((m) => m.is_watchlist).length ?? 0
+  const customLists = listsCount ?? 0
+
+  // Movies: use runtime from movies table (need to fetch separately or estimate)
+  // For now, estimate movies at 2 hours each since we don't join movies table here
+  const movieSeconds = watchedMovies * 2 * 3600 // 2 hours in seconds
+
+  const totalHours = Math.round((totalShowSeconds + movieSeconds) / 3600)
 
   return {
     totalShows,
@@ -112,6 +150,7 @@ async function fetchFavorites(userId: string): Promise<FavoriteShow[]> {
       poster_path: show.poster_path,
       total_episodes: show.total_episodes,
       last_air_date: show.last_air_date,
+      average_runtime: show.average_runtime ?? null,
       episodes_seen: row.episodes_seen ?? 0,
       favorited_at: row.favorited_at ?? null,
     }
@@ -152,6 +191,7 @@ async function fetchWatchlistShows(userId: string): Promise<WatchlistShow[]> {
       poster_path: show.poster_path,
       total_episodes: show.total_episodes,
       last_air_date: show.last_air_date,
+      average_runtime: show.average_runtime ?? null,
       episodes_seen: row.episodes_seen ?? 0,
     }
   })
