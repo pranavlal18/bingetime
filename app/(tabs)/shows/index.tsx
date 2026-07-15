@@ -11,7 +11,7 @@ import {
 } from 'react-native'
 import { FlashList } from '@shopify/flash-list'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import { usePathname } from 'expo-router'
+import { useFocusEffect } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
 import { useQueries } from '@tanstack/react-query'
 import { useShows, useMarkWatched, deriveWatchNextEpisodes, deriveHaventWatchedEpisodes } from '@/lib/queries/shows'
@@ -52,20 +52,15 @@ export default function ShowsScreen() {
 
   const isGrid = viewMode === 'poster-grid'
 
-  // Refetch when navigating back
-  const pathname = usePathname()
-  const prevPathname = useRef(pathname)
+  // Refetch when screen comes into focus
   const watchListRef = useRef<any>(null)
-  useEffect(() => {
-    if (prevPathname.current !== pathname) {
-      prevPathname.current = pathname
-      if (pathname === '/(tabs)/shows') {
-        refetch()
-        refetchHistory()
-        refetchUpcoming()
-      }
-    }
-  }, [pathname, refetch, refetchHistory, refetchUpcoming])
+  useFocusEffect(
+    useCallback(() => {
+      refetch()
+      refetchHistory()
+      refetchUpcoming()
+    }, [refetch, refetchHistory, refetchUpcoming])
+  )
 
   // ── Watch List sections (list mode) ──
 

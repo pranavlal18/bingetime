@@ -27,7 +27,7 @@ import {
   useProfileStats,
   useFavorites,
 } from '@/lib/queries/profile'
-import { useRepairRuntime, useRepairUserIds, useWatchTimeBreakdown } from '@/lib/queries/stats'
+import { useWatchTimeBreakdown } from '@/lib/queries/stats'
 import { useTheme } from '@/contexts/ThemeContext'
 
 import type { ShowWithUserData } from '@/lib/queries/shows'
@@ -218,6 +218,7 @@ const PosterItem = memo(function PosterItem({
 // ── Stats Preview Cards (horizontal carousel on Profile tab) ──
 
 const STATS_CARD_GAP = 12
+const STATS_CARD_W = (SCREEN_WIDTH - SIDE_OFFSET * 2 - STATS_CARD_GAP) / 2
 
 interface TimeBreakdown {
   months: number
@@ -440,52 +441,59 @@ const StatsPreviewCards = memo(function StatsPreviewCards({
         showsHorizontalScrollIndicator={false}
         onScroll={handleScroll}
         scrollEventThrottle={16}
-        contentContainerStyle={{
-          paddingHorizontal: SIDE_OFFSET,
-        }}
       >
         {/* Page 1: Shows stats */}
-        <View
-          style={{
-            width: pageWidth - SIDE_OFFSET * 2,
-            flexDirection: 'row',
-            gap: STATS_CARD_GAP,
-          }}
-        >
-          <StatMiniCard
-            icon="tv-outline"
-            title="TV time"
-            breakdown={showBreakdown}
-            breakdownLabels={{ months: 'months', days: 'days', hours: 'hours' }}
-          />
-          <StatMiniCard
-            icon="play-circle-outline"
-            title="Episodes watched"
-            primary={showEpisodes}
-            primaryLabel="episodes"
-          />
+        <View style={{ width: pageWidth }}>
+          <View
+            style={{
+              paddingHorizontal: SIDE_OFFSET,
+              flexDirection: 'row',
+            }}
+          >
+            <View style={{ width: STATS_CARD_W }}>
+              <StatMiniCard
+                icon="tv-outline"
+                title="TV time"
+                breakdown={showBreakdown}
+                breakdownLabels={{ months: 'months', days: 'days', hours: 'hours' }}
+              />
+            </View>
+            <View style={{ width: STATS_CARD_W, marginLeft: STATS_CARD_GAP }}>
+              <StatMiniCard
+                icon="play-circle-outline"
+                title="Episodes watched"
+                primary={showEpisodes}
+                primaryLabel="episodes"
+              />
+            </View>
+          </View>
         </View>
 
         {/* Page 2: Movies stats */}
-        <View
-          style={{
-            width: pageWidth - SIDE_OFFSET * 2,
-            flexDirection: 'row',
-            gap: STATS_CARD_GAP,
-          }}
-        >
-          <StatMiniCard
-            icon="film-outline"
-            title="Movie time"
-            breakdown={movieBreakdown}
-            breakdownLabels={{ months: 'months', days: 'days', hours: 'hours' }}
-          />
-          <StatMiniCard
-            icon="checkmark-circle-outline"
-            title="Movies watched"
-            primary={movieCount}
-            primaryLabel="movies"
-          />
+        <View style={{ width: pageWidth }}>
+          <View
+            style={{
+              paddingHorizontal: SIDE_OFFSET,
+              flexDirection: 'row',
+            }}
+          >
+            <View style={{ width: STATS_CARD_W }}>
+              <StatMiniCard
+                icon="film-outline"
+                title="Movie time"
+                breakdown={movieBreakdown}
+                breakdownLabels={{ months: 'months', days: 'days', hours: 'hours' }}
+              />
+            </View>
+            <View style={{ width: STATS_CARD_W, marginLeft: STATS_CARD_GAP }}>
+              <StatMiniCard
+                icon="checkmark-circle-outline"
+                title="Movies watched"
+                primary={movieCount}
+                primaryLabel="movies"
+              />
+            </View>
+          </View>
         </View>
       </ScrollView>
 
@@ -714,20 +722,6 @@ export default function ProfileScreen() {
     setImportComplete(false)
     router.push('/import')
   }, [setImportComplete])
-
-  const [repairProgress, setRepairProgress] = useState<{ fixed: number; total: number } | null>(null)
-  const repairMutation = useRepairRuntime((fixed, total) => setRepairProgress({ fixed, total }))
-  const handleRepair = useCallback(() => {
-    setRepairProgress({ fixed: 0, total: 0 })
-    repairMutation.mutate(undefined, {
-      onSettled: () => setRepairProgress(null),
-    })
-  }, [repairMutation])
-
-  const repairIdsMutation = useRepairUserIds()
-  const handleRepairIds = useCallback(() => {
-    repairIdsMutation.mutate(undefined)
-  }, [repairIdsMutation])
 
   // Dynamic styles that depend on theme
   const styles = useMemo(
@@ -1166,31 +1160,6 @@ export default function ProfileScreen() {
             icon="sync-outline"
             label="Import TV Time Data"
             onPress={handleImport}
-          />
-          <SettingsRow
-            icon="hammer-outline"
-            label={repairMutation.isPending
-              ? `Repairing... ${repairProgress ? `${repairProgress.fixed}/${repairProgress.total}` : ''}`
-              : 'Repair Runtime Data'
-            }
-            showChevron={false}
-            rightLabel={repairMutation.isSuccess ? 'Fixed!' : ''}
-            onPress={handleRepair}
-          />
-          <SettingsRow
-            icon="person-outline"
-            label={
-              repairIdsMutation.isPending ? 'Repairing...' :
-              repairIdsMutation.isSuccess
-                ? `Fixed ${repairIdsMutation.data?.shows_fixed ?? 0} shows`
-                : 'Repair User IDs'
-            }
-            showChevron={false}
-            rightLabel={
-              repairIdsMutation.isError ? 'Error' :
-              repairIdsMutation.isSuccess ? 'Done!' : ''
-            }
-            onPress={handleRepairIds}
           />
           <SettingsRow
             icon="log-out-outline"

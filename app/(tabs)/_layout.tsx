@@ -8,6 +8,7 @@ export default function TabLayout() {
 
   const screenOptions = useMemo(() => ({
     headerShown: false,
+    animation: 'none' as const,
     tabBarActiveTintColor: colors.primary,
     tabBarInactiveTintColor: colors.outlineVariant,
     tabBarStyle: {

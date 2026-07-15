@@ -17,7 +17,8 @@ import { FlashList } from '@shopify/flash-list'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Image } from 'expo-image'
 import { Ionicons } from '@expo/vector-icons'
-import { router, usePathname } from 'expo-router'
+import { router } from 'expo-router'
+import { useFocusEffect } from 'expo-router'
 import {
   useTrending,
   useSearch,
@@ -63,17 +64,12 @@ export default function DiscoverScreen() {
 
   // Refetch trending when navigating back to this tab
   // Clear local library tracking so previously-added items disappear
-  const pathname = usePathname()
-  const prevPathname = useRef(pathname)
-  useEffect(() => {
-    if (prevPathname.current !== pathname) {
-      prevPathname.current = pathname
-      if (pathname === '/(tabs)/discover') {
-        localLibraryRef.current = new Map()
-        refetch()
-      }
-    }
-  }, [pathname, refetch])
+  useFocusEffect(
+    useCallback(() => {
+      localLibraryRef.current = new Map()
+      refetch()
+    }, [refetch])
+  )
 
   const { data: searchResults, isLoading: searchLoading } = useSearch(
     isSearching ? debouncedQuery : '',

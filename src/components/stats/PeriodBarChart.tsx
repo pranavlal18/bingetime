@@ -1,7 +1,7 @@
 // ─── PeriodBarChart — vertical bar chart for weekly/monthly buckets ───
 
-import { memo, useMemo } from 'react'
-import { View, Text, Dimensions } from 'react-native'
+import { memo, useMemo, useState } from 'react'
+import { View, Text, Dimensions, Pressable } from 'react-native'
 import { useTheme } from '@/contexts/ThemeContext'
 
 const SCREEN_WIDTH = Dimensions.get('window').width
@@ -29,6 +29,7 @@ const PeriodBarChart = memo(function PeriodBarChart({
   const barColor = color ?? colors.tertiary
   const bgColor = trackColor ?? colors.surfaceContainerHighest
   const contentW = SCREEN_WIDTH - 40 - 32 // screen minus margins minus card padding
+  const [selectedBar, setSelectedBar] = useState<number | null>(null)
 
   const maxValue = useMemo(() => Math.max(...data.map((d) => d.value), 1), [data])
 
@@ -37,6 +38,15 @@ const PeriodBarChart = memo(function PeriodBarChart({
   const totalGap = barCount > 1 ? (barCount - 1) * barGap : 0
   const barW = Math.max(3, (contentW - totalGap) / barCount)
 
+  // Responsive label font size — shrink when many bars to fit all labels
+  const labelFontSize = barCount > 20 ? 7 : barCount > 12 ? 8 : barCount > 6 ? 9 : 10
+
+  const formatValue = useMemo(() => {
+    // Detect if values are hours (decimal) or counts (integer)
+    const hasDecimals = data.some((d) => d.value !== Math.floor(d.value))
+    return (v: number) => (hasDecimals ? v.toFixed(1) : Math.round(v).toLocaleString('en-US'))
+  }, [data])
+
   return (
     <View>
       {/* Bars */}
@@ -44,11 +54,38 @@ const PeriodBarChart = memo(function PeriodBarChart({
         {data.map((d, i) => {
           const barH = maxValue > 0 ? Math.max(2, (d.value / maxValue) * (height - 10)) : 0
           const isZero = d.value === 0
+          const isSelected = selectedBar === i
           return (
-            <View
+            <Pressable
               key={`${d.label}-${i}`}
               style={{ flex: 1, alignItems: 'center', height, justifyContent: 'flex-end' }}
+              onPress={() => setSelectedBar(isSelected ? null : i)}
             >
+              {/* Tooltip */}
+              {isSelected && (
+                <View
+                  style={{
+                    position: 'absolute',
+                    top: -4,
+                    backgroundColor: colors.onSurface,
+                    paddingHorizontal: 6,
+                    paddingVertical: 2,
+                    borderRadius: 4,
+                    zIndex: 10,
+                  }}
+                >
+                  <Text
+                    style={{
+                      fontFamily: 'Inter',
+                      fontSize: 10,
+                      fontWeight: '700',
+                      color: colors.background,
+                    }}
+                  >
+                    {formatValue(d.value)}
+                  </Text>
+                </View>
+              )}
               <View
                 style={{
                   width: barW,
@@ -58,7 +95,7 @@ const PeriodBarChart = memo(function PeriodBarChart({
                   opacity: isZero ? 0.4 : 1,
                 }}
               />
-            </View>
+            </Pressable>
           )
         })}
       </View>
@@ -71,11 +108,12 @@ const PeriodBarChart = memo(function PeriodBarChart({
               <Text
                 style={{
                   fontFamily: 'Inter',
-                  fontSize: 9,
+                  fontSize: labelFontSize,
                   fontWeight: '600',
                   color: colors.secondary,
                 }}
                 numberOfLines={1}
+                adjustsFontSizeToFit
               >
                 {d.label}
               </Text>

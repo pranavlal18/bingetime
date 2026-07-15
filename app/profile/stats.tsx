@@ -1,7 +1,6 @@
 // ─── Statistics — TV Time-style redesign ───
 
-import { useState, useMemo, useCallback } from 'react'
-import { useQueryClient } from '@tanstack/react-query'
+import { useState, useMemo } from 'react'
 import {
   View,
   Text,
@@ -24,19 +23,14 @@ import {
   useFutureWatchTimeBars,
   useProjectedFinishDate,
   useWatchTimeBreakdown,
-  useShowGenreStats,
-  useMovieGenreStats,
   useRemainingCounts,
-  useRepairShowGenres,
 } from '@/lib/queries/stats'
-import { useRefreshMovieGenres } from '@/lib/queries/movies'
 import {
   StatBlock,
   SegmentedToggle,
   PeriodTabs,
   PeriodBarChart,
   BigValue,
-  RankedListItem,
   MarathonRow,
   UpcomingList,
   StatsPageSkeleton,
@@ -57,7 +51,6 @@ function formatNumber(n: number): string {
 export default function StatsScreen() {
   const insets = useSafeAreaInsets()
   const { colors } = useTheme()
-  const queryClient = useQueryClient()
   const [tab, setTab] = useState<TabKind>('shows')
 
   // ── All data queries ──
@@ -78,60 +71,7 @@ export default function StatsScreen() {
   const { data: finishDate } = useProjectedFinishDate(tab)
   const { data: remaining } = useRemainingCounts(tab)
 
-  // Genre data
-  const { data: showGenres } = useShowGenreStats()
-  const { data: movieGenres } = useMovieGenreStats()
 
-  // Show genre repair state
-  const [showRepairStatus, setShowRepairStatus] = useState<'idle' | 'repairing' | 'success' | 'error'>('idle')
-  const [showRepairMsg, setShowRepairMsg] = useState('')
-  const showRepairMutation = useRepairShowGenres()
-
-  // Movie genre repair state
-  const [movieRepairStatus, setMovieRepairStatus] = useState<'idle' | 'repairing' | 'success' | 'error'>('idle')
-  const [movieRepairMsg, setMovieRepairMsg] = useState('')
-  const movieRepairMutation = useRefreshMovieGenres()
-
-  const handleRepairShows = useCallback(() => {
-    setShowRepairStatus('repairing')
-    setShowRepairMsg('')
-    showRepairMutation.mutate(undefined, {
-      onSuccess: (data) => {
-        if (data.fixed > 0) {
-          setShowRepairStatus('success')
-          setShowRepairMsg(`Fixed ${data.fixed} show genre${data.fixed > 1 ? 's' : ''}`)
-        } else if (data.total > 0) {
-          setShowRepairStatus('error')
-          setShowRepairMsg(`Could not update any genres (${data.skipped} skipped). Check console for details.`)
-        } else {
-          setShowRepairStatus('success')
-          setShowRepairMsg('All shows already have genres')
-        }
-      },
-      onError: (err) => {
-        const message = (err as Error)?.message || 'Unknown error'
-        setShowRepairStatus('error')
-        setShowRepairMsg(message)
-      },
-    })
-  }, [showRepairMutation])
-
-  const handleRepairMovies = useCallback(() => {
-    setMovieRepairStatus('repairing')
-    setMovieRepairMsg('')
-    movieRepairMutation.mutate(undefined, {
-      onSuccess: (data) => {
-        queryClient.invalidateQueries({ queryKey: ['stats'] })
-        setMovieRepairStatus('success')
-        setMovieRepairMsg(`Updated ${data.updated} movie genre${data.updated > 1 ? 's' : ''}`)
-      },
-      onError: (err) => {
-        const message = (err as Error)?.message || 'Unknown error'
-        setMovieRepairStatus('error')
-        setMovieRepairMsg(message)
-      },
-    })
-  }, [movieRepairMutation, queryClient])
 
   // Upcoming chart data (bucketed by week)
   const upcomingChartData = useMemo(() => {
@@ -205,21 +145,6 @@ export default function StatsScreen() {
     if (!weeklyCounts || weeklyCounts.length === 0) return 0
     return weeklyCounts[0].value
   }, [weeklyCounts])
-
-  // Genres for current tab
-  const genres = tab === 'shows' ? showGenres : movieGenres
-  const maxGenreValue = useMemo(() => {
-    if (!genres || genres.length === 0) return 1
-    return Math.max(...genres.map((g) => g.hours))
-  }, [genres])
-
-  // If every watched item has NULL/empty genres, we get a single "Other" entry.
-  // That means genres need repair, not that "Other" is a real genre.
-  const hasOnlyOtherGenre = useMemo(
-    () => genres && genres.length === 1 && genres[0].genre === 'Other',
-    [genres]
-  )
-  const needsGenreRepair = !genres || genres.length === 0 || hasOnlyOtherGenre
 
   const isRemainingEmpty = remaining?.count === 0 || remaining === undefined
   const isCatchUpEmpty = catchUp?.ratePerWeek === undefined || catchUp.ratePerWeek <= 0
@@ -302,7 +227,7 @@ export default function StatsScreen() {
             <PeriodBarChart
               data={weeklyHours ?? []}
               height={100}
-              maxLabelInterval={period === 'week' ? 1 : 3}
+              maxLabelInterval={1}
             />
           )}
         </StatBlock>
@@ -346,7 +271,7 @@ export default function StatsScreen() {
             <PeriodBarChart
               data={weeklyCounts ?? []}
               height={80}
-              maxLabelInterval={period === 'week' ? 1 : 3}
+              maxLabelInterval={1}
             />
           )}
         </StatBlock>
@@ -383,89 +308,7 @@ export default function StatsScreen() {
           </Text>
         </StatBlock>
 
-        {/* ══════════════════════════════════════════
-            4. Top genres
-            ══════════════════════════════════════════ */}
-        <StatBlock
-          title={`Top ${tab === 'movies' ? 'movie' : 'show'} genres`}
-          empty={false}
-        >
-          {!needsGenreRepair ? (
-            <View style={{ marginTop: 4 }}>
-              {genres!.slice(0, 10).map((g, i) => (
-                <RankedListItem
-                  key={g.genre}
-                  label={g.genre}
-                  value={g.hours}
-                  maxValue={maxGenreValue}
-                  suffix="h"
-                  rank={i + 1}
-                  barColor={tab === 'shows' ? colors.tertiary : colors.primary}
-                />
-              ))}
-            </View>
-          ) : tab === 'shows' ? (
-            showRepairStatus === 'repairing' ? (
-              <Text style={{ fontFamily: 'Inter', fontSize: 13, color: colors.secondary, textAlign: 'center', paddingVertical: 16 }}>
-                Repairing show genres…
-              </Text>
-            ) : showRepairStatus === 'success' ? (
-              <Text style={{ fontFamily: 'Inter', fontSize: 13, color: colors.tertiary, textAlign: 'center', paddingVertical: 16 }}>
-                {showRepairMsg}
-              </Text>
-            ) : showRepairStatus === 'error' ? (
-              <View style={{ alignItems: 'center', paddingVertical: 8 }}>
-                <Text style={{ fontFamily: 'Inter', fontSize: 12, color: '#f87171', textAlign: 'center', marginBottom: 10, paddingHorizontal: 8 }}>
-                  {showRepairMsg}
-                </Text>
-                <Pressable
-                  onPress={handleRepairShows}
-                  style={{ backgroundColor: colors.primaryContainer, borderRadius: 8, paddingVertical: 10, paddingHorizontal: 16, alignItems: 'center' }}
-                >
-                  <Text style={{ fontFamily: 'Inter', fontSize: 13, fontWeight: '600', color: colors.onPrimaryContainer }}>Retry</Text>
-                </Pressable>
-              </View>
-            ) : (
-              <Pressable
-                onPress={handleRepairShows}
-                style={{ backgroundColor: colors.primaryContainer, borderRadius: 8, paddingVertical: 10, paddingHorizontal: 16, alignItems: 'center', marginTop: 4 }}
-              >
-                <Text style={{ fontFamily: 'Inter', fontSize: 13, fontWeight: '600', color: colors.onPrimaryContainer }}>
-                  Repair show genres
-                </Text>
-              </Pressable>
-            )
-          ) : movieRepairStatus === 'repairing' ? (
-            <Text style={{ fontFamily: 'Inter', fontSize: 13, color: colors.secondary, textAlign: 'center', paddingVertical: 16 }}>
-              Repairing movie genres…
-            </Text>
-          ) : movieRepairStatus === 'success' ? (
-            <Text style={{ fontFamily: 'Inter', fontSize: 13, color: colors.tertiary, textAlign: 'center', paddingVertical: 16 }}>
-              {movieRepairMsg}
-            </Text>
-          ) : movieRepairStatus === 'error' ? (
-            <View style={{ alignItems: 'center', paddingVertical: 8 }}>
-              <Text style={{ fontFamily: 'Inter', fontSize: 12, color: '#f87171', textAlign: 'center', marginBottom: 10, paddingHorizontal: 8 }}>
-                {movieRepairMsg}
-              </Text>
-              <Pressable
-                onPress={handleRepairMovies}
-                style={{ backgroundColor: colors.primaryContainer, borderRadius: 8, paddingVertical: 10, paddingHorizontal: 16, alignItems: 'center' }}
-              >
-                <Text style={{ fontFamily: 'Inter', fontSize: 13, fontWeight: '600', color: colors.onPrimaryContainer }}>Retry</Text>
-              </Pressable>
-            </View>
-          ) : (
-            <Pressable
-              onPress={handleRepairMovies}
-              style={{ backgroundColor: colors.primaryContainer, borderRadius: 8, paddingVertical: 10, paddingHorizontal: 16, alignItems: 'center', marginTop: 4 }}
-            >
-              <Text style={{ fontFamily: 'Inter', fontSize: 13, fontWeight: '600', color: colors.onPrimaryContainer }}>
-                Repair movie genres
-              </Text>
-            </Pressable>
-          )}
-        </StatBlock>
+
 
         {/* ══════════════════════════════════════════
              5. Biggest marathons — Shows only

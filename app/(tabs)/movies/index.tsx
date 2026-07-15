@@ -235,19 +235,6 @@ function MoviesScreenContent() {
 
       const today = new Date().toISOString().slice(0, 10) // "2026-07-13"
 
-      console.log('🎬 [MoviesTab] filtering:', {
-        totalMovies: movies.length,
-        unwatched: unwatched.length,
-        activeSegment,
-        today,
-        sampleDates: unwatched.slice(0, 3).map((m) => ({
-          title: m.title,
-          release_date: m.release_date,
-          type: typeof m.release_date,
-          watched: m.watched,
-        })),
-      })
-
       const segmentFiltered = activeSegment === 'watchlist'
         ? unwatched.filter((m) => !m.release_date || String(m.release_date).slice(0, 10) <= today)
         : unwatched.filter((m) => m.release_date && String(m.release_date).slice(0, 10) > today)
@@ -404,13 +391,6 @@ function MoviesScreenContent() {
       </View>
     )
   }
-
-  console.log('🎬 [MoviesTab] rendering with:', {
-    activeSegment,
-    isGrid,
-    filteredCount: filteredMovies.length,
-    isSearchVisible,
-  })
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
