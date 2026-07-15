@@ -483,7 +483,9 @@ function MoviesScreenContent() {
         renderItem={renderItem}
         numColumns={isGrid ? 2 : 1}
         key={isGrid ? 'grid' : 'list'}
-        contentContainerStyle={styles.listContent}
+        contentContainerStyle={[
+          styles.listContent,
+        ]}
         ListHeaderComponent={
           <View style={styles.listHeader}>
             <SegmentedControl

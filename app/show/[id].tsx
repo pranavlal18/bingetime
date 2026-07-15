@@ -24,6 +24,7 @@ import FavoriteToggle from '@/components/ui/FavoriteToggle'
 import { typography, spacing, borderRadius } from '@/theme'
 import { useTheme } from '@/contexts/ThemeContext'
 import EpisodeDetailModal from '@/components/episodes/EpisodeDetailModal'
+
 import { isAired, getDaysUntilAiring, isNew, formatRuntime } from '@/utils'
 import type { EpisodeWithStatus } from '@/lib/queries/episodes'
 import type { TMDbShowDetails } from '@/types'
@@ -128,6 +129,11 @@ export default function ShowDetailScreen() {
           paddingBottom: 24,
           gap: spacing.stackSm,
           maxWidth: SCREEN_WIDTH - POSTER_W - spacing.marginMobile * 2 - 16,
+        },
+        heroInfoContent: {
+          flex: 1,
+          justifyContent: 'flex-end',
+          gap: spacing.stackSm,
         },
         statusBadge: {
           alignSelf: 'flex-start',
@@ -794,8 +800,6 @@ export default function ShowDetailScreen() {
             )}
             <Text style={styles.heroTitle}>{displayName}</Text>
             {year && <Text style={styles.heroYear}>{year}</Text>}
-
-            {/* Progress (library items only) */}
             {hasLocalData && (
               <View style={styles.progressContainer}>
                 <View style={styles.progressLabels}>

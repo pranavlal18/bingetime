@@ -1,25 +1,39 @@
-// ─── Import Screen — first-launch onboarding for importing TV Time data ───
+// ─── Import Screen — entry point for data onboarding ───
 
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react'
-import { View, Text, ScrollView, Pressable, Animated, StyleSheet } from 'react-native'
+import {
+  View,
+  Text,
+  ScrollView,
+  Pressable,
+  Animated,
+  StyleSheet,
+  Dimensions,
+} from 'react-native'
 import { router } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import { useTheme } from '@/contexts/ThemeContext'
 import { runImport, IMPORT_STEPS } from '@/lib/import/pipeline'
 import type { ImportStep } from '@/lib/import/types'
-import { useAppStore } from '@/stores/appStore'
 import { typography, spacing, borderRadius } from '@/theme'
 import type { ThemeColors } from '@/themes'
-import { useTheme } from '@/contexts/ThemeContext'
+import { useAuth } from '@/contexts/AuthContext'
+import { useAppStore } from '@/stores/appStore'
 
-type Phase = 'welcome' | 'importing' | 'complete' | 'error'
+const SCREEN_WIDTH = Dimensions.get('window').width
+const CARD_WIDTH = (SCREEN_WIDTH - 40 - 12) / 2
+
+type Phase = 'landing' | 'importing' | 'complete' | 'error'
 
 export default function ImportScreen() {
   const { colors } = useTheme()
   const insets = useSafeAreaInsets()
+  const { user } = useAuth()
   const setImportComplete = useAppStore((s) => s.setImportComplete)
+  const importStarted = useAppStore((s) => s.importStarted)
 
-  const [phase, setPhase] = useState<Phase>('welcome')
+  const [phase, setPhase] = useState<Phase>('landing')
   const [steps, setSteps] = useState<ImportStep[]>(IMPORT_STEPS.map((s) => ({ ...s })))
   const [warnings, setWarnings] = useState<string[]>([])
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
@@ -71,7 +85,7 @@ export default function ImportScreen() {
     setWarnings([])
     setErrorMessage(null)
 
-    const result = await runImport(updateProgress, updateStepStatus)
+    const result = await runImport(user?.id ?? '', updateProgress, updateStepStatus)
 
     if (result.success) {
       setPhase('complete')
@@ -84,7 +98,20 @@ export default function ImportScreen() {
     }
   }, [updateProgress, updateStepStatus, setImportComplete])
 
+  const handleManualEntry = useCallback(() => {
+    router.push('/add-content')
+  }, [])
+
   const handleContinue = useCallback(() => {
+    setImportComplete(true)
+    router.replace('/(tabs)/shows')
+  }, [setImportComplete])
+
+  const handleRetry = useCallback(() => {
+    handleStartImport()
+  }, [handleStartImport])
+
+  const handleSkip = useCallback(() => {
     setImportComplete(true)
     router.replace('/(tabs)/shows')
   }, [setImportComplete])
@@ -108,12 +135,11 @@ export default function ImportScreen() {
       {/* Header */}
       <View style={styles.header}>
         <Text style={styles.logo}>BingeTime</Text>
-        {phase === 'importing' && (
-          <Text style={styles.headerSubtitle}>Importing your data...</Text>
-        )}
+        {phase === 'importing' && <Text style={styles.headerSubtitle}>Importing your data...</Text>}
+        {phase === 'landing' && <Text style={styles.headerSubtitle}>Choose how to get started</Text>}
       </View>
 
-      {phase === 'welcome' && <WelcomeContent onStart={handleStartImport} />}
+      {phase === 'landing' && <LandingContent onStartImport={handleStartImport} onManualEntry={handleManualEntry} />}
       {phase === 'importing' && (
         <ImportingContent
           steps={steps}
@@ -128,8 +154,8 @@ export default function ImportScreen() {
         <ErrorContent
           error={errorMessage}
           warnings={warnings}
-          onRetry={handleStartImport}
-          onSkip={handleContinue}
+          onRetry={handleRetry}
+          onSkip={handleSkip}
         />
       )}
     </View>
@@ -138,7 +164,10 @@ export default function ImportScreen() {
 
 // ── Sub-components ──
 
-function WelcomeContent({ onStart }: { onStart: () => void }) {
+function LandingContent({
+  onStartImport,
+  onManualEntry,
+}: { onStartImport: () => void; onManualEntry: () => void }) {
   const { colors } = useTheme()
   const styles = useMemo(() => createStyles(colors), [colors])
   const insets = useSafeAreaInsets()
@@ -150,26 +179,34 @@ function WelcomeContent({ onStart }: { onStart: () => void }) {
       </View>
       <Text style={styles.welcomeTitle}>Welcome to BingeTime</Text>
       <Text style={styles.welcomeText}>
-        Let's import your TV Time data. We'll read your export files, match shows and
-        movies to TMDb, and set everything up. This one-time process may take a few
-        minutes depending on your library size.
+        How would you like to add your watch history?
       </Text>
 
-      <View style={styles.statsBox}>
-        <Text style={styles.statsTitle}>What we'll import:</Text>
-        <StatRow icon="tv-outline" label="TV Shows" value="334 tracked" />
-        <StatRow icon="film-outline" label="Movies" value="~1,000+ watched" />
-        <StatRow icon="play-circle-outline" label="Episode Watches" value="6,430 logged" />
-        <StatRow icon="list-outline" label="Custom Lists" value="10 lists" />
+      {/* Two option cards */}
+      <View style={styles.optionCards}>
+        <Pressable style={styles.optionCard} onPress={onStartImport}>
+          <Ionicons name="cloud-download-outline" size={32} color={colors.primary} />
+          <Text style={styles.optionTitle}>Import from TV Time</Text>
+          <Text style={styles.optionDesc}>
+            Upload your GDPR export CSVs. We'll match shows & movies to TMDb
+            and calculate all your stats automatically.
+          </Text>
+          <Text style={styles.optionBadge}>Recommended for existing TV Time users</Text>
+        </Pressable>
+
+        <Pressable style={styles.optionCard} onPress={onManualEntry}>
+          <Ionicons name="add-circle-outline" size={32} color={colors.tertiary} />
+          <Text style={styles.optionTitle}>Add Manually</Text>
+          <Text style={styles.optionDesc}>
+            Search TMDb and add shows/movies one by one. Perfect for
+            starting fresh or adding missing titles.
+          </Text>
+          <Text style={[styles.optionBadge, { color: colors.tertiary }]}>Great for new users</Text>
+        </Pressable>
       </View>
 
-      <Pressable style={styles.startButton} onPress={onStart}>
-        <Text style={styles.startButtonText}>Start Import</Text>
-        <Ionicons name="arrow-forward" size={20} color="#FFF" />
-      </Pressable>
-
       <Text style={styles.disclaimer}>
-        Your data stays private. All matching is done via the free TMDb API.
+        Your data stays private. All matching uses the free TMDb API.
       </Text>
     </View>
   )
@@ -219,26 +256,32 @@ function ImportingContent({
           let icon: keyof typeof Ionicons.glyphMap = 'ellipse-outline'
           let iconColor: string = colors.onSurfaceVariant
 
-          if (isDone) { icon = 'checkmark-circle'; iconColor = colors.success }
-          if (isError) { icon = 'alert-circle'; iconColor = colors.error }
-          if (isActive) { icon = 'sync-circle'; iconColor = colors.primary }
-          if (isSkipped) { icon = 'remove-circle-outline'; iconColor = colors.onSurfaceVariant }
+          if (isDone) {
+            icon = 'checkmark-circle'
+            iconColor = colors.success
+          }
+          if (isError) {
+            icon = 'alert-circle'
+            iconColor = colors.error
+          }
+          if (isActive) {
+            icon = 'sync-circle'
+            iconColor = colors.primary
+          }
+          if (isSkipped) {
+            icon = 'remove-circle-outline'
+            iconColor = colors.onSurfaceVariant
+          }
 
           return (
             <View key={step.id} style={[styles.stepItem, isActive && styles.stepItemActive]}>
               <Ionicons name={icon} size={22} color={iconColor} />
               <View style={styles.stepInfo}>
-                <Text style={[styles.stepLabel, isActive && styles.stepLabelActive]}>
-                  {step.label}
-                </Text>
+                <Text style={[styles.stepLabel, isActive && styles.stepLabelActive]}>{step.label}</Text>
                 {(isActive || isDone) && step.total > 0 && (
-                  <Text style={styles.stepProgress}>
-                    {step.current} / {step.total}
-                  </Text>
+                  <Text style={styles.stepProgress}>{step.current} / {step.total}</Text>
                 )}
-                {isError && step.error && (
-                  <Text style={styles.stepError}>{step.error}</Text>
-                )}
+                {isError && step.error && <Text style={styles.stepError}>{step.error}</Text>}
               </View>
             </View>
           )
@@ -269,7 +312,9 @@ function CompleteContent({ warnings, onContinue }: { warnings: string[]; onConti
           </Text>
           <ScrollView style={styles.warningsList}>
             {warnings.slice(0, 20).map((w, i) => (
-              <Text key={i} style={styles.warningText}>{w}</Text>
+              <Text key={i} style={styles.warningText}>
+                {w}
+              </Text>
             ))}
             {warnings.length > 20 && (
               <Text style={styles.warningText}>
@@ -333,284 +378,263 @@ function ErrorContent({
   )
 }
 
-function StatRow({ icon, label, value }: { icon: keyof typeof Ionicons.glyphMap; label: string; value: string }) {
-  const { colors } = useTheme()
-  const styles = useMemo(() => createStyles(colors), [colors])
-
-  return (
-    <View style={styles.statRow}>
-      <Ionicons name={icon} size={18} color={colors.onSurfaceVariant} />
-      <Text style={styles.statLabel}>{label}</Text>
-      <Text style={styles.statValue}>{value}</Text>
-    </View>
-  )
-}
-
 // ── Styles ──
 
 function createStyles(colors: ThemeColors) {
   return StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.surface,
-  },
-  header: {
-    alignItems: 'center',
-    paddingVertical: 24,
-  },
-  logo: {
-    fontSize: typography.headlineLg.fontSize,
-    fontWeight: '800',
-    color: colors.onSurface,
-    letterSpacing: 1,
-  },
-  headerSubtitle: {
-    fontSize: typography.bodySm.fontSize,
-    color: colors.onSurfaceVariant,
-    marginTop: 4,
-  },
-  content: {
-    flex: 1,
-    paddingHorizontal: spacing.marginMobile,
-  },
-  centerContent: {
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+    container: {
+      flex: 1,
+      backgroundColor: colors.surface,
+    },
+    header: {
+      alignItems: 'center',
+      paddingVertical: 24,
+    },
+    logo: {
+      fontSize: typography.headlineLg.fontSize,
+      fontWeight: '800',
+      color: colors.onSurface,
+      letterSpacing: 1,
+    },
+    headerSubtitle: {
+      fontSize: typography.bodySm.fontSize,
+      color: colors.onSurfaceVariant,
+      marginTop: 4,
+    },
+    content: {
+      flex: 1,
+      paddingHorizontal: spacing.marginMobile,
+    },
+    centerContent: {
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
 
-  // Welcome
-  welcomeIcon: {
-    alignItems: 'center',
-    marginBottom: 24,
-    marginTop: 16,
-  },
-  welcomeTitle: {
-    fontSize: typography.headlineMd.fontSize,
-    fontWeight: '700',
-    color: colors.onSurface,
-    textAlign: 'center',
-    marginBottom: 12,
-  },
-  welcomeText: {
-    fontSize: typography.bodyMd.fontSize,
-    color: colors.onSurfaceVariant,
-    textAlign: 'center',
-    lineHeight: typography.bodyMd.lineHeight,
-    marginBottom: 24,
-  },
-  statsBox: {
-    backgroundColor: colors.surfaceContainer,
-    borderRadius: borderRadius.lg,
-    padding: 16,
-    marginBottom: 24,
-    width: '100%',
-    borderWidth: 1,
-    borderColor: colors.outlineVariant,
-  },
-  statsTitle: {
-    fontSize: typography.labelMd.fontSize,
-    fontWeight: '600',
-    color: colors.onSurface,
-    marginBottom: 12,
-  },
-  statRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 6,
-  },
-  statLabel: {
-    fontSize: typography.bodySm.fontSize,
-    color: colors.onSurfaceVariant,
-    marginLeft: 10,
-    flex: 1,
-  },
-  statValue: {
-    fontSize: typography.bodySm.fontSize,
-    color: colors.onSurface,
-    fontWeight: '600',
-  },
-  startButton: {
-    backgroundColor: colors.primary,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 16,
-    borderRadius: borderRadius.lg,
-    gap: 8,
-    width: '100%',
-  },
-  startButtonText: {
-    fontSize: typography.bodyLg.fontSize,
-    fontWeight: '700',
-    color: colors.onPrimary,
-  },
-  disclaimer: {
-    fontSize: typography.bodyXs.fontSize,
-    color: colors.onSurfaceVariant,
-    textAlign: 'center',
-    marginTop: 16,
-  },
+    // Landing
+    welcomeIcon: {
+      alignItems: 'center',
+      marginBottom: 24,
+      marginTop: 16,
+    },
+    welcomeTitle: {
+      fontSize: typography.headlineMd.fontSize,
+      fontWeight: '700',
+      color: colors.onSurface,
+      textAlign: 'center',
+      marginBottom: 12,
+    },
+    welcomeText: {
+      fontSize: typography.bodyMd.fontSize,
+      color: colors.onSurfaceVariant,
+      textAlign: 'center',
+      lineHeight: typography.bodyMd.lineHeight,
+      marginBottom: 24,
+    },
+    optionCards: {
+      flexDirection: 'row',
+      gap: 12,
+      marginBottom: 24,
+    },
+    optionCard: {
+      width: CARD_WIDTH,
+      backgroundColor: colors.surfaceContainer,
+      borderRadius: borderRadius.lg,
+      padding: 20,
+      alignItems: 'center',
+      borderWidth: 1,
+      borderColor: colors.outlineVariant,
+    },
+    optionTitle: {
+      fontSize: typography.bodyMd.fontSize,
+      fontWeight: '600',
+      color: colors.onSurface,
+      textAlign: 'center',
+      marginTop: 12,
+      marginBottom: 8,
+    },
+    optionDesc: {
+      fontSize: typography.bodySm.fontSize,
+      color: colors.onSurfaceVariant,
+      textAlign: 'center',
+      lineHeight: 20,
+      marginBottom: 12,
+    },
+    optionBadge: {
+      fontSize: typography.bodyXs.fontSize,
+      fontWeight: '600',
+      color: colors.primary,
+      backgroundColor: colors.primaryContainer,
+      paddingHorizontal: 10,
+      paddingVertical: 4,
+      borderRadius: borderRadius.full,
+    },
+    disclaimer: {
+      fontSize: typography.bodyXs.fontSize,
+      color: colors.onSurfaceVariant,
+      textAlign: 'center',
+      marginTop: 16,
+    },
 
-  // Importing
-  progressBarContainer: {
-    height: 6,
-    backgroundColor: colors.surfaceContainerHighest,
-    borderRadius: borderRadius.full,
-    overflow: 'hidden',
-    marginBottom: 8,
-  },
-  progressBarFill: {
-    height: '100%',
-    backgroundColor: colors.primary,
-    borderRadius: borderRadius.full,
-  },
-  progressPercent: {
-    fontSize: typography.bodyXs.fontSize,
-    color: colors.onSurfaceVariant,
-    textAlign: 'right',
-    marginBottom: 16,
-  },
-  stepList: {
-    flex: 1,
-  },
-  stepItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 12,
-    borderRadius: borderRadius.md,
-    marginBottom: 4,
-  },
-  stepItemActive: {
-    backgroundColor: colors.surfaceContainer,
-  },
-  stepInfo: {
-    marginLeft: 12,
-    flex: 1,
-  },
-  stepLabel: {
-    fontSize: typography.bodySm.fontSize,
-    color: colors.onSurfaceVariant,
-  },
-  stepLabelActive: {
-    color: colors.onSurface,
-    fontWeight: '600',
-  },
-  stepProgress: {
-    fontSize: typography.bodyXs.fontSize,
-    color: colors.onSurfaceVariant,
-    marginTop: spacing.unit,
-  },
-  stepError: {
-    fontSize: typography.bodyXs.fontSize,
-    color: colors.error,
-    marginTop: spacing.unit,
-  },
+    // Importing
+    progressBarContainer: {
+      height: 6,
+      backgroundColor: colors.surfaceContainerHighest,
+      borderRadius: borderRadius.full,
+      overflow: 'hidden',
+      marginBottom: 8,
+    },
+    progressBarFill: {
+      height: '100%',
+      backgroundColor: colors.primary,
+      borderRadius: borderRadius.full,
+    },
+    progressPercent: {
+      fontSize: typography.bodyXs.fontSize,
+      color: colors.onSurfaceVariant,
+      textAlign: 'right',
+      marginBottom: 16,
+    },
+    stepList: {
+      flex: 1,
+    },
+    stepItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingVertical: 12,
+      paddingHorizontal: 12,
+      borderRadius: borderRadius.md,
+      marginBottom: 4,
+    },
+    stepItemActive: {
+      backgroundColor: colors.surfaceContainer,
+    },
+    stepInfo: {
+      marginLeft: 12,
+      flex: 1,
+    },
+    stepLabel: {
+      fontSize: typography.bodySm.fontSize,
+      color: colors.onSurfaceVariant,
+    },
+    stepLabelActive: {
+      color: colors.onSurface,
+      fontWeight: '600',
+    },
+    stepProgress: {
+      fontSize: typography.bodyXs.fontSize,
+      color: colors.onSurfaceVariant,
+      marginTop: spacing.unit,
+    },
+    stepError: {
+      fontSize: typography.bodyXs.fontSize,
+      color: colors.error,
+      marginTop: spacing.unit,
+    },
 
-  // Complete
-  completeTitle: {
-    fontSize: typography.headlineMd.fontSize,
-    fontWeight: '700',
-    color: colors.onSurface,
-    marginTop: 16,
-    marginBottom: 8,
-  },
-  completeText: {
-    fontSize: typography.bodyMd.fontSize,
-    color: colors.onSurfaceVariant,
-    textAlign: 'center',
-    lineHeight: typography.bodyMd.lineHeight,
-    marginBottom: 24,
-  },
-  warningsBox: {
-    backgroundColor: colors.surfaceContainer,
-    borderRadius: borderRadius.lg,
-    padding: 16,
-    marginBottom: 24,
-    width: '100%',
-    maxHeight: 200,
-    borderWidth: 1,
-    borderColor: colors.outlineVariant,
-  },
-  warningsTitle: {
-    fontSize: typography.labelMd.fontSize,
-    fontWeight: '600',
-    color: colors.tertiary,
-    marginBottom: 8,
-  },
-  warningsList: {
-    maxHeight: 140,
-  },
-  warningText: {
-    fontSize: typography.bodyXs.fontSize,
-    color: colors.onSurfaceVariant,
-    lineHeight: 18,
-  },
-  continueButton: {
-    backgroundColor: colors.primary,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 16,
-    borderRadius: borderRadius.lg,
-    gap: 8,
-    width: '100%',
-  },
-  continueButtonText: {
-    fontSize: typography.bodyLg.fontSize,
-    fontWeight: '700',
-    color: colors.onPrimary,
-  },
+    // Complete
+    completeTitle: {
+      fontSize: typography.headlineMd.fontSize,
+      fontWeight: '700',
+      color: colors.onSurface,
+      marginTop: 16,
+      marginBottom: 8,
+    },
+    completeText: {
+      fontSize: typography.bodyMd.fontSize,
+      color: colors.onSurfaceVariant,
+      textAlign: 'center',
+      lineHeight: typography.bodyMd.lineHeight,
+      marginBottom: 24,
+    },
+    warningsBox: {
+      backgroundColor: colors.surfaceContainer,
+      borderRadius: borderRadius.lg,
+      padding: 16,
+      marginBottom: 24,
+      width: '100%',
+      maxHeight: 200,
+      borderWidth: 1,
+      borderColor: colors.outlineVariant,
+    },
+    warningsTitle: {
+      fontSize: typography.labelMd.fontSize,
+      fontWeight: '600',
+      color: colors.tertiary,
+      marginBottom: 8,
+    },
+    warningsList: {
+      maxHeight: 140,
+    },
+    warningText: {
+      fontSize: typography.bodyXs.fontSize,
+      color: colors.onSurfaceVariant,
+      lineHeight: 18,
+    },
+    continueButton: {
+      backgroundColor: colors.primary,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingVertical: 16,
+      borderRadius: borderRadius.lg,
+      gap: 8,
+      width: '100%',
+    },
+    continueButtonText: {
+      fontSize: typography.bodyLg.fontSize,
+      fontWeight: '700',
+      color: colors.onPrimary,
+    },
 
-  // Error
-  errorTitle: {
-    fontSize: typography.headlineMd.fontSize,
-    fontWeight: '700',
-    color: colors.onSurface,
-    marginTop: 16,
-    marginBottom: 8,
-  },
-  errorText: {
-    fontSize: typography.bodyMd.fontSize,
-    color: colors.error,
-    textAlign: 'center',
-    lineHeight: typography.bodyMd.lineHeight,
-    marginBottom: 24,
-  },
-  errorActions: {
-    flexDirection: 'row',
-    gap: 12,
-    width: '100%',
-  },
-  retryButton: {
-    backgroundColor: colors.primary,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 14,
-    borderRadius: borderRadius.lg,
-    gap: 6,
-    flex: 1,
-  },
-  retryButtonText: {
-    fontSize: typography.bodyMd.fontSize,
-    fontWeight: '700',
-    color: colors.onPrimary,
-  },
-  skipButton: {
-    backgroundColor: colors.surfaceContainerHighest,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 14,
-    borderRadius: borderRadius.lg,
-    flex: 1,
-    borderWidth: 1,
-    borderColor: colors.outlineVariant,
-  },
-  skipButtonText: {
-    fontSize: typography.bodyMd.fontSize,
-    fontWeight: '600',
-    color: colors.onSurfaceVariant,
-  },
+    // Error
+    errorTitle: {
+      fontSize: typography.headlineMd.fontSize,
+      fontWeight: '700',
+      color: colors.onSurface,
+      marginTop: 16,
+      marginBottom: 8,
+    },
+    errorText: {
+      fontSize: typography.bodyMd.fontSize,
+      color: colors.error,
+      textAlign: 'center',
+      lineHeight: typography.bodyMd.lineHeight,
+      marginBottom: 24,
+    },
+    errorActions: {
+      flexDirection: 'row',
+      gap: 12,
+      width: '100%',
+    },
+    retryButton: {
+      backgroundColor: colors.primary,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingVertical: 14,
+      borderRadius: borderRadius.lg,
+      gap: 6,
+      flex: 1,
+    },
+    retryButtonText: {
+      fontSize: typography.bodyMd.fontSize,
+      fontWeight: '700',
+      color: colors.onPrimary,
+    },
+    skipButton: {
+      backgroundColor: colors.surfaceContainerHighest,
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingVertical: 14,
+      borderRadius: borderRadius.lg,
+      flex: 1,
+      borderWidth: 1,
+      borderColor: colors.outlineVariant,
+    },
+    skipButtonText: {
+      fontSize: typography.bodyMd.fontSize,
+      fontWeight: '600',
+      color: colors.onSurfaceVariant,
+    },
   })
 }

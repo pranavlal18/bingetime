@@ -41,6 +41,7 @@ export type ProgressCallback = (stepIndex: number, current: number, total: numbe
 // ── Main pipeline ──
 
 export async function runImport(
+  userId: string,
   onProgress?: ProgressCallback,
   onStepStatus?: (stepIndex: number, status: ImportStep['status'], error?: string) => void
 ): Promise<{ success: boolean; warnings: string[]; error?: string }> {
@@ -79,7 +80,7 @@ export async function runImport(
     onStepStatus?.(1, 'processing')
     onProgress?.(1, 0, context.followedShows.length, 'Importing shows...')
 
-    const showInsertResults = await importShows(context.followedShows, (count) => {
+    const showInsertResults = await importShows(context.followedShows, userId, (count) => {
       onProgress?.(1, count, context.followedShows.length)
     })
     context.showUuidMap = showInsertResults.uuidMap
@@ -95,6 +96,7 @@ export async function runImport(
     const reconcileResults = await reconcileShowData(
       context.userShowData,
       context.showUuidMap,
+      userId,
       (count) => {
         onProgress?.(2, count, context.userShowData.length)
       }
@@ -116,6 +118,7 @@ export async function runImport(
     const episodeResults = await importEpisodeWatches(
       episodeRows,
       context.showUuidMap,
+      userId,
       (count) => {
         onProgress?.(3, count, episodeRows.length)
       }
@@ -145,6 +148,7 @@ export async function runImport(
       context.seenEpisodeLatest,
       context.showUuidMap,
       episodeLookup,
+      userId,
       (count) => {
         onProgress?.(4, count, context.seenEpisodeLatest.length)
       }
@@ -160,6 +164,7 @@ export async function runImport(
     const watchlistResults = await setWatchlistStatus(
       context.specialStatus,
       context.showUuidMap,
+      userId,
       (count) => {
         onProgress?.(5, count, context.specialStatus.length)
       }
@@ -172,7 +177,7 @@ export async function runImport(
     onStepStatus?.(6, 'processing')
     onProgress?.(6, 0, context.movieRecords.length, 'Importing movies...')
 
-    const movieResults = await importMovies(context.movieRecords, (count) => {
+    const movieResults = await importMovies(context.movieRecords, userId, (count) => {
       onProgress?.(6, count, context.movieRecords.length)
     })
     context.warnings.push(...movieResults.warnings)
@@ -199,14 +204,34 @@ export async function runImport(
     const allTvdbIds = [...context.showUuidMap.keys()]
     onProgress?.(8, 0, allTvdbIds.length, 'Resolving TMDb IDs...')
 
+    // Build tvdb_id -> name map for fallback search
+    const tvdbIdToName = new Map<number, string>()
+    for (const row of context.followedShows) {
+      const id = parseInt(row.tv_show_id, 10)
+      if (!isNaN(id)) tvdbIdToName.set(id, row.tv_show_name)
+    }
+    for (const row of context.userShowData) {
+      const id = parseInt(row.tv_show_id, 10)
+      if (!isNaN(id)) tvdbIdToName.set(id, row.tv_show_name)
+    }
+
     const resolutionMap = await resolveShowsBatch(
       allTvdbIds,
       context.showResolutionMap,
+      tvdbIdToName,
       (resolved, total) => {
         onProgress?.(8, resolved, total)
       }
     )
     context.showResolutionMap = resolutionMap
+
+    // Add resolution stats to warnings
+    const resolvedCount = resolutionMap.size
+    const totalCount = allTvdbIds.length
+    const failedCount = totalCount - resolvedCount
+    if (failedCount > 0) {
+      context.warnings.push(`TMDb show resolution: ${resolvedCount}/${totalCount} succeeded (${failedCount} failed)`)
+    }
 
     // Update shows with TMDb data
     await updateShowsWithTmdbData(resolutionMap, context.showUuidMap)
@@ -226,6 +251,7 @@ export async function runImport(
 
 async function importShows(
   rows: FollowedTvShowRow[],
+  userId: string,
   onBatch: (count: number) => void
 ): Promise<{ uuidMap: Map<number, string>; warnings: string[] }> {
   const uuidMap = new Map<number, string>()
@@ -299,16 +325,17 @@ async function importShows(
         }
         return {
           show_id: showUuid,
+          user_id: userId,
           is_following: true,
           is_watchlist: true,
         }
       })
-      .filter(Boolean) as Array<{ show_id: string; is_following: boolean; is_watchlist: boolean }>
+      .filter(Boolean) as Array<{ show_id: string; user_id: string; is_following: boolean; is_watchlist: boolean }>
 
     if (userShowInserts.length > 0) {
       const { error: usError } = await supabase
         .from('user_shows')
-        .upsert(userShowInserts, { onConflict: 'show_id' })
+        .upsert(userShowInserts, { onConflict: 'show_id,user_id' })
 
       if (usError) {
         warnings.push(`Failed to batch upsert user_shows: ${usError.message}`)
@@ -324,6 +351,7 @@ async function importShows(
 async function reconcileShowData(
   rows: UserTvShowDataRow[],
   existingUuidMap: Map<number, string>,
+  userId: string,
   onBatch: (count: number) => void
 ): Promise<{ newUuids: Map<number, string>; warnings: string[] }> {
   const newUuids = new Map<number, string>()
@@ -385,18 +413,19 @@ async function reconcileShowData(
 
         return {
           show_id: showUuid,
+          user_id: userId,
           episodes_seen: parseInt(row.nb_episodes_seen, 10) || 0,
           is_favorited: row.is_favorited === '1',
           is_following: row.is_followed !== '0',
           is_watchlist: true,
         }
       })
-      .filter(Boolean) as Array<{ show_id: string; episodes_seen: number; is_favorited: boolean; is_following: boolean; is_watchlist: boolean }>
+      .filter(Boolean) as Array<{ show_id: string; user_id: string; episodes_seen: number; is_favorited: boolean; is_following: boolean; is_watchlist: boolean }>
 
     if (userShowInserts.length > 0) {
       const { error: usError } = await supabase
         .from('user_shows')
-        .upsert(userShowInserts, { onConflict: 'show_id' })
+        .upsert(userShowInserts, { onConflict: 'show_id,user_id' })
 
       if (usError) {
         warnings.push(`Failed to batch upsert user_shows reconcile: ${usError.message}`)
@@ -419,9 +448,20 @@ function filterEpisodeWatches(rows: TrackingV2Row[]): TrackingV2Row[] {
   })
 }
 
+function extractWatchDate(row: TrackingV2Row): string | null {
+  const mapStr = row.most_recent_ep_watched
+  if (!mapStr) return null
+  const match = mapStr.match(/watch_date:([\d.e\+]+)/)
+  if (!match) return null
+  const timestampMs = parseFloat(match[1])
+  if (isNaN(timestampMs)) return null
+  return new Date(timestampMs).toISOString()
+}
+
 async function importEpisodeWatches(
   rows: TrackingV2Row[],
   showUuidMap: Map<number, string>,
+  userId: string,
   onBatch: (count: number) => void
 ): Promise<{ warnings: string[] }> {
   const warnings: string[] = []
@@ -467,10 +507,13 @@ async function importEpisodeWatches(
 
         const seasonNumber = parseInt(row.season_number || row.s_no, 10)
         const episodeNumber = parseInt(row.episode_number || row.ep_no, 10)
-        const watchedAt = row.created_at || null
+        
+        // Use extracted watch date if available, otherwise fallback to created_at
+        const watchedAt = extractWatchDate(row) || row.created_at || null
 
         return {
           show_id: showUuid,
+          user_id: userId,
           season_number: seasonNumber,
           episode_number: episodeNumber,
           watched: true,
@@ -479,6 +522,7 @@ async function importEpisodeWatches(
       })
       .filter(Boolean) as Array<{
         show_id: string
+        user_id: string
         season_number: number
         episode_number: number
         watched: boolean
@@ -488,7 +532,7 @@ async function importEpisodeWatches(
     if (episodeInserts.length > 0) {
       const { error: epError } = await supabase
         .from('user_episodes')
-        .upsert(episodeInserts, { onConflict: 'show_id, season_number, episode_number' })
+        .upsert(episodeInserts, { onConflict: 'show_id, season_number, episode_number, user_id' })
 
       if (epError) {
         warnings.push(`Failed to batch upsert episodes: ${epError.message}`)
@@ -505,6 +549,7 @@ async function setContinueWatching(
   rows: ShowSeenEpisodeLatestRow[],
   showUuidMap: Map<number, string>,
   episodeLookup: Map<string, { season: number; episode: number }>,
+  userId: string,
   onBatch: (count: number) => void
 ): Promise<{ warnings: string[] }> {
   const warnings: string[] = []
@@ -535,6 +580,7 @@ async function setContinueWatching(
 
         return {
           show_id: showUuid,
+          user_id: userId,
           last_watched_episode_data: {
             episode_id: row.episode_id,
             season_number: season,
@@ -543,12 +589,12 @@ async function setContinueWatching(
           },
         }
       })
-      .filter(Boolean) as Array<{ show_id: string; last_watched_episode_data: Record<string, unknown> }>
+      .filter(Boolean) as Array<{ show_id: string; user_id: string; last_watched_episode_data: Record<string, unknown> }>
 
     if (updates.length > 0) {
       const { error } = await supabase
         .from('user_shows')
-        .upsert(updates, { onConflict: 'show_id' })
+        .upsert(updates, { onConflict: 'show_id,user_id' })
 
       if (error) {
         warnings.push(`Failed to batch update continue-watching: ${error.message}`)
@@ -564,6 +610,7 @@ async function setContinueWatching(
 async function setWatchlistStatus(
   rows: UserShowSpecialStatusRow[],
   showUuidMap: Map<number, string>,
+  userId: string,
   onBatch: (count: number) => void
 ): Promise<{ warnings: string[] }> {
   const warnings: string[] = []
@@ -587,15 +634,16 @@ async function setWatchlistStatus(
 
         return {
           show_id: showUuid,
+          user_id: userId,
           is_watchlist: true,
         }
       })
-      .filter(Boolean) as Array<{ show_id: string; is_watchlist: boolean }>
+      .filter(Boolean) as Array<{ show_id: string; user_id: string; is_watchlist: boolean }>
 
     if (updates.length > 0) {
       const { error } = await supabase
         .from('user_shows')
-        .upsert(updates, { onConflict: 'show_id' })
+        .upsert(updates, { onConflict: 'show_id,user_id' })
 
       if (error) {
         warnings.push(`Failed to batch update watchlist: ${error.message}`)
@@ -610,6 +658,7 @@ async function setWatchlistStatus(
 
 async function importMovies(
   rows: TrackingProdRecordRow[],
+  userId: string,
   onBatch: (count: number) => void
 ): Promise<{ warnings: string[] }> {
   const warnings: string[] = []
@@ -704,19 +753,20 @@ async function importMovies(
 
             return [movieId, {
               movie_id: movieId,
+              user_id: userId,
               watched,
               watched_at: watched ? watchedAt : null,
               is_watchlist: true,
             }]
           })
-          .filter(Boolean) as Array<[string, { movie_id: string; watched: boolean; watched_at: string | null; is_watchlist: boolean }]>
+          .filter(Boolean) as Array<[string, { movie_id: string; user_id: string; watched: boolean; watched_at: string | null; is_watchlist: boolean }]>
       ).values()
     )
 
     if (userMovieInserts.length > 0) {
       const { error: umError } = await supabase
         .from('user_movies')
-        .upsert(userMovieInserts, { onConflict: 'movie_id' })
+        .upsert(userMovieInserts, { onConflict: 'movie_id,user_id' })
 
       if (umError) {
         warnings.push(`Failed to batch upsert user_movies: ${umError.message}`)
@@ -748,6 +798,8 @@ async function importMovies(
       tmdb_id: number
       poster_path: string | null
       release_date: string | null
+      genres: string[]
+      runtime: number | null
     }> = []
 
     for (const [key, resolution] of resolutionMap.entries()) {
@@ -761,6 +813,8 @@ async function importMovies(
         tmdb_id: resolution.tmdb_id,
         poster_path: resolution.poster_path,
         release_date: resolution.release_date,
+        genres: resolution.genres,
+        runtime: resolution.runtime,
       })
     }
 
@@ -866,6 +920,7 @@ async function updateShowsWithTmdbData(
           total_episodes: resolution.total_episodes,
           last_air_date: resolution.last_air_date,
           average_runtime: resolution.average_runtime ?? null,
+          genres: resolution.genres,
         }
       })
       .filter(Boolean) as Array<{
@@ -878,6 +933,7 @@ async function updateShowsWithTmdbData(
         total_episodes: number | null
         last_air_date: string | null
         average_runtime: number | null
+        genres: string[]
       }>
 
     if (showUpdates.length > 0) {

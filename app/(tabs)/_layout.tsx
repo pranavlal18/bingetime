@@ -4,7 +4,7 @@ import { Ionicons } from '@expo/vector-icons'
 import { useTheme } from '@/contexts/ThemeContext'
 
 export default function TabLayout() {
-  const { colors, tabBar } = useTheme()
+  const { colors } = useTheme()
 
   const screenOptions = useMemo(() => ({
     headerShown: false,
@@ -18,7 +18,7 @@ export default function TabLayout() {
       paddingTop: 4,
       height: 64,
     },
-  }), [colors, tabBar])
+  }), [colors])
 
   return (
     <Tabs screenOptions={screenOptions}>

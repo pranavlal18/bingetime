@@ -53,6 +53,7 @@ export interface ShowResolution {
   total_episodes: number | null
   last_air_date: string | null
   average_runtime: number | null // in seconds
+  genres: string[] // NEW
   seasons: Array<{
     season_number: number
     episode_count: number
@@ -65,6 +66,8 @@ export interface MovieResolution {
   tmdb_id: number
   poster_path: string | null
   release_date: string | null
+  genres: string[]
+  runtime: number | null
 }
 
 // ── Raw CSV Row Types (matching actual CSV columns) ──

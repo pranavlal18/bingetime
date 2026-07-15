@@ -118,6 +118,8 @@ export interface TMDbSearchResponse {
     release_date?: string
     first_air_date?: string
     overview: string | null
+    media_type?: 'tv' | 'movie'
+    genre_ids?: number[]
   }>
 }
 

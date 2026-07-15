@@ -13,6 +13,8 @@ interface AppState extends AppSettings {
   setImportComplete: (done: boolean) => void
   importStarted: boolean
   setImportStarted: (started: boolean) => void
+  statsPeriod: 'week' | 'month'
+  setStatsPeriod: (period: 'week' | 'month') => void
 }
 
 export const useAppStore = create<AppState>()(
@@ -25,6 +27,7 @@ export const useAppStore = create<AppState>()(
       notificationsEnabled: false,
       isImportComplete: false,
       importStarted: false,
+      statsPeriod: 'week',
 
       setShowsViewMode: (mode) => set({ showsViewMode: mode }),
       setMoviesViewMode: (mode) => set({ moviesViewMode: mode }),
@@ -32,6 +35,7 @@ export const useAppStore = create<AppState>()(
       setNotificationsEnabled: (enabled) => set({ notificationsEnabled: enabled }),
       setImportComplete: (done) => set({ isImportComplete: done }),
       setImportStarted: (started) => set({ importStarted: started }),
+      setStatsPeriod: (period) => set({ statsPeriod: period }),
     }),
     {
       name: 'bingetime-settings',

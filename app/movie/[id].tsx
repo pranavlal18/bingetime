@@ -10,7 +10,6 @@ import {
   ActivityIndicator,
   Dimensions,
   Animated,
-  Platform,
 } from 'react-native'
 import { useLocalSearchParams, router, Stack } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -33,6 +32,7 @@ export default function MovieDetailScreen() {
   const insets = useSafeAreaInsets()
   const scrollY = useRef(new Animated.Value(0)).current
   const { colors } = useTheme()
+
 
   const styles = useMemo(() => StyleSheet.create({
   container: {
@@ -117,6 +117,7 @@ export default function MovieDetailScreen() {
     marginTop: -40,
     paddingHorizontal: spacing.marginMobile,
   },
+
   titleRow: {
     flexDirection: 'row',
     gap: 16,
@@ -363,7 +364,7 @@ export default function MovieDetailScreen() {
 
         {/* ── Movie Info Section ── */}
         <View style={styles.infoSection}>
-          {/* Poster + Title row */}
+
           <View style={styles.titleRow}>
             {displayPoster ? (
               <Image

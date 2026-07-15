@@ -4,11 +4,11 @@ import { Platform, Alert, Linking } from 'react-native';
 const isExpoGo = __DEV__ && !process.env.EXPO_DEV_BUILD;
 
 // Lazy-load expo-notifications only when needed and not in Expo Go
+// On web, expo-notifications methods are unavailable entirely.
 let Notifications: any = null;
 async function getNotificationsModule() {
-  if (isExpoGo && Platform.OS === 'android') {
-    return null;
-  }
+  if (Platform.OS === 'web') return null;
+  if (isExpoGo && Platform.OS === 'android') return null;
   if (!Notifications) {
     const module = await import('expo-notifications');
     Notifications = module.default || module;

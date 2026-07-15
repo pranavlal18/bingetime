@@ -268,6 +268,8 @@ export function useToggleEpisodeWatched() {
       const uid = user?.id ?? ''
       queryClient.invalidateQueries({ queryKey: showKeys.list(uid) })
       queryClient.invalidateQueries({ queryKey: showKeys.continueWatching(uid) })
+      // Sync profile stats (watched hours, episode count)
+      queryClient.invalidateQueries({ queryKey: ['profile'] })
     },
   })
 }
@@ -368,6 +370,8 @@ export function useBatchMarkWatched() {
       const uid = user?.id ?? ''
       queryClient.invalidateQueries({ queryKey: showKeys.list(uid) })
       queryClient.invalidateQueries({ queryKey: showKeys.continueWatching(uid) })
+      // Sync profile stats (watched hours, episode count)
+      queryClient.invalidateQueries({ queryKey: ['profile'] })
     },
   })
 }

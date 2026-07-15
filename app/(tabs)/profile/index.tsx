@@ -27,7 +27,9 @@ import {
   useProfileStats,
   useFavorites,
 } from '@/lib/queries/profile'
+import { useRepairRuntime, useRepairUserIds, useWatchTimeBreakdown } from '@/lib/queries/stats'
 import { useTheme } from '@/contexts/ThemeContext'
+
 import type { ShowWithUserData } from '@/lib/queries/shows'
 import type { MovieWithUserData } from '@/lib/queries/movies'
 import type { ThemeKey } from '@/types'
@@ -59,10 +61,12 @@ const STAT_CARD_WIDTH = (SCREEN_WIDTH - 20 * 2 - 16) / 2
 
 const StatCard = memo(function StatCard({ label, value }: { label: string; value: string }) {
   const { colors } = useTheme()
+
   return (
     <View
       style={{
         width: STAT_CARD_WIDTH,
+        height: 88,
         backgroundColor: colors.surfaceContainer,
         borderRadius: 16,
         paddingVertical: 20,
@@ -197,17 +201,317 @@ const PosterItem = memo(function PosterItem({
       <Text
         style={{
           fontFamily: 'Inter',
-          fontSize: 11,
+          fontSize: 11.5,
           fontWeight: '600',
           color: colors.onSurface,
-          marginTop: 6,
-          lineHeight: 14,
+          marginTop: 8,
+          lineHeight: 15,
         }}
         numberOfLines={2}
       >
         {title}
       </Text>
     </Pressable>
+  )
+})
+
+// ── Stats Preview Cards (horizontal carousel on Profile tab) ──
+
+const STATS_CARD_GAP = 12
+
+interface TimeBreakdown {
+  months: number
+  days: number
+  hours: number
+}
+
+function getTimeBreakdown(totalHours: number): TimeBreakdown {
+  // 30 days per month, 24 hours per day
+  const months = Math.floor(totalHours / (30 * 24))
+  const remaining = totalHours - months * 30 * 24
+  const days = Math.floor(remaining / 24)
+  const hours = Math.floor(remaining - days * 24)
+  return { months, days, hours }
+}
+
+const StatMiniCard = memo(function StatMiniCard({
+  icon,
+  title,
+  primary,
+  primaryLabel,
+  breakdown,
+  breakdownLabels,
+}: {
+  icon: keyof typeof Ionicons.glyphMap
+  title: string
+  primary?: number
+  primaryLabel?: string
+  breakdown?: TimeBreakdown
+  breakdownLabels?: { months: string; days: string; hours: string }
+}) {
+  const { colors } = useTheme()
+  return (
+    <View
+      style={{
+        flex: 1,
+        backgroundColor: colors.surfaceContainer,
+        borderRadius: 16,
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.05)',
+        padding: 16,
+        minHeight: 130,
+        justifyContent: 'space-between',
+      }}
+    >
+      {/* Header: icon + title */}
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+        <Ionicons name={icon} size={14} color={colors.secondary} />
+        <Text
+          style={{
+            fontFamily: 'Inter',
+            fontSize: 13,
+            fontWeight: '500',
+            color: colors.secondary,
+          }}
+          numberOfLines={1}
+        >
+          {title}
+        </Text>
+      </View>
+
+      {/* Primary value (when no breakdown) */}
+      {primary !== undefined && primaryLabel !== undefined && (
+        <View style={{ marginTop: 8 }}>
+          <Text
+            style={{
+              fontFamily: 'Inter',
+              fontSize: 26,
+              fontWeight: '700',
+              color: colors.onSurface,
+              lineHeight: 32,
+              letterSpacing: -0.01,
+            }}
+            numberOfLines={1}
+            adjustsFontSizeToFit
+          >
+            {primary.toLocaleString('en-US')}
+          </Text>
+          <Text
+            style={{
+              fontFamily: 'Inter',
+              fontSize: 11,
+              fontWeight: '600',
+              letterSpacing: 0.08,
+              textTransform: 'uppercase',
+              color: colors.secondary,
+              marginTop: 4,
+            }}
+          >
+            {primaryLabel}
+          </Text>
+        </View>
+      )}
+
+      {/* Time breakdown (months/days/hours) */}
+      {breakdown && breakdownLabels && (
+        <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 10, marginTop: 6 }}>
+          <View style={{ alignItems: 'flex-start' }}>
+            <Text
+              style={{
+                fontFamily: 'Inter',
+                fontSize: 22,
+                fontWeight: '700',
+                color: colors.onSurface,
+                lineHeight: 26,
+                letterSpacing: -0.01,
+              }}
+            >
+              {breakdown.months}
+            </Text>
+            <Text
+              style={{
+                fontFamily: 'Inter',
+                fontSize: 9,
+                fontWeight: '600',
+                textTransform: 'uppercase',
+                color: colors.secondary,
+                marginTop: 4,
+                letterSpacing: 0.08,
+              }}
+            >
+              {breakdownLabels.months}
+            </Text>
+          </View>
+          <View style={{ alignItems: 'flex-start' }}>
+            <Text
+              style={{
+                fontFamily: 'Inter',
+                fontSize: 22,
+                fontWeight: '700',
+                color: colors.onSurface,
+                lineHeight: 26,
+                letterSpacing: -0.01,
+              }}
+            >
+              {breakdown.days}
+            </Text>
+            <Text
+              style={{
+                fontFamily: 'Inter',
+                fontSize: 9,
+                fontWeight: '600',
+                textTransform: 'uppercase',
+                color: colors.secondary,
+                marginTop: 4,
+                letterSpacing: 0.08,
+              }}
+            >
+              {breakdownLabels.days}
+            </Text>
+          </View>
+          <View style={{ alignItems: 'flex-start' }}>
+            <Text
+              style={{
+                fontFamily: 'Inter',
+                fontSize: 22,
+                fontWeight: '700',
+                color: colors.onSurface,
+                lineHeight: 26,
+                letterSpacing: -0.01,
+              }}
+            >
+              {breakdown.hours}
+            </Text>
+            <Text
+              style={{
+                fontFamily: 'Inter',
+                fontSize: 9,
+                fontWeight: '600',
+                textTransform: 'uppercase',
+                color: colors.secondary,
+                marginTop: 4,
+                letterSpacing: 0.08,
+              }}
+            >
+              {breakdownLabels.hours}
+            </Text>
+          </View>
+        </View>
+      )}
+    </View>
+  )
+})
+
+const StatsPreviewCards = memo(function StatsPreviewCards({
+  showHours,
+  showEpisodes,
+  movieHours,
+  movieCount,
+}: {
+  showHours: number
+  showEpisodes: number
+  movieHours: number
+  movieCount: number
+}) {
+  const { colors } = useTheme()
+  const [pageIndex, setPageIndex] = useState(0)
+
+  const showBreakdown = getTimeBreakdown(showHours)
+  const movieBreakdown = getTimeBreakdown(movieHours)
+
+  // Pages: [shows page, movies page]
+  const pageWidth = SCREEN_WIDTH
+  const totalPages = 2
+
+  const handleScroll = useCallback(
+    (e: any) => {
+      const x = e.nativeEvent.contentOffset.x
+      const idx = Math.round(x / pageWidth)
+      setPageIndex(Math.max(0, Math.min(totalPages - 1, idx)))
+    },
+    [pageWidth]
+  )
+
+  return (
+    <View style={{ marginBottom: 16 }}>
+      <ScrollView
+        horizontal
+        pagingEnabled
+        showsHorizontalScrollIndicator={false}
+        onScroll={handleScroll}
+        scrollEventThrottle={16}
+        contentContainerStyle={{
+          paddingHorizontal: SIDE_OFFSET,
+        }}
+      >
+        {/* Page 1: Shows stats */}
+        <View
+          style={{
+            width: pageWidth - SIDE_OFFSET * 2,
+            flexDirection: 'row',
+            gap: STATS_CARD_GAP,
+          }}
+        >
+          <StatMiniCard
+            icon="tv-outline"
+            title="TV time"
+            breakdown={showBreakdown}
+            breakdownLabels={{ months: 'months', days: 'days', hours: 'hours' }}
+          />
+          <StatMiniCard
+            icon="play-circle-outline"
+            title="Episodes watched"
+            primary={showEpisodes}
+            primaryLabel="episodes"
+          />
+        </View>
+
+        {/* Page 2: Movies stats */}
+        <View
+          style={{
+            width: pageWidth - SIDE_OFFSET * 2,
+            flexDirection: 'row',
+            gap: STATS_CARD_GAP,
+          }}
+        >
+          <StatMiniCard
+            icon="film-outline"
+            title="Movie time"
+            breakdown={movieBreakdown}
+            breakdownLabels={{ months: 'months', days: 'days', hours: 'hours' }}
+          />
+          <StatMiniCard
+            icon="checkmark-circle-outline"
+            title="Movies watched"
+            primary={movieCount}
+            primaryLabel="movies"
+          />
+        </View>
+      </ScrollView>
+
+      {/* Pagination dots */}
+      <View
+        style={{
+          flexDirection: 'row',
+          justifyContent: 'center',
+          alignItems: 'center',
+          gap: 6,
+          marginTop: 12,
+        }}
+      >
+        {Array.from({ length: totalPages }).map((_, i) => (
+          <View
+            key={i}
+            style={{
+              width: i === pageIndex ? 18 : 6,
+              height: 6,
+              borderRadius: 3,
+              backgroundColor: i === pageIndex ? colors.primary : colors.outlineVariant,
+            }}
+          />
+        ))}
+      </View>
+    </View>
   )
 })
 
@@ -377,6 +681,7 @@ export default function ProfileScreen() {
   const { user, signOut, loading: authLoading } = useAuth()
 
   const { data: stats, isLoading: statsLoading } = useProfileStats()
+  const { data: watchTime, isLoading: watchTimeLoading } = useWatchTimeBreakdown()
   const { data: shows, isLoading: showsLoading } = useShows()
   const { data: movies, isLoading: moviesLoading } = useMovies()
   const { data: favoriteShows } = useFavorites()
@@ -410,6 +715,20 @@ export default function ProfileScreen() {
     router.push('/import')
   }, [setImportComplete])
 
+  const [repairProgress, setRepairProgress] = useState<{ fixed: number; total: number } | null>(null)
+  const repairMutation = useRepairRuntime((fixed, total) => setRepairProgress({ fixed, total }))
+  const handleRepair = useCallback(() => {
+    setRepairProgress({ fixed: 0, total: 0 })
+    repairMutation.mutate(undefined, {
+      onSettled: () => setRepairProgress(null),
+    })
+  }, [repairMutation])
+
+  const repairIdsMutation = useRepairUserIds()
+  const handleRepairIds = useCallback(() => {
+    repairIdsMutation.mutate(undefined)
+  }, [repairIdsMutation])
+
   // Dynamic styles that depend on theme
   const styles = useMemo(
     () =>
@@ -432,11 +751,11 @@ export default function ProfileScreen() {
           paddingHorizontal: 20,
         },
         avatarRing: {
-          width: 96,
-          height: 96,
+          width: 112,
+          height: 112,
           borderRadius: 100,
           borderWidth: 2,
-          borderColor: 'rgba(208,188,255,0.2)',
+          borderColor: 'rgba(208,188,255,0.25)',
           padding: 4,
           marginBottom: 16,
         },
@@ -458,10 +777,10 @@ export default function ProfileScreen() {
         },
         avatarInitials: {
           fontFamily: 'Inter',
-          fontSize: 28,
+          fontSize: 34,
           fontWeight: '700',
           color: colors.onSurface,
-          opacity: 0.8,
+          opacity: 0.85,
         },
         userName: {
           fontFamily: 'Inter',
@@ -541,6 +860,40 @@ export default function ProfileScreen() {
           color: colors.onSurfaceVariant,
           marginTop: 2,
         },
+        // Empty State
+        emptyState: {
+          marginHorizontal: 20,
+          marginTop: 16,
+          marginBottom: 24,
+          padding: 24,
+          backgroundColor: colors.surfaceContainer,
+          borderRadius: 16,
+          alignItems: 'center',
+          borderWidth: 1,
+          borderColor: 'rgba(255,255,255,0.05)',
+        },
+        emptyTitle: {
+          fontFamily: 'Inter',
+          fontSize: 20,
+          fontWeight: '600',
+          color: colors.onSurface,
+          marginTop: 12,
+          marginBottom: 8,
+        },
+        emptySubtitle: {
+          fontFamily: 'Inter',
+          fontSize: 14,
+          color: colors.onSurfaceVariant,
+          textAlign: 'center',
+          lineHeight: 20,
+          marginBottom: 16,
+        },
+        emptyActionPrimary: {
+          flex: 1,
+        },
+        emptyActionSecondary: {
+          flex: 1,
+        },
       }),
     [colors]
   )
@@ -575,15 +928,51 @@ export default function ProfileScreen() {
           <Text style={styles.userBadge}>{user?.email || 'Premium Member'}</Text>
         </View>
 
-        {/* ── Bento Stats Grid ── */}
-        {stats && (
-          <View style={styles.statsGrid}>
-            <StatCard label="SHOWS" value={formatNumber(stats.totalShows)} />
-            <StatCard label="MOVIES" value={formatNumber(stats.totalMovies)} />
-            <StatCard label="EPISODES" value={formatNumber(stats.totalEpisodes)} />
-            <StatCard label="WATCHED" value={`${formatNumber(stats.totalHours)}h`} />
+        {/* ── Empty State CTA ── */}
+        {activeShows.length === 0 && watchedMoviesList.length === 0 && (favoriteShows?.length ?? 0) === 0 && (favoriteMovies?.length ?? 0) === 0 && (
+          <View style={styles.emptyState}>
+            <Ionicons name="film-outline" size={64} color={colors.primary} />
+            <Text style={styles.emptyTitle}>No content yet</Text>
+            <Text style={styles.emptySubtitle}>
+              Start building your library by importing from TV Time or adding shows and movies manually.
+            </Text>
+            <View style={{ flexDirection: 'row', gap: 12, marginTop: 16 }}>
+              <Pressable
+                style={[
+                  styles.emptyActionPrimary,
+                  { backgroundColor: colors.primary, paddingVertical: 12, paddingHorizontal: 24, borderRadius: 10, flex: 1, alignItems: 'center' }
+                ]}
+                onPress={() => router.push('/import')}
+              >
+                <Text style={{ color: '#FFF', fontFamily: 'Inter', fontSize: 14, fontWeight: '600' }}>Import from TV Time</Text>
+              </Pressable>
+              <Pressable
+                style={[
+                  styles.emptyActionSecondary,
+                  { backgroundColor: colors.surfaceContainer, paddingVertical: 12, paddingHorizontal: 24, borderRadius: 10, flex: 1, alignItems: 'center', borderWidth: 1, borderColor: colors.outlineVariant }
+                ]}
+                onPress={() => router.push('/add-content')}
+              >
+                <Text style={{ color: colors.onSurface, fontFamily: 'Inter', fontSize: 14, fontWeight: '600' }}>Add Manually</Text>
+              </Pressable>
+            </View>
           </View>
         )}
+
+        {/* ── Statistics Link ── */}
+        <SectionHeader
+          title="Stats"
+          icon="stats-chart-outline"
+          onPress={() => router.push('/profile/stats')}
+        />
+
+        {/* ── Stats Preview Cards ── */}
+        <StatsPreviewCards
+          showHours={watchTime?.showHours ?? 0}
+          showEpisodes={watchTime?.showEpisodes ?? 0}
+          movieHours={watchTime?.movieHours ?? 0}
+          movieCount={watchTime?.movieCount ?? 0}
+        />
 
         {/* ── Shows Carousel ── */}
         {activeShows.length > 0 && (
@@ -777,6 +1166,31 @@ export default function ProfileScreen() {
             icon="sync-outline"
             label="Import TV Time Data"
             onPress={handleImport}
+          />
+          <SettingsRow
+            icon="hammer-outline"
+            label={repairMutation.isPending
+              ? `Repairing... ${repairProgress ? `${repairProgress.fixed}/${repairProgress.total}` : ''}`
+              : 'Repair Runtime Data'
+            }
+            showChevron={false}
+            rightLabel={repairMutation.isSuccess ? 'Fixed!' : ''}
+            onPress={handleRepair}
+          />
+          <SettingsRow
+            icon="person-outline"
+            label={
+              repairIdsMutation.isPending ? 'Repairing...' :
+              repairIdsMutation.isSuccess
+                ? `Fixed ${repairIdsMutation.data?.shows_fixed ?? 0} shows`
+                : 'Repair User IDs'
+            }
+            showChevron={false}
+            rightLabel={
+              repairIdsMutation.isError ? 'Error' :
+              repairIdsMutation.isSuccess ? 'Done!' : ''
+            }
+            onPress={handleRepairIds}
           />
           <SettingsRow
             icon="log-out-outline"

@@ -13,6 +13,7 @@ import { Ionicons } from '@expo/vector-icons'
 import { router } from 'expo-router'
 import { getImageUrl } from '@/lib/queries/shows'
 import ProgressBar from './ProgressBar'
+
 import { typography, borderRadius, spacing } from '@/theme'
 import { useTheme } from '@/contexts/ThemeContext'
 import type { ShowWithUserData } from '@/lib/queries/shows'
@@ -101,36 +102,42 @@ export default function ShowCard({ show }: ShowCardProps) {
   },
 }), [colors])
 
+  const posterContent = (
+    <>
+      {posterUrl ? (
+        <Image
+          source={{ uri: posterUrl }}
+          style={styles.poster}
+          contentFit="cover"
+          cachePolicy="memory-disk"
+        />
+      ) : (
+        <View style={styles.posterPlaceholder}>
+          <Ionicons name="tv-outline" size={32} color={colors.outlineVariant} />
+        </View>
+      )}
+
+      {/* Complete badge */}
+      {isComplete && (
+        <View style={styles.completeBadge}>
+          <Ionicons name="checkmark-circle" size={18} color={colors.statusFinished} />
+        </View>
+      )}
+
+      {/* Up to date badge */}
+      {isUpToDate && (
+        <View style={styles.upToDateBadge}>
+          <Ionicons name="checkmark-circle" size={18} color={colors.statusUpToDate} />
+        </View>
+      )}
+    </>
+  )
+
   return (
     <Pressable style={styles.card} onPress={handlePress}>
       {/* Poster */}
       <View style={styles.posterContainer}>
-        {posterUrl ? (
-          <Image
-            source={{ uri: posterUrl }}
-            style={styles.poster}
-            contentFit="cover"
-            cachePolicy="memory-disk"
-          />
-        ) : (
-          <View style={styles.posterPlaceholder}>
-            <Ionicons name="tv-outline" size={32} color={colors.outlineVariant} />
-          </View>
-        )}
-
-        {/* Complete badge */}
-        {isComplete && (
-          <View style={styles.completeBadge}>
-            <Ionicons name="checkmark-circle" size={18} color={colors.statusFinished} />
-          </View>
-        )}
-
-        {/* Up to date badge */}
-        {isUpToDate && (
-          <View style={styles.upToDateBadge}>
-            <Ionicons name="checkmark-circle" size={18} color={colors.statusUpToDate} />
-          </View>
-        )}
+        {posterContent}
       </View>
 
       {/* Progress bar */}

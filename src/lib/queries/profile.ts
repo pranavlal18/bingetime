@@ -59,7 +59,7 @@ async function fetchStats(userId: string): Promise<ProfileStats> {
 
   const { data: userMovies, error: moviesError } = await supabase
     .from('user_movies')
-    .select('watched, is_watchlist')
+    .select('watched, is_watchlist, movies!inner(runtime)')
     .eq('user_id', userId)
 
   const { count: listsCount, error: listsError } = await supabase
@@ -97,9 +97,21 @@ async function fetchStats(userId: string): Promise<ProfileStats> {
   const watchlistMovies = userMovies?.filter((m) => m.is_watchlist).length ?? 0
   const customLists = listsCount ?? 0
 
-  // Movies: use runtime from movies table (need to fetch separately or estimate)
-  // For now, estimate movies at 2 hours each since we don't join movies table here
-  const movieSeconds = watchedMovies * 2 * 3600 // 2 hours in seconds
+  // Calculate total movie watch time using actual runtime from movies table
+  // Fall back to 2h estimate if runtime is null
+  let movieSeconds = 0
+  if (userMovies) {
+    for (const um of userMovies) {
+      if (!um.watched) continue
+      const movie = Array.isArray(um.movies) ? um.movies[0] : um.movies
+      const runtime = movie?.runtime ?? null
+      if (runtime) {
+        movieSeconds += runtime
+      } else {
+        movieSeconds += 2 * 3600 // fallback: 2 hours in seconds
+      }
+    }
+  }
 
   const totalHours = Math.round((totalShowSeconds + movieSeconds) / 3600)
 

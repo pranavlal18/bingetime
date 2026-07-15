@@ -7,6 +7,7 @@ import { Swipeable } from 'react-native-gesture-handler'
 import { Ionicons } from '@expo/vector-icons'
 import { router } from 'expo-router'
 import { getImageUrl } from '@/lib/queries/movies'
+
 import { typography, borderRadius, spacing } from '@/theme'
 import { useTheme } from '@/contexts/ThemeContext'
 import type { MovieWithUserData } from '@/lib/queries/movies'
@@ -106,6 +107,37 @@ const MovieCard = memo(function MovieCard({ movie, onMarkWatched }: MovieCardPro
   const posterUrl = getImageUrl(movie.poster_path, 'w342')
   const year = movie.release_date ? movie.release_date.slice(0, 4) : null
 
+  const posterContent = (
+    <>
+      {posterUrl ? (
+        <Image
+          source={{ uri: posterUrl }}
+          style={styles.poster}
+          contentFit="cover"
+          cachePolicy="memory-disk"
+        />
+      ) : (
+        <View style={styles.posterPlaceholder}>
+          <Ionicons name="film-outline" size={32} color={colors.outlineVariant} />
+        </View>
+      )}
+
+      {/* Watched badge */}
+      {movie.watched && (
+        <View style={styles.watchedBadge}>
+          <Ionicons name="checkmark-circle" size={18} color={colors.success} />
+        </View>
+      )}
+
+      {/* Year badge */}
+      {year ? (
+        <View style={styles.yearBadge}>
+          <Text style={styles.yearText}>{year}</Text>
+        </View>
+      ) : null}
+    </>
+  )
+
   const renderRightActions = () => {
     if (movie.watched) return null
     return (
@@ -132,32 +164,7 @@ const MovieCard = memo(function MovieCard({ movie, onMarkWatched }: MovieCardPro
       <Pressable style={styles.card} onPress={handlePress}>
         {/* Poster */}
         <View style={styles.posterContainer}>
-          {posterUrl ? (
-            <Image
-              source={{ uri: posterUrl }}
-              style={styles.poster}
-              contentFit="cover"
-              cachePolicy="memory-disk"
-            />
-          ) : (
-            <View style={styles.posterPlaceholder}>
-              <Ionicons name="film-outline" size={32} color={colors.outlineVariant} />
-            </View>
-          )}
-
-          {/* Watched badge */}
-          {movie.watched && (
-            <View style={styles.watchedBadge}>
-              <Ionicons name="checkmark-circle" size={18} color={colors.success} />
-            </View>
-          )}
-
-          {/* Year badge */}
-          {year ? (
-            <View style={styles.yearBadge}>
-              <Text style={styles.yearText}>{year}</Text>
-            </View>
-          ) : null}
+          {posterContent}
         </View>
 
         {/* Title */}

@@ -1,3 +1,4 @@
+import { Platform } from 'react-native';
 import { useEffect } from 'react';
 import { useAppStore } from '@/stores/appStore';
 import { useUpcomingEpisodes } from '@/lib/queries/upcoming';
@@ -8,6 +9,9 @@ export function useNotificationScheduler() {
   const { data: upcomingEpisodes } = useUpcomingEpisodes();
 
   useEffect(() => {
+    // Notifications are not available on web
+    if (Platform.OS === 'web') return;
+
     async function setupReminders() {
       if (!notificationsEnabled) {
         await cancelAllReminders();
