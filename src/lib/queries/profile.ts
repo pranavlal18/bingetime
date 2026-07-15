@@ -302,6 +302,8 @@ export function useMarkWatched() {
             user_id: user.id,
             episodes_seen: newCount,
             updated_at: new Date().toISOString(),
+            is_watchlist: true,
+            is_following: true,
           },
           { onConflict: 'show_id,user_id' }
         )

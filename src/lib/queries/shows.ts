@@ -4,28 +4,9 @@ import { useQuery, useMutation, useQueryClient, QueryClient } from '@tanstack/re
 import { supabase } from '@/lib/supabase'
 import { getImageUrl, getShowBasicDetails } from '@/lib/tmdb'
 import { useAuth } from '@/contexts/AuthContext'
-import { episodeKeys } from './episodes'
-import { profileKeys } from './profile'
-import type { Show, UserShow } from '@/types'
+import { showKeys, episodeKeys, type ShowWithUserData, type NextAirEpisode, profileKeys } from './sharedTypes'
 
-// ── Types for joined query result ──
-
-export interface NextAirEpisode {
-  season_number: number
-  episode_number: number
-  name: string | null
-  air_date: string
-}
-
-export interface ShowWithUserData extends Show {
-  user_shows: UserShow | null
-  episodes_seen: number
-  is_following: boolean
-  is_favorited: boolean
-  is_watchlist: boolean
-  last_watched_episode_data: UserShow['last_watched_episode_data']
-  next_air_episode: NextAirEpisode | null
-}
+export type { ShowWithUserData, NextAirEpisode }
 
 function mapRow(row: any): ShowWithUserData {
   // PostgREST returns to-many relationships as arrays, even with !inner
@@ -42,7 +23,6 @@ function mapRow(row: any): ShowWithUserData {
     last_air_date: row.last_air_date,
     average_runtime: row.average_runtime ?? null,
     // User show data
-    user_shows: us,
     episodes_seen: us.episodes_seen ?? 0,
     is_following: us.is_following ?? true,
     is_favorited: us.is_favorited ?? false,
@@ -52,26 +32,36 @@ function mapRow(row: any): ShowWithUserData {
   }
 }
 
-// ── Query keys ──
-
-export const showKeys = {
-  all: ['shows'] as const,
-  list: (userId: string) => ['shows', 'list', userId] as const,
-  continueWatching: (userId: string) => ['shows', 'continue-watching', userId] as const,
-  detail: (id: string) => ['shows', 'detail', id] as const,
-}
-
-// ── Fetch all shows (with user data join) ──
+// ── Fetch all shows (with user data join) ───
 
 async function fetchShows(
   userId: string,
   queryClient?: QueryClient
 ): Promise<ShowWithUserData[]> {
-  // Use inner join to only get shows that have user_shows for this user
+  // Query from user_shows (user's library) with join to shows
+  // This ensures ALL shows in user's library are returned, not just is_watchlist=true
   let query = supabase
-    .from('shows')
-    .select('*, user_shows!inner(*)')
-    .eq('user_shows.user_id', userId)
+    .from('user_shows')
+    .select(`
+      episodes_seen,
+      is_favorited,
+      is_following,
+      is_watchlist,
+      last_watched_episode_data,
+      created_at,
+      shows!inner(
+        id,
+        tmdb_id,
+        tvdb_id,
+        name,
+        status,
+        poster_path,
+        total_episodes,
+        last_air_date,
+        average_runtime
+      )
+    `)
+    .eq('user_id', userId)
 
   const { data, error } = await query
 
@@ -80,12 +70,34 @@ async function fetchShows(
   if (error) throw new Error(`Failed to fetch shows: ${error.message}`)
   if (!data) return []
 
-  let result = data.map(mapRow)
+  let result = data.map((row: any) => {
+    const show = Array.isArray(row.shows) ? row.shows[0] : row.shows
+    return {
+      id: show.id,
+      tmdb_id: show.tmdb_id,
+      tvdb_id: show.tvdb_id,
+      name: show.name,
+      status: show.status,
+      poster_path: show.poster_path,
+      total_episodes: show.total_episodes,
+      last_air_date: show.last_air_date,
+      average_runtime: show.average_runtime ?? null,
+      // User show data
+      user_shows: row,
+      episodes_seen: row.episodes_seen ?? 0,
+      is_following: row.is_following ?? true,
+      is_favorited: row.is_favorited ?? false,
+      is_watchlist: row.is_watchlist ?? true, // Default to true for library visibility
+      last_watched_episode_data: row.last_watched_episode_data ?? null,
+      created_at: row.created_at ?? null,
+      next_air_episode: null, // Enriched later if needed
+    }
+  })
 
   console.log('🔍 [fetchShows] After mapping:', { count: result.length, watchlist: result.filter(s => s.is_watchlist).length })
 
-  // Filter: only show items that are in the user's library
-  result = result.filter((s) => s.is_watchlist)
+  // NO FILTER - show ALL shows in user's library (user_shows table IS the library)
+  // The is_watchlist filter was hiding shows that were imported without that flag
 
   // ── Batch sync episodes_seen ──
   // Uses Math.max to NEVER decrease the counter:
@@ -125,22 +137,41 @@ async function fetchShows(
     if (updates.length > 0) {
       await Promise.all(updates)
 
-      // Also patch the continue-watching cache so the UI is consistent
+      // Also patch the caches so the UI is consistent
       if (queryClient) {
-        const cwCached = queryClient.getQueryData<ShowWithUserData[]>(showKeys.continueWatching(userId))
-        if (cwCached) {
-          const cwMap = new Map(result.map((s) => [s.id, s.episodes_seen]))
-          let changed = false
-          const updated = cwCached.map((s) => {
-            const fixed = cwMap.get(s.id)
+        // Patch the main list cache
+        const listCached = queryClient.getQueryData<ShowWithUserData[]>(showKeys.list(userId))
+        if (listCached) {
+          const listMap = new Map(result.map((s) => [s.id, s.episodes_seen]))
+          let listChanged = false
+          const listUpdated = listCached.map((s) => {
+            const fixed = listMap.get(s.id)
             if (fixed !== undefined && fixed !== s.episodes_seen) {
-              changed = true
+              listChanged = true
               return { ...s, episodes_seen: fixed }
             }
             return s
           })
-          if (changed) {
-            queryClient.setQueryData(showKeys.continueWatching(userId), updated)
+          if (listChanged) {
+            queryClient.setQueryData(showKeys.list(userId), listUpdated)
+          }
+        }
+
+        // Patch the continue-watching cache
+        const cwCached = queryClient.getQueryData<ShowWithUserData[]>(showKeys.continueWatching(userId))
+        if (cwCached) {
+          const cwMap = new Map(result.map((s) => [s.id, s.episodes_seen]))
+          let cwChanged = false
+          const cwUpdated = cwCached.map((s) => {
+            const fixed = cwMap.get(s.id)
+            if (fixed !== undefined && fixed !== s.episodes_seen) {
+              cwChanged = true
+              return { ...s, episodes_seen: fixed }
+            }
+            return s
+          })
+          if (cwChanged) {
+            queryClient.setQueryData(showKeys.continueWatching(userId), cwUpdated)
           }
         }
       }
@@ -252,30 +283,7 @@ export function useShow(id: string) {
     queryKey: showKeys.detail(id),
     queryFn: () => fetchShow(id, user?.id ?? '', queryClient),
     staleTime: 1000 * 60 * 2,
-    enabled: !!user,
-    // Use placeholderData (not initialData) so the query stays in pending state
-    // when no cache is available — avoids React Query v5 treating undefined
-    // initialData as a "success" state with no data.
-    placeholderData: () => {
-      if (!user) return undefined
-      // Check the list cache
-      const cached = queryClient.getQueryData<ShowWithUserData[]>(
-        showKeys.list(user.id)
-      )
-      if (cached) {
-        const found = cached.find((s) => s.id === id)
-        if (found) return found
-      }
-      // Also check continue watching cache
-      const cwCached = queryClient.getQueryData<ShowWithUserData[]>(
-        showKeys.continueWatching(user.id)
-      )
-      if (cwCached) {
-        const found = cwCached.find((s) => s.id === id)
-        if (found) return found
-      }
-      return undefined
-    },
+    enabled: !!user && !!id,
   })
 }
 
@@ -715,11 +723,22 @@ export function computeNextEpisode(show: ShowWithUserData): NextEpisodeInfo | nu
   }
 }
 
-/** Check if a show hasn't been watched for 14+ days (or never watched) */
-export function isHaventWatched(show: ShowWithUserData): boolean {
-  // Never watched — definitely "haven't watched"
-  if (show.episodes_seen === 0) return true
+/** Check if a show hasn't been watched for 21+ days (or never started after 21 days) */
+const HAVENT_WATCHED_THRESHOLD_DAYS = 21
 
+export function isHaventWatched(show: ShowWithUserData): boolean {
+  // Never watched any episode
+  if (show.episodes_seen === 0) {
+    // Check if added 21+ days ago (never started)
+    const lastData = show.last_watched_episode_data
+    if (lastData?.updated_at) {
+      const daysSinceAdded = (Date.now() - new Date(lastData.updated_at).getTime()) / (1000 * 60 * 60 * 24)
+      return daysSinceAdded >= HAVENT_WATCHED_THRESHOLD_DAYS
+    }
+    return false
+  }
+
+  // Has watched at least once - check 21-day gap since last watch
   const lastData = show.last_watched_episode_data
   if (!lastData) return false
 
@@ -729,7 +748,7 @@ export function isHaventWatched(show: ShowWithUserData): boolean {
 
   const watchedAt = new Date(dateStr)
   const daysSinceWatched = (Date.now() - watchedAt.getTime()) / (1000 * 60 * 60 * 24)
-  return daysSinceWatched >= 14
+  return daysSinceWatched >= HAVENT_WATCHED_THRESHOLD_DAYS
 }
 
 // ── New Season Detection (async, non-blocking) ──

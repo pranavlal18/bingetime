@@ -700,7 +700,12 @@ export default function ProfileScreen() {
   // Theme label
   const currentThemeMeta = availableThemes.find((t) => t.key === themeKey)
 
-  // Derived sections — only active shows (started) and watched movies
+  // Derived sections — all shows in library and watched movies
+  const libraryShows = useMemo(() => {
+    if (!shows) return []
+    return shows // All shows in library
+  }, [shows])
+
   const activeShows = useMemo(() => {
     if (!shows) return []
     return shows.filter((s) => s.episodes_seen > 0)
@@ -1040,7 +1045,7 @@ export default function ProfileScreen() {
             <Ionicons name="film-outline" size={64} color={colors.primary} />
             <Text style={styles.emptyTitle}>No content yet</Text>
             <Text style={styles.emptySubtitle}>
-              Start building your library by importing from TV Time or adding shows and movies manually.
+              Start by discovering shows and movies, or import your library from TV Time.
             </Text>
             <View style={{ flexDirection: 'row', gap: 12, marginTop: 16 }}>
               <Pressable
@@ -1048,20 +1053,28 @@ export default function ProfileScreen() {
                   styles.emptyActionPrimary,
                   { backgroundColor: colors.primary, paddingVertical: 12, paddingHorizontal: 24, borderRadius: 10, flex: 1, alignItems: 'center' }
                 ]}
-                onPress={() => router.push('/import')}
+                onPress={() => router.replace('/(tabs)/discover')}
               >
-                <Text style={{ color: '#FFF', fontFamily: 'Inter', fontSize: 14, fontWeight: '600' }}>Import from TV Time</Text>
+                <Text style={{ color: '#FFF', fontFamily: 'Inter', fontSize: 14, fontWeight: '600' }}>Discover Content</Text>
               </Pressable>
               <Pressable
                 style={[
                   styles.emptyActionSecondary,
                   { backgroundColor: colors.surfaceContainer, paddingVertical: 12, paddingHorizontal: 24, borderRadius: 10, flex: 1, alignItems: 'center', borderWidth: 1, borderColor: colors.outlineVariant }
                 ]}
-                onPress={() => router.push('/add-content')}
+                onPress={() => router.push('/import')}
               >
-                <Text style={{ color: colors.onSurface, fontFamily: 'Inter', fontSize: 14, fontWeight: '600' }}>Add Manually</Text>
+                <Text style={{ color: colors.onSurface, fontFamily: 'Inter', fontSize: 14, fontWeight: '600' }}>Import from TV Time</Text>
               </Pressable>
             </View>
+            <Pressable
+              style={[
+                { backgroundColor: colors.surfaceContainer, paddingVertical: 12, paddingHorizontal: 24, borderRadius: 10, alignItems: 'center', borderWidth: 1, borderColor: colors.outlineVariant, marginTop: 8 }
+              ]}
+              onPress={() => router.push('/add-content')}
+            >
+              <Text style={{ color: colors.onSurface, fontFamily: 'Inter', fontSize: 14, fontWeight: '600' }}>Add Manually</Text>
+            </Pressable>
           </View>
         )}
 
@@ -1081,11 +1094,11 @@ export default function ProfileScreen() {
         />
 
         {/* ── Shows Carousel ── */}
-        {activeShows.length > 0 && (
+        {libraryShows.length > 0 && (
           <View style={styles.carouselSection}>
             <SectionHeader
               title="Shows"
-              count={activeShows.length}
+              count={libraryShows.length}
               onPress={() => router.push('/all-shows')}
             />
             <ScrollView
@@ -1093,7 +1106,7 @@ export default function ProfileScreen() {
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={styles.carouselContent}
             >
-              {activeShows.slice(0, 10).map((show) => (
+              {libraryShows.slice(0, 10).map((show) => (
                 <PosterItem
                   key={show.id}
                   posterPath={show.poster_path}

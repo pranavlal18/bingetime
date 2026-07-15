@@ -4,8 +4,8 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import { getSeasonDetails } from '@/lib/tmdb'
 import { useAuth } from '@/contexts/AuthContext'
+import { episodeKeys, showKeys, type ShowWithUserData } from './sharedTypes'
 import type { TMDbSeasonDetails, EpisodeCardData } from '@/types'
-import { showKeys, type ShowWithUserData } from './shows'
 
 // ── Types ──
 
@@ -24,14 +24,6 @@ export interface SeasonWithEpisodes {
   seasonName: string
   seasonOverview: string | null
   episodes: EpisodeWithStatus[]
-}
-
-// ── Query keys ──
-
-export const episodeKeys = {
-  all: ['episodes'] as const,
-  season: (showId: string, tmdbId: number | null, seasonNumber: number, userId: string) =>
-    ['episodes', 'season', showId, tmdbId, seasonNumber, userId] as const,
 }
 
 // ── Fetch season episodes + user watch status ──

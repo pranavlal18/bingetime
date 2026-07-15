@@ -114,25 +114,26 @@ export default function ShowsScreen() {
       .map(ep => ({ showId: ep.showId, tmdbId: ep.tmdbId, seasonNumber: ep.seasonNumber }))
   }, [rawWatchNext, rawHaventWatched])
 
+  // Memoize query arrays to stabilize useQueries references
+  const showQueriesConfig = useMemo(() => showPairs.map(pair => ({
+    queryKey: ['tmdb', 'show-basic', pair.tmdbId],
+    queryFn: () => getShowBasicDetails(pair.tmdbId),
+    staleTime: 1000 * 60 * 60,
+    enabled: showPairs.length > 0,
+  })), [showPairs])
+
+  const seasonQueriesConfig = useMemo(() => episodeNamePairs.map(pair => ({
+    queryKey: ['tmdb', 'season-details', pair.tmdbId, pair.seasonNumber],
+    queryFn: () => getSeasonDetails(pair.tmdbId, pair.seasonNumber),
+    staleTime: 1000 * 60 * 60, // 1 hour — episode names don't change
+    enabled: episodeNamePairs.length > 0,
+  })), [episodeNamePairs])
+
   // 3a. Fetch show-level details for ALL season episode counts (boundary detection)
-  const showQueries = useQueries({
-    queries: showPairs.map(pair => ({
-      queryKey: ['tmdb', 'show-basic', pair.tmdbId],
-      queryFn: () => getShowBasicDetails(pair.tmdbId),
-      staleTime: 1000 * 60 * 60,
-      enabled: showPairs.length > 0,
-    })),
-  })
+  const showQueries = useQueries({ queries: showQueriesConfig })
 
   // 3b. Batch-fetch TMDb season details for episode names
-  const seasonQueries = useQueries({
-    queries: episodeNamePairs.map(pair => ({
-      queryKey: ['tmdb', 'season-details', pair.tmdbId, pair.seasonNumber],
-      queryFn: () => getSeasonDetails(pair.tmdbId, pair.seasonNumber),
-      staleTime: 1000 * 60 * 60, // 1 hour — episode names don't change
-      enabled: episodeNamePairs.length > 0,
-    })),
-  })
+  const seasonQueries = useQueries({ queries: seasonQueriesConfig })
 
   // 3c. Watch Next loading state: ready when shows loaded AND all TMDb queries resolved
   const isWatchNextReady = useMemo(() => {

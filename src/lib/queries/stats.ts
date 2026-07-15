@@ -1418,8 +1418,10 @@ async function fetchWatchTimeBreakdown(userId: string): Promise<WatchTimeBreakdo
       const show = Array.isArray(row.shows) ? row.shows[0] : row.shows
       const eps = row.episodes_seen ?? 0
       showEpisodes += eps
-      if (show.average_runtime && eps > 0) {
-        showSeconds += show.average_runtime * eps
+      // Use actual average_runtime if available, otherwise fallback to 45 min (2700 seconds)
+      const runtime = show.average_runtime ?? 2700
+      if (eps > 0) {
+        showSeconds += runtime * eps
       }
     }
   }

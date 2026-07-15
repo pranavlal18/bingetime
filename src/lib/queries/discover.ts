@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
 import * as tmdb from '@/lib/tmdb'
+import { upcomingKeys } from './upcoming'
 
 // ── Unified result type for the Discover tab ──
 
@@ -207,6 +208,11 @@ export function useAddToLibrary() {
       queryClient.invalidateQueries({ queryKey: ['profile'] })
       // Refresh stats (tab counts, remaining, watch time, etc.)
       queryClient.invalidateQueries({ queryKey: ['stats'] })
+
+      // Invalidate Upcoming so newly added running TV shows appear immediately
+      if (item.mediaType === 'tv' && user) {
+        queryClient.invalidateQueries({ queryKey: upcomingKeys.list(user.id) })
+      }
     },
     onError: (error) => {
       console.error('❌ [useAddToLibrary] Error:', error.message)
@@ -301,6 +307,7 @@ async function addShowToLibrary(item: DiscoverResult, userId: string): Promise<s
         last_air_date: item.year ? `${item.year}-01-01` : null,
         total_episodes: details?.number_of_episodes ?? null,
         average_runtime: averageRuntime,
+        status: details?.status ?? null,  // Save TMDb status for Upcoming filtering
       },
       { onConflict: 'tvdb_id' }
     )

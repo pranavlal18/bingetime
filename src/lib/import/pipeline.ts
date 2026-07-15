@@ -696,7 +696,7 @@ async function updateShowsWithTmdbData(
           total_episodes: resolution.total_episodes,
           last_air_date: resolution.last_air_date,
           average_runtime: resolution.average_runtime ?? null,
-          genres: resolution.genres,
+          // genres: resolution.genres, // Commented out until schema is updated
         }
       })
       .filter(Boolean) as Array<{
@@ -709,7 +709,7 @@ async function updateShowsWithTmdbData(
         total_episodes: number | null
         last_air_date: string | null
         average_runtime: number | null
-        genres: string[]
+        // genres?: string[]
       }>
 
     if (showUpdates.length > 0) {
