@@ -13,6 +13,7 @@ import {
 } from 'react-native'
 import { router } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
+import { Image } from 'expo-image'
 import { useAuth } from '@/contexts/AuthContext'
 import { typography, spacing, borderRadius } from '@/theme'
 import { useTheme } from '@/contexts/ThemeContext'
@@ -42,6 +43,13 @@ export default function RegisterScreen() {
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: spacing.stackMd,
+    borderWidth: 1,
+    borderColor: colors.primary + '30',
+    shadowColor: colors.primary,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.4,
+    shadowRadius: 12,
+    elevation: 10,
   },
   title: {
     fontFamily: 'Inter',
@@ -213,7 +221,11 @@ export default function RegisterScreen() {
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         <View style={styles.logoContainer}>
           <View style={styles.logo}>
-            <Ionicons name="tv-outline" size={48} color={colors.primary} />
+            <Image
+              source={require('../../assets/logo.png')}
+              style={{ width: '100%', height: '100%', borderRadius: borderRadius.xl }}
+              contentFit="contain"
+            />
           </View>
           <Text style={styles.title}>BingeTime</Text>
           <Text style={styles.subtitle}>Track your shows & movies</Text>

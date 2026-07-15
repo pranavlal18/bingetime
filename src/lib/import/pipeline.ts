@@ -13,26 +13,19 @@ import type {
   FollowedTvShowRow,
   UserTvShowDataRow,
   TrackingV2Row,
-  ShowSeenEpisodeLatestRow,
-  UserShowSpecialStatusRow,
   TrackingProdRecordRow,
 } from './types'
 
 // ── Step definitions ──
 
 export const IMPORT_STEPS: ImportStep[] = [
-  { id: 'read-csvs', label: 'Reading CSV files', status: 'pending', current: 0, total: 7 },
+  { id: 'read-csvs', label: 'Reading CSV files', status: 'pending', current: 0, total: 4 },
   { id: 'import-shows', label: 'Importing shows', status: 'pending', current: 0, total: 0 },
   { id: 'reconcile-usershows', label: 'Reconciling show data', status: 'pending', current: 0, total: 0 },
   { id: 'import-episodes', label: 'Importing episode watches', status: 'pending', current: 0, total: 0 },
-  { id: 'continue-watching', label: 'Setting continue watching', status: 'pending', current: 0, total: 0 },
-  { id: 'special-status', label: 'Setting watchlist status', status: 'pending', current: 0, total: 0 },
   { id: 'import-movies', label: 'Importing movies', status: 'pending', current: 0, total: 0 },
-  { id: 'import-lists', label: 'Importing custom lists', status: 'pending', current: 0, total: 0 },
   { id: 'resolve-tmdb', label: 'Resolving TMDb IDs', status: 'pending', current: 0, total: 0 },
 ]
-
-const STEP_COUNT = IMPORT_STEPS.length
 
 // ── Progress callback type ──
 
@@ -43,16 +36,14 @@ export type ProgressCallback = (stepIndex: number, current: number, total: numbe
 export async function runImport(
   userId: string,
   onProgress?: ProgressCallback,
-  onStepStatus?: (stepIndex: number, status: ImportStep['status'], error?: string) => void
+  onStepStatus?: (stepIndex: number, status: ImportStep['status'], error?: string) => void,
+  csvData?: AllCsvData
 ): Promise<{ success: boolean; warnings: string[]; error?: string }> {
   const context: ImportContext = {
     followedShows: [],
     userShowData: [],
     trackingV2Rows: [],
-    seenEpisodeLatest: [],
-    specialStatus: [],
     movieRecords: [],
-    listRows: [],
     showResolutionMap: new Map(),
     movieResolutionMap: new Map(),
     showUuidMap: new Map(),
@@ -60,21 +51,27 @@ export async function runImport(
   }
 
   try {
-    // ── Step 0: Read all CSVs ──
-    onStepStatus?.(0, 'processing')
-    onProgress?.(0, 0, 7, 'Reading CSV files from assets...')
+    // ── Step 0: Read all CSVs (skip if pre-parsed data was passed) ──
+    if (csvData) {
+      context.followedShows = csvData.followedShows
+      context.userShowData = csvData.userShowData
+      context.trackingV2Rows = csvData.trackingV2
+      context.movieRecords = csvData.movieRecords
 
-    const csvData: AllCsvData = await readAllCsvs()
-    context.followedShows = csvData.followedShows
-    context.userShowData = csvData.userShowData
-    context.trackingV2Rows = csvData.trackingV2
-    context.seenEpisodeLatest = csvData.seenEpisodeLatest
-    context.specialStatus = csvData.specialStatus
-    context.movieRecords = csvData.movieRecords
-    context.listRows = csvData.listRows
+      onStepStatus?.(0, 'done')
+    } else {
+      onStepStatus?.(0, 'processing')
+      onProgress?.(0, 0, 4, 'Reading CSV files from assets...')
 
-    onProgress?.(0, 7, 7, 'All CSVs read successfully')
-    onStepStatus?.(0, 'done')
+      const bundledData: AllCsvData = await readAllCsvs()
+      context.followedShows = bundledData.followedShows
+      context.userShowData = bundledData.userShowData
+      context.trackingV2Rows = bundledData.trackingV2
+      context.movieRecords = bundledData.movieRecords
+
+      onProgress?.(0, 4, 4, 'All CSVs read successfully')
+      onStepStatus?.(0, 'done')
+    }
 
     // ── Step 1: Import shows from followed_tv_show.csv ──
     onStepStatus?.(1, 'processing')
@@ -128,81 +125,24 @@ export async function runImport(
     onProgress?.(3, episodeRows.length, episodeRows.length, 'Episode watches imported')
     onStepStatus?.(3, 'done')
 
-    // ── Step 4: Set continue watching from show_seen_episode_latest.csv ──
+    // ── Step 4: Import movies from tracking-prod-records.csv ──
     onStepStatus?.(4, 'processing')
-    onProgress?.(4, 0, context.seenEpisodeLatest.length, 'Setting continue watching...')
-
-    // Build episode_id → (season, episode) lookup from tracking data
-    const episodeLookup = new Map<string, { season: number; episode: number }>()
-    for (const row of context.trackingV2Rows) {
-      const epId = row.ep_id
-      if (!epId) continue
-      const season = parseInt(row.season_number || row.s_no, 10)
-      const episode = parseInt(row.episode_number || row.ep_no, 10)
-      if (!isNaN(season) && !isNaN(episode)) {
-        episodeLookup.set(epId, { season, episode })
-      }
-    }
-
-    const continueResults = await setContinueWatching(
-      context.seenEpisodeLatest,
-      context.showUuidMap,
-      episodeLookup,
-      userId,
-      (count) => {
-        onProgress?.(4, count, context.seenEpisodeLatest.length)
-      }
-    )
-    context.warnings.push(...continueResults.warnings)
-    onProgress?.(4, context.seenEpisodeLatest.length, context.seenEpisodeLatest.length, 'Continue watching set')
-    onStepStatus?.(4, 'done')
-
-    // ── Step 5: Set watchlist status from user_show_special_status.csv ──
-    onStepStatus?.(5, 'processing')
-    onProgress?.(5, 0, context.specialStatus.length, 'Setting watchlist status...')
-
-    const watchlistResults = await setWatchlistStatus(
-      context.specialStatus,
-      context.showUuidMap,
-      userId,
-      (count) => {
-        onProgress?.(5, count, context.specialStatus.length)
-      }
-    )
-    context.warnings.push(...watchlistResults.warnings)
-    onProgress?.(5, context.specialStatus.length, context.specialStatus.length, 'Watchlist status set')
-    onStepStatus?.(5, 'done')
-
-    // ── Step 6: Import movies from tracking-prod-records.csv ──
-    onStepStatus?.(6, 'processing')
-    onProgress?.(6, 0, context.movieRecords.length, 'Importing movies...')
+    onProgress?.(4, 0, context.movieRecords.length, 'Importing movies...')
 
     const movieResults = await importMovies(context.movieRecords, userId, (count) => {
-      onProgress?.(6, count, context.movieRecords.length)
+      onProgress?.(4, count, context.movieRecords.length)
     })
     context.warnings.push(...movieResults.warnings)
 
-    onProgress?.(6, context.movieRecords.length, context.movieRecords.length, 'Movies imported')
-    onStepStatus?.(6, 'done')
+    onProgress?.(4, context.movieRecords.length, context.movieRecords.length, 'Movies imported')
+    onStepStatus?.(4, 'done')
 
-    // ── Step 7: Import custom lists ──
-    onStepStatus?.(7, 'processing')
-    onProgress?.(7, 0, context.listRows.length, 'Importing custom lists...')
-
-    const listResults = await importLists(context.listRows, (count) => {
-      onProgress?.(7, count, context.listRows.length)
-    })
-    context.warnings.push(...listResults.warnings)
-
-    onProgress?.(7, context.listRows.length, context.listRows.length, 'Custom lists imported')
-    onStepStatus?.(7, 'done')
-
-    // ── Step 8: Resolve TMDb IDs for shows ──
-    onStepStatus?.(8, 'processing')
+    // ── Step 5: Resolve TMDb IDs for shows ──
+    onStepStatus?.(5, 'processing')
 
     // Get all unique tvdb_ids that need resolution
     const allTvdbIds = [...context.showUuidMap.keys()]
-    onProgress?.(8, 0, allTvdbIds.length, 'Resolving TMDb IDs...')
+    onProgress?.(5, 0, allTvdbIds.length, 'Resolving TMDb IDs...')
 
     // Build tvdb_id -> name map for fallback search
     const tvdbIdToName = new Map<number, string>()
@@ -220,7 +160,7 @@ export async function runImport(
       context.showResolutionMap,
       tvdbIdToName,
       (resolved, total) => {
-        onProgress?.(8, resolved, total)
+        onProgress?.(5, resolved, total)
       }
     )
     context.showResolutionMap = resolutionMap
@@ -236,8 +176,8 @@ export async function runImport(
     // Update shows with TMDb data
     await updateShowsWithTmdbData(resolutionMap, context.showUuidMap)
 
-    onProgress?.(8, allTvdbIds.length, allTvdbIds.length, 'TMDb IDs resolved')
-    onStepStatus?.(8, 'done')
+    onProgress?.(5, allTvdbIds.length, allTvdbIds.length, 'TMDb IDs resolved')
+    onStepStatus?.(5, 'done')
 
     return { success: true, warnings: context.warnings }
   } catch (error) {
@@ -545,117 +485,6 @@ async function importEpisodeWatches(
   return { warnings }
 }
 
-async function setContinueWatching(
-  rows: ShowSeenEpisodeLatestRow[],
-  showUuidMap: Map<number, string>,
-  episodeLookup: Map<string, { season: number; episode: number }>,
-  userId: string,
-  onBatch: (count: number) => void
-): Promise<{ warnings: string[] }> {
-  const warnings: string[] = []
-  const BATCH_SIZE = 100
-
-  for (let i = 0; i < rows.length; i += BATCH_SIZE) {
-    const batch = rows.slice(i, i + BATCH_SIZE)
-
-    // Batch upsert user_shows with last_watched_episode_data
-    const updates = batch
-      .map((row) => {
-        const tvdbId = parseInt(row.tv_show_id, 10)
-        if (isNaN(tvdbId)) {
-          warnings.push(`Invalid tv_show_id in seen_episode_latest: ${row.tv_show_id}`)
-          return null
-        }
-
-        const showUuid = showUuidMap.get(tvdbId)
-        if (!showUuid) {
-          warnings.push(`No UUID for show tvdb_id ${tvdbId} (${row.tv_show_name}) — skipping continue-watching`)
-          return null
-        }
-
-        // Look up season/episode from tracking data
-        const epInfo = episodeLookup.get(row.episode_id)
-        const season = epInfo?.season ?? null
-        const episode = epInfo?.episode ?? null
-
-        return {
-          show_id: showUuid,
-          user_id: userId,
-          last_watched_episode_data: {
-            episode_id: row.episode_id,
-            season_number: season,
-            episode_number: episode,
-            updated_at: row.updated_at,
-          },
-        }
-      })
-      .filter(Boolean) as Array<{ show_id: string; user_id: string; last_watched_episode_data: Record<string, unknown> }>
-
-    if (updates.length > 0) {
-      const { error } = await supabase
-        .from('user_shows')
-        .upsert(updates, { onConflict: 'show_id,user_id' })
-
-      if (error) {
-        warnings.push(`Failed to batch update continue-watching: ${error.message}`)
-      }
-    }
-
-    onBatch(Math.min(i + BATCH_SIZE, rows.length))
-  }
-
-  return { warnings }
-}
-
-async function setWatchlistStatus(
-  rows: UserShowSpecialStatusRow[],
-  showUuidMap: Map<number, string>,
-  userId: string,
-  onBatch: (count: number) => void
-): Promise<{ warnings: string[] }> {
-  const warnings: string[] = []
-  const BATCH_SIZE = 100
-
-  for (let i = 0; i < rows.length; i += BATCH_SIZE) {
-    const batch = rows.slice(i, i + BATCH_SIZE)
-
-    // Batch upsert user_shows with is_watchlist = true for 'for_later' status
-    const updates = batch
-      .map((row) => {
-        const tvdbId = parseInt(row.tv_show_id, 10)
-        if (isNaN(tvdbId)) return null
-        if (row.status !== 'for_later') return null
-
-        const showUuid = showUuidMap.get(tvdbId)
-        if (!showUuid) {
-          warnings.push(`No UUID for show tvdb_id ${tvdbId} (${row.tv_show_name}) — skipping watchlist`)
-          return null
-        }
-
-        return {
-          show_id: showUuid,
-          user_id: userId,
-          is_watchlist: true,
-        }
-      })
-      .filter(Boolean) as Array<{ show_id: string; user_id: string; is_watchlist: boolean }>
-
-    if (updates.length > 0) {
-      const { error } = await supabase
-        .from('user_shows')
-        .upsert(updates, { onConflict: 'show_id,user_id' })
-
-      if (error) {
-        warnings.push(`Failed to batch update watchlist: ${error.message}`)
-      }
-    }
-
-    onBatch(Math.min(i + BATCH_SIZE, rows.length))
-  }
-
-  return { warnings }
-}
-
 async function importMovies(
   rows: TrackingProdRecordRow[],
   userId: string,
@@ -790,7 +619,13 @@ async function importMovies(
     .filter((m) => m.title.length > 0)
 
   if (titleYearList.length > 0) {
-    const resolutionMap = await resolveMoviesBatch(titleYearList, new Map())
+    const resolutionMap = await resolveMoviesBatch(
+      titleYearList,
+      new Map(),
+      (resolved) => {
+        onBatch(uniqueMovies.length + Math.min(resolved, titleYearList.length))
+      }
+    )
 
     const movieUpdates: Array<{
       id: string
@@ -830,65 +665,6 @@ async function importMovies(
         }
       }
     }
-  }
-
-  return { warnings }
-}
-
-async function importLists(
-  rows: any[],
-  onBatch: (count: number) => void
-): Promise<{ warnings: string[] }> {
-  const warnings: string[] = []
-  const BATCH_SIZE = 50
-
-  for (let i = 0; i < rows.length; i += BATCH_SIZE) {
-    const batch = rows.slice(i, i + BATCH_SIZE)
-
-    // Build batch upsert array
-    const listInserts = batch
-      .map((row, idx) => {
-        if (!row.name && !row.objects) return null
-
-        // Try to extract item IDs from the serialized `objects` field
-        // Format is: [map[created_at:... id:79481 type:series] map[...]]
-        const itemIds: string[] = []
-        const objectsStr = row.objects || ''
-
-        // Parse TV Time's Go map serialization format
-        const idMatches = objectsStr.matchAll(/id:(\d+)/g)
-        for (const match of idMatches) {
-          itemIds.push(match[1])
-        }
-
-        // Also extract movie UUIDs
-        const uuidMatches = objectsStr.matchAll(/uuid:([a-f0-9-]+)/g)
-        for (const match of uuidMatches) {
-          itemIds.push(match[1])
-        }
-
-        const listId = `list-${row.name?.toLowerCase().replace(/\s+/g, '-') || `list-${i + idx}`}`
-
-        return {
-          id: listId,
-          name: row.name || 'Untitled List',
-          description: row.description || null,
-          item_ids: itemIds,
-        }
-      })
-      .filter(Boolean) as Array<{ id: string; name: string; description: string | null; item_ids: string[] }>
-
-    if (listInserts.length > 0) {
-      const { error } = await supabase
-        .from('lists')
-        .upsert(listInserts, { onConflict: 'id' })
-
-      if (error) {
-        warnings.push(`Failed to batch upsert lists: ${error.message}`)
-      }
-    }
-
-    onBatch(Math.min(i + BATCH_SIZE, rows.length))
   }
 
   return { warnings }

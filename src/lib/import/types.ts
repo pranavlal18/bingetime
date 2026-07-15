@@ -26,10 +26,7 @@ export interface ImportContext {
   followedShows: FollowedTvShowRow[]
   userShowData: UserTvShowDataRow[]
   trackingV2Rows: TrackingV2Row[]
-  seenEpisodeLatest: ShowSeenEpisodeLatestRow[]
-  specialStatus: UserShowSpecialStatusRow[]
   movieRecords: TrackingProdRecordRow[]
-  listRows: ListsProdListRow[]
 
   // Resolved IDs for shows (tvdb_id -> tmdb_id)
   showResolutionMap: Map<number, ShowResolution>
@@ -103,20 +100,6 @@ export interface TrackingV2Row {
   most_recent_ep_watched: string
 }
 
-export interface ShowSeenEpisodeLatestRow {
-  tv_show_id: string
-  tv_show_name: string
-  episode_id: string
-  updated_at: string
-  created_at: string
-}
-
-export interface UserShowSpecialStatusRow {
-  tv_show_id: string
-  tv_show_name: string
-  status: string
-}
-
 export interface TrackingProdRecordRow {
   type: string // 'watch', 'follow', 'towatch', 'rewatch', 'rewatch_count'
   entity_type: string // 'movie' or 'episode'
@@ -127,8 +110,4 @@ export interface TrackingProdRecordRow {
   series_name?: string
 }
 
-export interface ListsProdListRow {
-  name: string
-  objects: string // serialized map format
-  description: string
-}
+

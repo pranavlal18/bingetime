@@ -17,6 +17,7 @@ import { requestNotificationPermissions, cancelAllReminders, getPermissionStatus
 import { Image } from 'expo-image'
 import { Ionicons } from '@expo/vector-icons'
 import { router } from 'expo-router'
+import Constants from 'expo-constants'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useAppStore } from '@/stores/appStore'
 import { useAuth } from '@/contexts/AuthContext'
@@ -28,6 +29,7 @@ import {
   useFavorites,
 } from '@/lib/queries/profile'
 import { useWatchTimeBreakdown } from '@/lib/queries/stats'
+import SkeletonBlock from '@/components/skeletons/SkeletonBlock'
 import { useTheme } from '@/contexts/ThemeContext'
 
 import type { ShowWithUserData } from '@/lib/queries/shows'
@@ -888,15 +890,125 @@ export default function ProfileScreen() {
         emptyActionSecondary: {
           flex: 1,
         },
+
+        // ── App Footer ──
+        footer: {
+          alignItems: 'center',
+          paddingVertical: 24,
+          paddingBottom: 32,
+        },
+        footerText: {
+          fontFamily: 'Inter',
+          fontSize: 13,
+          fontWeight: '600',
+          color: colors.onSurfaceVariant,
+          letterSpacing: 0.3,
+          opacity: 0.5,
+        },
+        footerVersion: {
+          fontFamily: 'Inter',
+          fontSize: 11,
+          fontWeight: '500',
+          color: colors.onSurfaceVariant,
+          marginTop: 2,
+          opacity: 0.4,
+        },
       }),
     [colors]
   )
 
-  // ── Loading ──
+  // ── Loading skeleton ──
   if (isLoading_) {
     return (
-      <View style={[styles.container, styles.centered, { paddingTop: insets.top }]}>
-        <ActivityIndicator size="large" color={colors.primary} />
+      <View style={[styles.container, { paddingTop: insets.top }]}>
+        <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+          {/* Avatar skeleton */}
+          <View style={styles.userHeader}>
+            <View style={styles.avatarRing}>
+              <View style={styles.avatarContainer}>
+                <SkeletonBlock width={80} height={80} borderRadius={40} />
+              </View>
+            </View>
+            <SkeletonBlock width={150} height={24} borderRadius={4} style={{ marginTop: 16 }} />
+            <SkeletonBlock width={120} height={14} borderRadius={4} style={{ marginTop: 8 }} />
+          </View>
+
+          {/* Statistics Link / Stats skeleton */}
+          <View style={{ paddingHorizontal: SIDE_OFFSET, marginBottom: 12 }}>
+            <SkeletonBlock width={80} height={20} borderRadius={4} />
+          </View>
+
+          {/* Stats preview cards skeleton */}
+          <View style={{ flexDirection: 'row', paddingHorizontal: SIDE_OFFSET, gap: 16, marginBottom: 24 }}>
+            <SkeletonBlock
+              width={STATS_CARD_W}
+              height={88}
+              borderRadius={16}
+            />
+            <SkeletonBlock
+              width={STATS_CARD_W}
+              height={88}
+              borderRadius={16}
+            />
+          </View>
+
+          {/* Shows carousel skeleton */}
+          <View style={{ paddingHorizontal: SIDE_OFFSET, marginBottom: 12 }}>
+            <SkeletonBlock width={100} height={20} borderRadius={4} />
+          </View>
+          <View
+            style={{
+              flexDirection: 'row',
+              paddingLeft: SIDE_OFFSET,
+              paddingRight: 8,
+              gap: 12,
+              marginBottom: 16,
+            }}
+          >
+            {[1, 2, 3, 4].map((i) => (
+              <View key={i} style={{ width: POSTER_W }}>
+                <SkeletonBlock width={POSTER_W} height={POSTER_H} borderRadius={12} />
+                <SkeletonBlock
+                  width="80%"
+                  height={12}
+                  borderRadius={4}
+                  style={{ marginTop: 8 }}
+                />
+              </View>
+            ))}
+          </View>
+
+          {/* Settings skeleton */}
+          <View
+            style={{
+              marginHorizontal: 20,
+              marginTop: 8,
+              backgroundColor: colors.surfaceContainer,
+              borderRadius: 16,
+              borderWidth: 1,
+              borderColor: 'rgba(255,255,255,0.05)',
+              overflow: 'hidden',
+            }}
+          >
+            {[1, 2, 3].map((i) => (
+              <View
+                key={i}
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  paddingHorizontal: 20,
+                  paddingVertical: 16,
+                  borderBottomWidth: i < 3 ? 1 : 0,
+                  borderBottomColor: 'rgba(255,255,255,0.05)',
+                  gap: 16,
+                }}
+              >
+                <SkeletonBlock width={20} height={20} borderRadius={10} />
+                <SkeletonBlock width="50%" height={16} borderRadius={4} />
+              </View>
+            ))}
+          </View>
+        </ScrollView>
       </View>
     )
   }
@@ -1170,8 +1282,11 @@ export default function ProfileScreen() {
           />
         </View>
 
-        {/* Bottom spacing for tab bar */}
-        <View style={{ height: 32 }} />
+        {/* App footer */}
+        <View style={styles.footer}>
+          <Text style={styles.footerText}>BingeTime</Text>
+          <Text style={styles.footerVersion}>v{Constants.expoConfig?.version ?? '1.0.0'}</Text>
+        </View>
       </ScrollView>
     </View>
   )

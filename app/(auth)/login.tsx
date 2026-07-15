@@ -11,7 +11,6 @@ import {
   KeyboardAvoidingView,
   Platform,
   ActivityIndicator,
-  Alert,
 } from 'react-native'
 import { Image } from 'expo-image'
 import { Ionicons } from '@expo/vector-icons'
@@ -46,6 +45,13 @@ export default function LoginScreen() {
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: spacing.stackMd,
+    borderWidth: 1,
+    borderColor: colors.primary + '30',
+    shadowColor: colors.primary,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.4,
+    shadowRadius: 12,
+    elevation: 10,
   },
   title: {
     fontFamily: 'Inter',
@@ -126,16 +132,6 @@ export default function LoginScreen() {
     fontSize: typography.bodyMd.fontSize,
     color: colors.onSurface,
   },
-  forgotButton: {
-    alignSelf: 'flex-end',
-    marginBottom: spacing.stackSm,
-  },
-  forgotText: {
-    fontFamily: 'Inter',
-    fontSize: typography.bodySm.fontSize,
-    fontWeight: '500',
-    color: colors.primary,
-  },
   submitButton: {
     height: 52,
     borderRadius: borderRadius.md,
@@ -200,20 +196,6 @@ export default function LoginScreen() {
     // Success - router will handle navigation via auth guard
   }
 
-  const handleForgotPassword = async () => {
-    if (!email) {
-      Alert.alert('Enter your email first', 'Type your email above, then tap "Forgot password"')
-      return
-    }
-    const { error } = await supabase.auth.resetPasswordForEmail(email)
-    if (error) {
-      console.log('❌ [LoginScreen] Reset password error:', error.message)
-      Alert.alert('Error', 'Could not send reset email. Please try again.')
-    } else {
-      Alert.alert('Reset email sent', 'Check your inbox for a password reset link')
-    }
-  }
-
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -224,7 +206,11 @@ export default function LoginScreen() {
         {/* ── Logo ── */}
         <View style={styles.logoContainer}>
           <View style={styles.logo}>
-            <Ionicons name="tv-outline" size={40} color={colors.primary} />
+            <Image
+              source={require('../../assets/logo.png')}
+              style={{ width: '100%', height: '100%', borderRadius: borderRadius.xl }}
+              contentFit="contain"
+            />
           </View>
           <Text style={styles.title}>BingeTime</Text>
           <Text style={styles.subtitle}>Track your shows & movies</Text>
@@ -278,10 +264,6 @@ export default function LoginScreen() {
               </View>
             </View>
           </View>
-
-          <Pressable style={styles.forgotButton} onPress={handleForgotPassword}>
-            <Text style={styles.forgotText}>Forgot password?</Text>
-          </Pressable>
 
           <Pressable style={[styles.submitButton, loading && styles.submitButtonLoading]} onPress={handleLogin} disabled={loading}>
             {loading ? (

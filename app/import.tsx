@@ -9,12 +9,20 @@ import {
   Animated,
   StyleSheet,
   Dimensions,
+  Alert,
 } from 'react-native'
 import { router } from 'expo-router'
+import * as DocumentPicker from 'expo-document-picker'
 import { Ionicons } from '@expo/vector-icons'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useTheme } from '@/contexts/ThemeContext'
 import { runImport, IMPORT_STEPS } from '@/lib/import/pipeline'
+import {
+  parsePickedFile,
+  assembleAllCsvData,
+  type CsvFileType,
+  type AllCsvData,
+} from '@/lib/import/csvParser'
 import type { ImportStep } from '@/lib/import/types'
 import { typography, spacing, borderRadius } from '@/theme'
 import type { ThemeColors } from '@/themes'
@@ -24,20 +32,46 @@ import { useAppStore } from '@/stores/appStore'
 const SCREEN_WIDTH = Dimensions.get('window').width
 const CARD_WIDTH = (SCREEN_WIDTH - 40 - 12) / 2
 
-type Phase = 'landing' | 'importing' | 'complete' | 'error'
+type Phase = 'landing' | 'picking' | 'importing' | 'complete' | 'error'
+type ImportMode = 'shows' | 'movies' | 'everything' | null
+
+interface PickedFile {
+  uri: string
+  name: string
+  type: CsvFileType
+  rowCount: number
+}
+
+const FILE_LABELS: Record<CsvFileType, string> = {
+  followed_tv_show: 'Followed Shows',
+  user_tv_show_data: 'Show Data',
+  tracking_prod_records_v2: 'Episode Watches',
+  tracking_prod_records: 'Movie Records',
+  unknown: 'Unknown File',
+}
+
+const FILE_ICONS: Record<CsvFileType, keyof typeof Ionicons.glyphMap> = {
+  followed_tv_show: 'tv-outline',
+  user_tv_show_data: 'analytics-outline',
+  tracking_prod_records_v2: 'play-circle-outline',
+  tracking_prod_records: 'film-outline',
+  unknown: 'document-outline',
+}
 
 export default function ImportScreen() {
   const { colors } = useTheme()
   const insets = useSafeAreaInsets()
   const { user } = useAuth()
   const setImportComplete = useAppStore((s) => s.setImportComplete)
-  const importStarted = useAppStore((s) => s.importStarted)
 
   const [phase, setPhase] = useState<Phase>('landing')
+  const [mode, setMode] = useState<ImportMode>(null)
   const [steps, setSteps] = useState<ImportStep[]>(IMPORT_STEPS.map((s) => ({ ...s })))
   const [warnings, setWarnings] = useState<string[]>([])
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [currentStepIndex, setCurrentStepIndex] = useState(0)
+  const [pickedFiles, setPickedFiles] = useState<PickedFile[]>([])
+  const [isParsing, setIsParsing] = useState(false)
 
   const progressAnim = useRef(new Animated.Value(0)).current
   const scrollRef = useRef<ScrollView>(null)
@@ -80,12 +114,89 @@ export default function ImportScreen() {
     []
   )
 
+  const handlePickFiles = useCallback(async () => {
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: ['text/csv', 'text/comma-separated-values', 'application/vnd.ms-excel'],
+        multiple: true,
+        copyToCacheDirectory: false, // Changed from true to false
+      })
+
+      if (result.canceled) return
+
+      setIsParsing(true)
+      const parsed: PickedFile[] = []
+
+      for (const asset of result.assets) {
+        const { type, data, headers } = await parsePickedFile(
+          asset.uri,
+          asset.name
+        )
+        parsed.push({
+          uri: asset.uri,
+          name: asset.name,
+          type,
+          rowCount: data.length,
+        })
+
+        // If detection failed, try matching by filename
+        if (type === 'unknown') {
+          const name = asset.name.toLowerCase()
+          if (name.includes('followed_tv_show')) {
+            parsed[parsed.length - 1].type = 'followed_tv_show'
+          } else if (name.includes('user_tv_show_data')) {
+            parsed[parsed.length - 1].type = 'user_tv_show_data'
+          } else if (name.includes('tracking-prod-records-v2')) {
+            parsed[parsed.length - 1].type = 'tracking_prod_records_v2'
+          } else if (name.includes('tracking-prod-records') && !name.includes('v2')) {
+            parsed[parsed.length - 1].type = 'tracking_prod_records'
+          }
+        }
+      }
+
+      setPickedFiles((prev) => {
+        // Merge: replace existing files of same type (keep latest), add new types
+        const merged = new Map<CsvFileType, PickedFile>()
+        for (const f of prev) merged.set(f.type, f)
+        for (const f of parsed) merged.set(f.type, f)
+        return [...merged.values()]
+      })
+      setIsParsing(false)
+    } catch (error) {
+      setIsParsing(false)
+      console.error('File parsing error:', error)
+      Alert.alert('Error', `Failed to read selected files: ${error instanceof Error ? error.message : 'Unknown error'}`)
+    }
+  }, [])
+
+  const handleRemoveFile = useCallback((type: CsvFileType) => {
+    setPickedFiles((prev) => prev.filter((f) => f.type !== type))
+  }, [])
+
   const handleStartImport = useCallback(async () => {
+    if (!user?.id) return
+
+    // Assemble parsed data from picked files
+    const csvData: AllCsvData = assembleAllCsvData(
+      pickedFiles.map((f) => ({ type: f.type, data: [] }))
+    )
+
+    // Re-parse all picked files into the assembled data
+    for (const file of pickedFiles) {
+      const { data } = await parsePickedFile(file.uri, file.name)
+      const assembled = assembleAllCsvData([{ type: file.type, data }])
+      // Merge into csvData
+      if (assembled.followedShows.length > 0) csvData.followedShows = assembled.followedShows
+      if (assembled.userShowData.length > 0) csvData.userShowData = assembled.userShowData
+      if (assembled.trackingV2.length > 0) csvData.trackingV2 = assembled.trackingV2
+      if (assembled.movieRecords.length > 0) csvData.movieRecords = assembled.movieRecords
+    }
+
     setPhase('importing')
     setWarnings([])
     setErrorMessage(null)
 
-    const result = await runImport(user?.id ?? '', updateProgress, updateStepStatus)
+    const result = await runImport(user.id, updateProgress, updateStepStatus, csvData)
 
     if (result.success) {
       setPhase('complete')
@@ -96,7 +207,26 @@ export default function ImportScreen() {
       setWarnings(result.warnings)
       setErrorMessage(result.error || 'Import failed with an unknown error')
     }
-  }, [updateProgress, updateStepStatus, setImportComplete])
+  }, [user, pickedFiles, updateProgress, updateStepStatus, setImportComplete])
+
+  const handleBundledImport = useCallback(async () => {
+    if (!user?.id) return
+    setPhase('importing')
+    setWarnings([])
+    setErrorMessage(null)
+
+    const result = await runImport(user.id, updateProgress, updateStepStatus)
+
+    if (result.success) {
+      setPhase('complete')
+      setWarnings(result.warnings)
+      setImportComplete(true)
+    } else {
+      setPhase('error')
+      setWarnings(result.warnings)
+      setErrorMessage(result.error || 'Import failed with an unknown error')
+    }
+  }, [user, updateProgress, updateStepStatus, setImportComplete])
 
   const handleManualEntry = useCallback(() => {
     router.push('/add-content')
@@ -104,16 +234,17 @@ export default function ImportScreen() {
 
   const handleContinue = useCallback(() => {
     setImportComplete(true)
-    router.replace('/(tabs)/shows')
+    router.replace('/(tabs)/discover')
   }, [setImportComplete])
 
   const handleRetry = useCallback(() => {
-    handleStartImport()
-  }, [handleStartImport])
+    setPickedFiles([])
+    setPhase('picking')
+  }, [])
 
   const handleSkip = useCallback(() => {
     setImportComplete(true)
-    router.replace('/(tabs)/shows')
+    router.replace('/(tabs)/discover')
   }, [setImportComplete])
 
   const overallProgress = steps.length > 0
@@ -130,16 +261,44 @@ export default function ImportScreen() {
 
   const styles = useMemo(() => createStyles(colors), [colors])
 
+  const recognizedCount = pickedFiles.filter((f) => f.type !== 'unknown').length
+  const canImport = recognizedCount >= 1 && !isParsing
+
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
       {/* Header */}
       <View style={styles.header}>
         <Text style={styles.logo}>BingeTime</Text>
         {phase === 'importing' && <Text style={styles.headerSubtitle}>Importing your data...</Text>}
+        {phase === 'picking' && <Text style={styles.headerSubtitle}>Select your CSV files</Text>}
         {phase === 'landing' && <Text style={styles.headerSubtitle}>Choose how to get started</Text>}
       </View>
 
-      {phase === 'landing' && <LandingContent onStartImport={handleStartImport} onManualEntry={handleManualEntry} />}
+      {phase === 'landing' && (
+        <LandingContent
+          onSelectMode={(mode) => {
+            setMode(mode)
+            setPhase('picking')
+          }}
+          onManualEntry={handleManualEntry}
+        />
+      )}
+      {phase === 'picking' && (
+        <PickingContent
+          mode={mode}
+          pickedFiles={pickedFiles}
+          isParsing={isParsing}
+          canImport={canImport}
+          recognizedCount={recognizedCount}
+          onPickFiles={handlePickFiles}
+          onRemoveFile={handleRemoveFile}
+          onStartImport={handleStartImport}
+          onBack={() => {
+            setPickedFiles([])
+            setPhase('landing')
+          }}
+        />
+      )}
       {phase === 'importing' && (
         <ImportingContent
           steps={steps}
@@ -165,9 +324,12 @@ export default function ImportScreen() {
 // ── Sub-components ──
 
 function LandingContent({
-  onStartImport,
+  onSelectMode,
   onManualEntry,
-}: { onStartImport: () => void; onManualEntry: () => void }) {
+}: {
+  onSelectMode: (mode: ImportMode) => void
+  onManualEntry: () => void
+}) {
   const { colors } = useTheme()
   const styles = useMemo(() => createStyles(colors), [colors])
   const insets = useSafeAreaInsets()
@@ -177,37 +339,183 @@ function LandingContent({
       <View style={styles.welcomeIcon}>
         <Ionicons name="cloud-upload-outline" size={64} color={colors.primary} />
       </View>
-      <Text style={styles.welcomeTitle}>Welcome to BingeTime</Text>
+      <Text style={styles.welcomeTitle}>Import Your Data</Text>
       <Text style={styles.welcomeText}>
-        How would you like to add your watch history?
+        Choose what you'd like to import from your TV Time export:
       </Text>
 
-      {/* Two option cards */}
-      <View style={styles.optionCards}>
-        <Pressable style={styles.optionCard} onPress={onStartImport}>
-          <Ionicons name="cloud-download-outline" size={32} color={colors.primary} />
-          <Text style={styles.optionTitle}>Import from TV Time</Text>
+      {/* Four mode cards */}
+      <View style={styles.optionGrid}>
+        <Pressable style={styles.optionCard} onPress={() => onSelectMode('shows')}>
+          <Ionicons name="tv-outline" size={28} color={colors.primary} />
+          <Text style={styles.optionTitle}>📺 Shows</Text>
           <Text style={styles.optionDesc}>
-            Upload your GDPR export CSVs. We'll match shows & movies to TMDb
-            and calculate all your stats automatically.
+            Import your episode watch history, show library, favorites & watchlist.
           </Text>
-          <Text style={styles.optionBadge}>Recommended for existing TV Time users</Text>
         </Pressable>
 
-        <Pressable style={styles.optionCard} onPress={onManualEntry}>
-          <Ionicons name="add-circle-outline" size={32} color={colors.tertiary} />
-          <Text style={styles.optionTitle}>Add Manually</Text>
+        <Pressable style={styles.optionCard} onPress={() => onSelectMode('movies')}>
+          <Ionicons name="film-outline" size={28} color={colors.secondary} />
+          <Text style={styles.optionTitle}>🎬 Movies</Text>
           <Text style={styles.optionDesc}>
-            Search TMDb and add shows/movies one by one. Perfect for
-            starting fresh or adding missing titles.
+            Import your movie watch history, ratings, and watchlist.
           </Text>
-          <Text style={[styles.optionBadge, { color: colors.tertiary }]}>Great for new users</Text>
+        </Pressable>
+
+        <Pressable style={styles.optionCard} onPress={() => onSelectMode('everything')}>
+          <Ionicons name="archive-outline" size={28} color={colors.tertiary} />
+          <Text style={styles.optionTitle}>📦 Everything</Text>
+          <Text style={styles.optionDesc}>
+            Full import: Shows, Movies, and all tracking data combined.
+          </Text>
+        </Pressable>
+
+        <Pressable style={[styles.optionCard, styles.optionCardFull]} onPress={onManualEntry}>
+          <Ionicons name="add-circle-outline" size={28} color={colors.onSurfaceVariant} />
+          <Text style={styles.optionTitle}>✏️ Add Manually</Text>
+          <Text style={styles.optionDesc}>
+            Search TMDb and add content one by one. Great for starting fresh.
+          </Text>
         </Pressable>
       </View>
 
       <Text style={styles.disclaimer}>
         Your data stays private. All matching uses the free TMDb API.
       </Text>
+    </View>
+  )
+}
+
+function PickingContent({
+  mode,
+  pickedFiles,
+  isParsing,
+  canImport,
+  recognizedCount,
+  onPickFiles,
+  onRemoveFile,
+  onStartImport,
+  onBack,
+}: {
+  mode: ImportMode
+  pickedFiles: PickedFile[]
+  isParsing: boolean
+  canImport: boolean
+  recognizedCount: number
+  onPickFiles: () => void
+  onRemoveFile: (type: CsvFileType) => void
+  onStartImport: () => void
+  onBack: () => void
+}) {
+  const { colors } = useTheme()
+  const styles = useMemo(() => createStyles(colors), [colors])
+  const insets = useSafeAreaInsets()
+
+  const guidance = useMemo(() => {
+    switch (mode) {
+      case 'shows':
+        return 'For shows, please select your episode history file (required) and show list (optional for cleaner library).'
+      case 'movies':
+        return 'For movies, please select your movie history file (required).'
+      default:
+        return 'Select your TV Time CSV files. We will auto-detect which file is which.'
+    }
+  }, [mode])
+
+  return (
+    <View style={[styles.content, { paddingBottom: insets.bottom + 16 }]}>
+      {/* Guidance */}
+      <Text style={styles.pickingInstruction}>{guidance}</Text>
+
+
+      {/* Pick button */}
+      <Pressable
+        style={[styles.pickButton, isParsing && styles.pickButtonDisabled]}
+        onPress={onPickFiles}
+        disabled={isParsing}
+      >
+        <Ionicons
+          name={isParsing ? 'hourglass-outline' : 'folder-open-outline'}
+          size={22}
+          color="#FFF"
+        />
+        <Text style={styles.pickButtonText}>
+          {isParsing ? 'Parsing files...' : 'Choose CSV Files'}
+        </Text>
+      </Pressable>
+
+      {/* Picked files list */}
+      <ScrollView style={styles.pickedList}>
+        {pickedFiles.length === 0 && !isParsing && (
+          <View style={styles.emptyState}>
+            <Ionicons name="document-outline" size={48} color={colors.onSurfaceVariant} />
+            <Text style={styles.emptyText}>No files selected yet</Text>
+          </View>
+        )}
+
+        {pickedFiles.map((file) => {
+          const isUnknown = file.type === 'unknown'
+          return (
+            <View
+              key={file.type}
+              style={[styles.pickedItem, isUnknown && styles.pickedItemUnknown]}
+            >
+              <Ionicons
+                name={FILE_ICONS[file.type]}
+                size={24}
+                color={isUnknown ? colors.error : colors.primary}
+              />
+              <View style={styles.pickedInfo}>
+                <Text style={styles.pickedName} numberOfLines={1}>
+                  {file.name}
+                </Text>
+                <View style={styles.pickedMeta}>
+                  <View
+                    style={[
+                      styles.pickedBadge,
+                      isUnknown && styles.pickedBadgeUnknown,
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.pickedBadgeText,
+                        isUnknown && styles.pickedBadgeTextUnknown,
+                      ]}
+                    >
+                      {FILE_LABELS[file.type]}
+                    </Text>
+                  </View>
+                  <Text style={styles.pickedRows}>{file.rowCount} rows</Text>
+                </View>
+              </View>
+              <Pressable
+                style={styles.removeButton}
+                onPress={() => onRemoveFile(file.type)}
+                hitSlop={8}
+              >
+                <Ionicons name="close-circle" size={20} color={colors.onSurfaceVariant} />
+              </Pressable>
+            </View>
+          )
+        })}
+      </ScrollView>
+
+      {/* Action buttons */}
+      <View style={styles.pickingActions}>
+        <Pressable style={styles.backButton} onPress={onBack}>
+          <Text style={styles.backButtonText}>Back</Text>
+        </Pressable>
+        <Pressable
+          style={[styles.startImportButton, !canImport && styles.startImportButtonDisabled]}
+          onPress={onStartImport}
+          disabled={!canImport}
+        >
+          <Ionicons name="rocket-outline" size={20} color="#FFF" />
+          <Text style={styles.startImportButtonText}>
+            Start Import ({recognizedCount} file{recognizedCount !== 1 ? 's' : ''})
+          </Text>
+        </Pressable>
+      </View>
     </View>
   )
 }
@@ -430,8 +738,9 @@ function createStyles(colors: ThemeColors) {
       lineHeight: typography.bodyMd.lineHeight,
       marginBottom: 24,
     },
-    optionCards: {
+    optionGrid: {
       flexDirection: 'row',
+      flexWrap: 'wrap',
       gap: 12,
       marginBottom: 24,
     },
@@ -443,6 +752,12 @@ function createStyles(colors: ThemeColors) {
       alignItems: 'center',
       borderWidth: 1,
       borderColor: colors.outlineVariant,
+    },
+    optionCardFull: {
+      width: '100%',
+      flexDirection: 'row',
+      gap: 16,
+      padding: 18,
     },
     optionTitle: {
       fontSize: typography.bodyMd.fontSize,
@@ -473,6 +788,136 @@ function createStyles(colors: ThemeColors) {
       color: colors.onSurfaceVariant,
       textAlign: 'center',
       marginTop: 16,
+    },
+
+    // Picking
+    pickingInstruction: {
+      fontSize: typography.bodySm.fontSize,
+      color: colors.onSurfaceVariant,
+      lineHeight: 20,
+      marginBottom: 16,
+    },
+    pickButton: {
+      backgroundColor: colors.primary,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingVertical: 14,
+      borderRadius: borderRadius.lg,
+      gap: 8,
+      marginBottom: 20,
+    },
+    pickButtonDisabled: {
+      opacity: 0.6,
+    },
+    pickButtonText: {
+      fontSize: typography.bodyMd.fontSize,
+      fontWeight: '600',
+      color: colors.onPrimary,
+    },
+    pickedList: {
+      flex: 1,
+      marginBottom: 16,
+    },
+    emptyState: {
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingVertical: 40,
+    },
+    emptyText: {
+      fontSize: typography.bodySm.fontSize,
+      color: colors.onSurfaceVariant,
+      marginTop: 12,
+    },
+    pickedItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      padding: 14,
+      backgroundColor: colors.surfaceContainer,
+      borderRadius: borderRadius.md,
+      marginBottom: 8,
+      borderWidth: 1,
+      borderColor: colors.outlineVariant,
+    },
+    pickedItemUnknown: {
+      borderColor: colors.error + '40',
+    },
+    pickedInfo: {
+      flex: 1,
+      marginLeft: 12,
+    },
+    pickedName: {
+      fontSize: typography.bodySm.fontSize,
+      fontWeight: '600',
+      color: colors.onSurface,
+      marginBottom: 4,
+    },
+    pickedMeta: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+    },
+    pickedBadge: {
+      backgroundColor: colors.primaryContainer,
+      paddingHorizontal: 8,
+      paddingVertical: 2,
+      borderRadius: borderRadius.full,
+    },
+    pickedBadgeUnknown: {
+      backgroundColor: colors.errorContainer,
+    },
+    pickedBadgeText: {
+      fontSize: typography.bodyXs.fontSize,
+      color: colors.primary,
+      fontWeight: '500',
+    },
+    pickedBadgeTextUnknown: {
+      color: colors.error,
+    },
+    pickedRows: {
+      fontSize: typography.bodyXs.fontSize,
+      color: colors.onSurfaceVariant,
+    },
+    removeButton: {
+      marginLeft: 8,
+      padding: 4,
+    },
+    pickingActions: {
+      flexDirection: 'row',
+      gap: 12,
+    },
+    backButton: {
+      backgroundColor: colors.surfaceContainerHighest,
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingVertical: 14,
+      paddingHorizontal: 20,
+      borderRadius: borderRadius.lg,
+      borderWidth: 1,
+      borderColor: colors.outlineVariant,
+    },
+    backButtonText: {
+      fontSize: typography.bodyMd.fontSize,
+      fontWeight: '600',
+      color: colors.onSurfaceVariant,
+    },
+    startImportButton: {
+      flex: 1,
+      backgroundColor: colors.primary,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingVertical: 14,
+      borderRadius: borderRadius.lg,
+      gap: 8,
+    },
+    startImportButtonDisabled: {
+      opacity: 0.4,
+    },
+    startImportButtonText: {
+      fontSize: typography.bodyMd.fontSize,
+      fontWeight: '700',
+      color: colors.onPrimary,
     },
 
     // Importing

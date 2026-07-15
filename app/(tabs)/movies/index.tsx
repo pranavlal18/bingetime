@@ -23,6 +23,7 @@ import { useTheme } from '@/contexts/ThemeContext'
 import { getImageUrl } from '@/lib/tmdb'
 import AnimatedPoster from '@/components/ui/AnimatedPoster'
 import MovieListItem from '@/components/movies/MovieListItem'
+import SkeletonBlock from '@/components/skeletons/SkeletonBlock'
 import { typography, borderRadius, spacing } from '@/theme'
 import { ErrorBoundary } from '@/components/ErrorBoundary'
 import type { MovieWithUserData } from '@/lib/queries/movies'
@@ -382,16 +383,6 @@ function MoviesScreenContent() {
     )
   }, [isLoading, activeSegment, colors, styles])
 
-  // Loading state
-  if (isLoading) {
-    return (
-      <View style={[styles.container, styles.centered, { paddingTop: insets.top }]}>
-        <ActivityIndicator size="large" color={colors.primary} />
-        <Text style={styles.loadingText}>Loading your movies...</Text>
-      </View>
-    )
-  }
-
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
       {/* ── AppBar ── */}
@@ -456,35 +447,86 @@ function MoviesScreenContent() {
         </View>
       )}
 
+      {/* ── Segment control (always visible) ── */}
+      <View style={styles.listHeader}>
+        <SegmentedControl
+          active={activeSegment}
+          onChange={setActiveSegment}
+        />
+      </View>
+
       {/* ── Content ── */}
-      <FlashList
-        data={filteredMovies}
-        keyExtractor={keyExtractor}
-        renderItem={renderItem}
-        numColumns={isGrid ? 2 : 1}
-        key={isGrid ? 'grid' : 'list'}
-        contentContainerStyle={[
-          styles.listContent,
-        ]}
-        ListHeaderComponent={
-          <View style={styles.listHeader}>
-            <SegmentedControl
-              active={activeSegment}
-              onChange={setActiveSegment}
+      {isLoading ? (
+        <View style={{ flex: 1 }}>
+          {isGrid ? (
+            <View
+              style={{
+                flexDirection: 'row',
+                flexWrap: 'wrap',
+                paddingHorizontal: spacing.marginMobile,
+                gap: 16,
+              }}
+            >
+              {[1, 2, 3, 4].map((i) => (
+                <View key={i} style={{ width: CARD_WIDTH, marginBottom: 16 }}>
+                  <SkeletonBlock
+                    width={CARD_WIDTH}
+                    height={CARD_WIDTH * 1.5}
+                    borderRadius={16}
+                  />
+                  <View style={{ marginTop: 8, gap: 4 }}>
+                    <SkeletonBlock width="80%" height={14} borderRadius={4} />
+                    <SkeletonBlock width="50%" height={12} borderRadius={4} />
+                  </View>
+                </View>
+              ))}
+            </View>
+          ) : (
+            <View style={{ paddingHorizontal: spacing.marginMobile, gap: 8 }}>
+              {[1, 2, 3].map((i) => (
+                <View
+                  key={i}
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    backgroundColor: colors.surfaceContainer,
+                    borderRadius: borderRadius.lg,
+                    padding: 12,
+                  }}
+                >
+                  <SkeletonBlock width={48} height={72} borderRadius={8} />
+                  <View style={{ flex: 1, marginLeft: 12, gap: 6 }}>
+                    <SkeletonBlock width="60%" height={16} borderRadius={4} />
+                    <SkeletonBlock width="35%" height={14} borderRadius={4} />
+                  </View>
+                  <SkeletonBlock width={20} height={20} borderRadius={10} />
+                </View>
+              ))}
+            </View>
+          )}
+        </View>
+      ) : (
+        <FlashList
+          data={filteredMovies}
+          keyExtractor={keyExtractor}
+          renderItem={renderItem}
+          numColumns={isGrid ? 2 : 1}
+          key={isGrid ? 'grid' : 'list'}
+          contentContainerStyle={[
+            styles.listContent,
+          ]}
+          ListEmptyComponent={emptyState}
+          refreshControl={
+            <RefreshControl
+              refreshing={isRefetching}
+              onRefresh={refetch}
+              tintColor={colors.primary}
+              colors={[colors.primary]}
             />
-          </View>
-        }
-        ListEmptyComponent={emptyState}
-        refreshControl={
-          <RefreshControl
-            refreshing={isRefetching}
-            onRefresh={refetch}
-            tintColor={colors.primary}
-            colors={[colors.primary]}
-          />
-        }
-        showsVerticalScrollIndicator={false}
-      />
+          }
+          showsVerticalScrollIndicator={false}
+        />
+      )}
     </View>
   )
 }

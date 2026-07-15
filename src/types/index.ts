@@ -329,3 +329,5 @@ export type ShowsTabKind = 'watchlist' | 'upcoming'
 export type ShowsListItem =
   | { type: 'section-header'; kind: EpisodeSectionKind; title: string }
   | { type: 'episode'; data: EpisodeCardData; sectionKind: EpisodeSectionKind }
+  | { type: 'more'; kind: EpisodeSectionKind; remaining: number }
+  | { type: 'skeleton'; kind: EpisodeSectionKind }

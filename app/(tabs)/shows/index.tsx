@@ -6,6 +6,7 @@ import {
   Text,
   Pressable,
   StyleSheet,
+  ScrollView,
   ActivityIndicator,
   RefreshControl,
 } from 'react-native'
@@ -14,7 +15,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useFocusEffect } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
 import { useQueries } from '@tanstack/react-query'
-import { useShows, useMarkWatched, deriveWatchNextEpisodes, deriveHaventWatchedEpisodes } from '@/lib/queries/shows'
+import { useShows, useMarkWatched, useNewSeasonIds, deriveWatchNextEpisodes, deriveHaventWatchedEpisodes } from '@/lib/queries/shows'
 import type { NextEpisodeInfo } from '@/lib/queries/shows'
 import { getSeasonDetails, getShowBasicDetails } from '@/lib/tmdb'
 import { useWatchedEpisodesHistory } from '@/lib/queries/episodes'
@@ -25,7 +26,10 @@ import { typography, spacing, borderRadius } from '@/theme'
 import ShowCard from '@/components/shows/ShowCard'
 import EpisodeCard from '@/components/shows/EpisodeCard'
 import EpisodeSection from '@/components/shows/EpisodeSection'
+import SkeletonEpisodeCard from '@/components/shows/SkeletonEpisodeCard'
+import SkeletonBlock from '@/components/skeletons/SkeletonBlock'
 import ShowsTabSwitcher from '@/components/shows/ShowsTabSwitcher'
+
 import type { ShowWithUserData } from '@/lib/queries/shows'
 import type { ShowsTabKind, ShowsListItem } from '@/types'
 import { isAired } from '@/utils'
@@ -50,6 +54,13 @@ export default function ShowsScreen() {
   } = useUpcomingEpisodes()
   const markWatchedMutation = useMarkWatched()
 
+  // New season detection (async, fires after render)
+  const newSeasonIds = useNewSeasonIds()
+
+  // Haven't watched pagination
+  const HAVENT_BATCH_SIZE = 20
+  const [haventLimit, setHaventLimit] = useState(5)
+
   const isGrid = viewMode === 'poster-grid'
 
   // Refetch when screen comes into focus
@@ -58,8 +69,9 @@ export default function ShowsScreen() {
     useCallback(() => {
       refetch()
       refetchHistory()
-      refetchUpcoming()
-    }, [refetch, refetchHistory, refetchUpcoming])
+      // Force scroll to top so Watch Next section is always visible first
+      watchListRef.current?.scrollToOffset({ offset: 0, animated: false })
+    }, [refetch, refetchHistory])
   )
 
   // ── Watch List sections (list mode) ──
@@ -121,6 +133,14 @@ export default function ShowsScreen() {
       enabled: episodeNamePairs.length > 0,
     })),
   })
+
+  // 3c. Watch Next loading state: ready when shows loaded AND all TMDb queries resolved
+  const isWatchNextReady = useMemo(() => {
+    if (showsLoading || !shows) return false
+    const tmdbDone = showPairs.length === 0 || showQueries.every(q => !q.isLoading)
+    const namesDone = episodeNamePairs.length === 0 || seasonQueries.every(q => !q.isLoading)
+    return tmdbDone && namesDone
+  }, [showsLoading, shows, showPairs, showQueries, episodeNamePairs, seasonQueries])
 
   // 4. Build episode name map: `${showId}:${episodeNumber}` → episode name
   //    AND airDate map: `${showId}:${episodeNumber}` → airDate
@@ -252,13 +272,18 @@ export default function ShowsScreen() {
 
     const items: ShowsListItem[] = []
 
-    // Section: Watch Next (primary — what to watch next)
+    // Section: Watch Next
+    items.push({ type: 'section-header', kind: 'watch-next', title: 'WATCH NEXT' })
     if (watchNextEpisodes.length > 0) {
-      items.push({ type: 'section-header', kind: 'watch-next', title: 'WATCH NEXT' })
       items.push(...watchNextEpisodes)
+    } else if (!isWatchNextReady) {
+      // Show skeletons while TMDb data loads
+      items.push({ type: 'skeleton', kind: 'watch-next' })
+      items.push({ type: 'skeleton', kind: 'watch-next' })
+      items.push({ type: 'skeleton', kind: 'watch-next' })
     }
 
-    // Section: Watched History (recently watched)
+    // Section: Watched History (recently watched) — ALWAYS show immediately
     if (watchedHistory && watchedHistory.length > 0) {
       items.push({ type: 'section-header', kind: 'watched-history', title: 'WATCHED HISTORY' })
       for (const ep of watchedHistory) {
@@ -266,14 +291,19 @@ export default function ShowsScreen() {
       }
     }
 
-    // Section: Haven't Watched
+    // Section: Haven't Watched (paginated)
     if (haventWatchedEpisodes.length > 0) {
-      items.push({ type: 'section-header', kind: 'haven-watched', title: "HAVEN'T WATCHED..." })
-      items.push(...haventWatchedEpisodes)
+      items.push({ type: 'section-header', kind: 'haven-watched', title: "HAVEN'T WATCHED FOR A WHILE" })
+      const visible = haventWatchedEpisodes.slice(0, haventLimit)
+      items.push(...visible)
+      const remaining = haventWatchedEpisodes.length - haventLimit
+      if (remaining > 0) {
+        items.push({ type: 'more', kind: 'haven-watched', remaining })
+      }
     }
 
     return items
-  }, [watchedHistory, watchNextEpisodes, haventWatchedEpisodes, isGrid])
+  }, [watchedHistory, watchNextEpisodes, haventWatchedEpisodes, isGrid, haventLimit, isWatchNextReady])
 
   // Auto-scroll to top when Watch Next data first loads (fresh login / cold cache)
   const prevWatchNextLength = useRef(0)
@@ -326,15 +356,39 @@ export default function ShowsScreen() {
 
   const renderGridItem = useCallback(
     ({ item }: { item: ShowWithUserData }) => (
-      <ShowCard show={item} />
+      <ShowCard show={item} isNewSeason={newSeasonIds.includes(item.id)} />
     ),
-    []
+    [newSeasonIds]
   )
 
   const renderEpisodeItem = useCallback(
     ({ item }: { item: ShowsListItem }) => {
       if (item.type === 'section-header') {
         return <EpisodeSection title={item.title} />
+      }
+      if (item.type === 'skeleton') {
+        return <SkeletonEpisodeCard />
+      }
+
+      if (item.type === 'more') {
+        return (
+          <Pressable
+            onPress={() => setHaventLimit((prev) => prev + HAVENT_BATCH_SIZE)}
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'center',
+              paddingVertical: 14,
+              paddingHorizontal: spacing.marginMobile,
+              gap: 6,
+            }}
+          >
+            <Text style={{ fontSize: 13, fontWeight: '600', color: colors.primary }}>
+              More ({item.remaining} left)
+            </Text>
+            <Ionicons name="chevron-down" size={16} color={colors.primary} />
+          </Pressable>
+        )
       }
       return (
         <EpisodeCard
@@ -344,7 +398,7 @@ export default function ShowsScreen() {
         />
       )
     },
-    [handleMarkWatched]
+    [handleMarkWatched, colors, HAVENT_BATCH_SIZE]
   )
 
   const gridKeyExtractor = useCallback((item: ShowWithUserData) => item.id, [])
@@ -353,6 +407,12 @@ export default function ShowsScreen() {
     (item: ShowsListItem, index: number) => {
       if (item.type === 'section-header') {
         return `header-${item.kind}-${index}`
+      }
+      if (item.type === 'skeleton') {
+        return `skeleton-${item.kind}-${index}`
+      }
+      if (item.type === 'more') {
+        return `more-${item.kind}-${index}`
       }
       return `ep-${item.data.showId}-${item.data.seasonNumber}-${item.data.episodeNumber}`
     },
@@ -456,22 +516,82 @@ export default function ShowsScreen() {
     [colors]
   )
 
-  // ── Loading state ──
+  // ── Loading state (initial Supabase query only — fast) ──
+
+// ── Render helpers ──
+
+  const renderWatchlist = useCallback(() => {
+    if (isGrid) {
+      return (
+        <FlashList
+          data={shows || []}
+          keyExtractor={gridKeyExtractor}
+          renderItem={renderGridItem}
+          numColumns={2}
+          key="grid"
+          contentContainerStyle={[
+            styles.listContent,
+            (shows?.length ?? 0) === 0 && styles.listContentEmpty,
+          ]}
+          ListEmptyComponent={renderEmptyState}
+          refreshControl={
+            <RefreshControl
+              refreshing={isRefetching}
+              onRefresh={handleRefresh}
+              tintColor={colors.primary}
+              colors={[colors.primary]}
+            />
+          }
+          showsVerticalScrollIndicator={false}
+        />
+      )
+    }
+
+    return (
+      <FlashList
+        ref={watchListRef}
+        data={watchListItems}
+        keyExtractor={episodeKeyExtractor}
+        renderItem={renderEpisodeItem}
+        key="watchlist-list"
+        contentContainerStyle={[
+          styles.listContentTight,
+          watchListItems.length === 0 && styles.listContentEmpty,
+        ]}
+        ListEmptyComponent={renderEmptyState}
+        refreshControl={
+          <RefreshControl
+            refreshing={isRefetching}
+            onRefresh={handleRefresh}
+            tintColor={colors.primary}
+            colors={[colors.primary]}
+          />
+        }
+        showsVerticalScrollIndicator={false}
+      />
+    )
+  }, [
+    isGrid,
+    isWatchNextReady,
+    shows,
+    watchListItems,
+    watchListRef,
+    isRefetching,
+    handleRefresh,
+    renderEmptyState,
+    gridKeyExtractor,
+    renderGridItem,
+    episodeKeyExtractor,
+    renderEpisodeItem,
+    styles,
+  ])
+
+  // ── Loading state (initial Supabase query only — fast) ──
 
   if (showsLoading && activeTab === 'watchlist') {
     return (
       <View style={[styles.container, styles.centered, { paddingTop: insets.top }]}>
         <ActivityIndicator size="large" color={colors.primary} />
-        <Text style={styles.loadingText}>Loading your shows...</Text>
-      </View>
-    )
-  }
-
-  if (upcomingLoading && activeTab === 'upcoming') {
-    return (
-      <View style={[styles.container, styles.centered, { paddingTop: insets.top }]}>
-        <ActivityIndicator size="large" color={colors.primary} />
-        <Text style={styles.loadingText}>Loading upcoming episodes...</Text>
       </View>
     )
   }
@@ -497,44 +617,78 @@ export default function ShowsScreen() {
       </View>
 
       {/* Content — separate FlashList for each tab */}
-      {activeTab === 'watchlist' && (
-        isGrid ? (
-          <FlashList
-            data={shows || []}
-            keyExtractor={gridKeyExtractor}
-            renderItem={renderGridItem}
-            numColumns={2}
-            key="grid"
-            contentContainerStyle={[
-              styles.listContent,
-              (shows?.length ?? 0) === 0 && styles.listContentEmpty,
-            ]}
-            ListEmptyComponent={renderEmptyState}
-            refreshControl={
-              <RefreshControl
-                refreshing={isRefetching}
-                onRefresh={handleRefresh}
-                tintColor={colors.primary}
-                colors={[colors.primary]}
-              />
-            }
+      {activeTab === 'watchlist' && <View style={{ flex: 1 }}>{renderWatchlist()}</View>}
+
+      {activeTab === 'upcoming' && (
+        upcomingLoading && upcomingItems.length === 0 ? (
+          <ScrollView
+            style={{ flex: 1 }}
+            contentContainerStyle={{ paddingBottom: 24, paddingTop: spacing.unit }}
             showsVerticalScrollIndicator={false}
-          />
+          >
+            {/* Section header pill skeleton */}
+            <View
+              style={{
+                alignSelf: 'flex-start',
+                paddingHorizontal: spacing.gutter,
+                paddingVertical: spacing.stackSm - 2,
+                marginBottom: spacing.stackSm,
+                marginHorizontal: spacing.marginMobile,
+                marginTop: spacing.stackMd,
+              }}
+            >
+              <SkeletonBlock width={100} height={14} borderRadius={7} />
+            </View>
+            <SkeletonEpisodeCard />
+            <SkeletonEpisodeCard />
+
+            {/* Another section */}
+            <View
+              style={{
+                alignSelf: 'flex-start',
+                paddingHorizontal: spacing.gutter,
+                paddingVertical: spacing.stackSm - 2,
+                marginBottom: spacing.stackSm,
+                marginHorizontal: spacing.marginMobile,
+                marginTop: spacing.stackMd,
+              }}
+            >
+              <SkeletonBlock width={130} height={14} borderRadius={7} />
+            </View>
+            <SkeletonEpisodeCard />
+            <SkeletonEpisodeCard />
+            <SkeletonEpisodeCard />
+
+            {/* Another section */}
+            <View
+              style={{
+                alignSelf: 'flex-start',
+                paddingHorizontal: spacing.gutter,
+                paddingVertical: spacing.stackSm - 2,
+                marginBottom: spacing.stackSm,
+                marginHorizontal: spacing.marginMobile,
+                marginTop: spacing.stackMd,
+              }}
+            >
+              <SkeletonBlock width={160} height={14} borderRadius={7} />
+            </View>
+            <SkeletonEpisodeCard />
+            <SkeletonEpisodeCard />
+          </ScrollView>
         ) : (
           <FlashList
-            ref={watchListRef}
-            data={watchListItems}
+            data={upcomingItems}
             keyExtractor={episodeKeyExtractor}
             renderItem={renderEpisodeItem}
-            key="watchlist-list"
+            key="upcoming"
             contentContainerStyle={[
               styles.listContentTight,
-              watchListItems.length === 0 && styles.listContentEmpty,
+              upcomingItems.length === 0 && styles.listContentEmpty,
             ]}
             ListEmptyComponent={renderEmptyState}
             refreshControl={
               <RefreshControl
-                refreshing={isRefetching}
+                refreshing={upcomingRefetching}
                 onRefresh={handleRefresh}
                 tintColor={colors.primary}
                 colors={[colors.primary]}
@@ -543,29 +697,6 @@ export default function ShowsScreen() {
             showsVerticalScrollIndicator={false}
           />
         )
-      )}
-
-      {activeTab === 'upcoming' && (
-        <FlashList
-          data={upcomingItems}
-          keyExtractor={episodeKeyExtractor}
-          renderItem={renderEpisodeItem}
-          key="upcoming"
-          contentContainerStyle={[
-            styles.listContentTight,
-            upcomingItems.length === 0 && styles.listContentEmpty,
-          ]}
-          ListEmptyComponent={renderEmptyState}
-          refreshControl={
-            <RefreshControl
-              refreshing={upcomingRefetching}
-              onRefresh={handleRefresh}
-              tintColor={colors.primary}
-              colors={[colors.primary]}
-            />
-          }
-          showsVerticalScrollIndicator={false}
-        />
       )}
     </View>
   )

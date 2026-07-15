@@ -270,6 +270,8 @@ export function useToggleEpisodeWatched() {
       queryClient.invalidateQueries({ queryKey: showKeys.continueWatching(uid) })
       // Sync profile stats (watched hours, episode count)
       queryClient.invalidateQueries({ queryKey: ['profile'] })
+      // Refresh stats (weekly chart, watch time, catch-up rate, etc.)
+      queryClient.invalidateQueries({ queryKey: ['stats'] })
     },
   })
 }
@@ -372,6 +374,8 @@ export function useBatchMarkWatched() {
       queryClient.invalidateQueries({ queryKey: showKeys.continueWatching(uid) })
       // Sync profile stats (watched hours, episode count)
       queryClient.invalidateQueries({ queryKey: ['profile'] })
+      // Refresh stats (weekly chart, watch time, catch-up rate, etc.)
+      queryClient.invalidateQueries({ queryKey: ['stats'] })
     },
   })
 }

@@ -58,3 +58,4 @@ assets/csv/*
 .claude/
 .stitch/
 supabase/migrations/*
+/android

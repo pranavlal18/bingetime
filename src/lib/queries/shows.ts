@@ -2,13 +2,20 @@
 
 import { useQuery, useMutation, useQueryClient, QueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
-import { getImageUrl } from '@/lib/tmdb'
+import { getImageUrl, getShowBasicDetails } from '@/lib/tmdb'
 import { useAuth } from '@/contexts/AuthContext'
 import { episodeKeys } from './episodes'
 import { profileKeys } from './profile'
 import type { Show, UserShow } from '@/types'
 
 // ── Types for joined query result ──
+
+export interface NextAirEpisode {
+  season_number: number
+  episode_number: number
+  name: string | null
+  air_date: string
+}
 
 export interface ShowWithUserData extends Show {
   user_shows: UserShow | null
@@ -17,6 +24,7 @@ export interface ShowWithUserData extends Show {
   is_favorited: boolean
   is_watchlist: boolean
   last_watched_episode_data: UserShow['last_watched_episode_data']
+  next_air_episode: NextAirEpisode | null
 }
 
 function mapRow(row: any): ShowWithUserData {
@@ -40,6 +48,7 @@ function mapRow(row: any): ShowWithUserData {
     is_favorited: us.is_favorited ?? false,
     is_watchlist: us.is_watchlist ?? false,
     last_watched_episode_data: us.last_watched_episode_data ?? null,
+    next_air_episode: null, // Enriched later in fetchShows
   }
 }
 
@@ -334,6 +343,31 @@ async function fetchContinueWatching(userId: string): Promise<ShowWithUserData[]
     }
   }
 
+  // ── Enrich with TMDb next_episode_to_air (for "new season" detection) ──
+  // Only 10 items max, so no batching needed
+  const airCandidates = result.filter(s =>
+    s.tmdb_id != null && s.episodes_seen > 0 &&
+    (s.total_episodes == null || s.episodes_seen < s.total_episodes)
+  )
+  await Promise.all(
+    airCandidates.map(async (show) => {
+      try {
+        const details = await getShowBasicDetails(show.tmdb_id!)
+        const next = details?.next_episode_to_air
+        if (next?.air_date) {
+          show.next_air_episode = {
+            season_number: next.season_number,
+            episode_number: next.episode_number,
+            name: next.name || null,
+            air_date: next.air_date,
+          }
+        }
+      } catch {
+        // Silently ignore — badge just won't show
+      }
+    })
+  )
+
   // Sort by most recent last_watched_episode_data.updated_at
   result.sort((a, b) => {
     const aDate = a.last_watched_episode_data?.updated_at
@@ -530,6 +564,8 @@ export function useMarkWatched() {
       queryClient.invalidateQueries({ queryKey: showKeys.detail(showId) })
       // Refresh watched history so new entry appears at top
       queryClient.invalidateQueries({ queryKey: episodeKeys.all })
+      // Refresh stats (weekly chart, watch time, catch-up rate, etc.)
+      queryClient.invalidateQueries({ queryKey: ['stats'] })
     },
   })
 }
@@ -684,17 +720,89 @@ export function isHaventWatched(show: ShowWithUserData): boolean {
   // Never watched — definitely "haven't watched"
   if (show.episodes_seen === 0) return true
 
-  // Not just added but never started — check last_watched timestamp
-  if (!show.last_watched_episode_data?.watched_at) return false
+  const lastData = show.last_watched_episode_data
+  if (!lastData) return false
 
-  const watchedAt = new Date(show.last_watched_episode_data.watched_at)
+  // Fall back to updated_at if watched_at isn't set (imported shows)
+  const dateStr = lastData.watched_at || lastData.updated_at
+  if (!dateStr) return false
+
+  const watchedAt = new Date(dateStr)
   const daysSinceWatched = (Date.now() - watchedAt.getTime()) / (1000 * 60 * 60 * 24)
   return daysSinceWatched >= 14
+}
+
+// ── New Season Detection (async, non-blocking) ──
+
+/**
+ * Hook that batch-fetches TMDb next_episode_to_air for shows and returns
+ * a list of showIds that have a new season premiere (episode 1 of a season
+ * higher than what the user last watched).
+ *
+ * Runs independently — does NOT block initial render.
+ */
+export function useNewSeasonIds(): string[] {
+  const { user } = useAuth()
+  const queryClient = useQueryClient()
+
+  const { data } = useQuery({
+    queryKey: ['shows', 'new-season-ids', user?.id],
+    queryFn: async () => {
+      if (!user) return []
+
+      const shows = queryClient.getQueryData<ShowWithUserData[]>(showKeys.list(user.id))
+      if (!shows) return []
+
+      // Only check shows being watched that aren't complete
+      const candidates = shows.filter(s =>
+        s.tmdb_id != null && s.episodes_seen > 0 &&
+        (s.total_episodes == null || s.episodes_seen < s.total_episodes)
+      )
+
+      const newSeasonIds: string[] = []
+
+      for (let i = 0; i < candidates.length; i += 4) {
+        const batch = candidates.slice(i, i + 4)
+        const results = await Promise.all(
+          batch.map(async (show) => {
+            try {
+              const details = await getShowBasicDetails(show.tmdb_id!)
+              const next = details?.next_episode_to_air
+              if (!next?.air_date) return null
+              if (next.episode_number !== 1) return null // Not a premiere
+              if (next.season_number <= 1) return null // S01E01 is just starting
+
+              const lastSeason = show.last_watched_episode_data?.season_number
+              if (lastSeason == null) return null
+              if (next.season_number <= lastSeason) return null
+
+              return show.id
+            } catch {
+              return null
+            }
+          })
+        )
+        for (const id of results) {
+          if (id) newSeasonIds.push(id)
+        }
+        if (i + 4 < candidates.length) {
+          await new Promise(r => setTimeout(r, 1000))
+        }
+      }
+
+      return newSeasonIds
+    },
+    staleTime: 1000 * 60 * 60, // 1 hour
+    enabled: !!user,
+  })
+
+  return data ?? []
 }
 
 /** Derive "Watch Next" episodes from show list */
 export function deriveWatchNextEpisodes(shows: ShowWithUserData[]): NextEpisodeInfo[] {
   return shows
+    .filter((s) => !isHaventWatched(s)) // Exclude shows that belong in "Haven't Watched"
     .map(computeNextEpisode)
     .filter((ep): ep is NextEpisodeInfo => ep !== null)
 }

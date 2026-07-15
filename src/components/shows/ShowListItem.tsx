@@ -11,7 +11,7 @@ import { Image } from 'expo-image'
 import { Swipeable } from 'react-native-gesture-handler'
 import { Ionicons } from '@expo/vector-icons'
 import { router } from 'expo-router'
-import { getImageUrl } from '@/lib/queries/shows'
+import { getImageUrl, isHaventWatched } from '@/lib/queries/shows'
 import ProgressBar from './ProgressBar'
 import { typography, borderRadius, spacing } from '@/theme'
 import { useTheme } from '@/contexts/ThemeContext'
@@ -20,9 +20,10 @@ import type { ShowWithUserData } from '@/lib/queries/shows'
 interface ShowListItemProps {
   show: ShowWithUserData
   onMarkWatched: (showId: string) => void
+  isNewSeason?: boolean
 }
 
-export default function ShowListItem({ show, onMarkWatched }: ShowListItemProps) {
+export default function ShowListItem({ show, onMarkWatched, isNewSeason = false }: ShowListItemProps) {
   const { colors } = useTheme()
   const swipeableRef = useRef<Swipeable>(null)
 
@@ -33,6 +34,9 @@ export default function ShowListItem({ show, onMarkWatched }: ShowListItemProps)
   const posterUrl = getImageUrl(show.poster_path, 'w92')
   const totalEps = show.total_episodes
   const seenEps = show.episodes_seen
+
+  const showHaventWatched = isHaventWatched(show)
+  const showNewSeason = isNewSeason
 
   const allCaughtUp = totalEps !== null && totalEps > 0 && seenEps >= totalEps
 
@@ -101,6 +105,10 @@ export default function ShowListItem({ show, onMarkWatched }: ShowListItemProps)
   },
   completeIcon: {
     marginLeft: 8,
+  },
+  inactiveIcon: {
+    marginLeft: 8,
+    marginRight: 4,
   },
   rightActions: {
     flexDirection: 'row',
@@ -215,6 +223,14 @@ export default function ShowListItem({ show, onMarkWatched }: ShowListItemProps)
 
         {/* Right actions */}
         <View style={styles.rightActions}>
+          {showNewSeason && (
+            <View style={{ backgroundColor: colors.primaryContainer, borderRadius: 8, paddingHorizontal: 5, paddingVertical: 2, flexDirection: 'row', alignItems: 'center', gap: 2 }}>
+              <Ionicons name="sparkles" size={14} color={colors.onPrimaryContainer} />
+            </View>
+          )}
+          {!showNewSeason && showHaventWatched && !isComplete && !isUpToDate && (
+            <Ionicons name="time-outline" size={20} color={colors.tertiary} />
+          )}
           {isComplete && (
             <Ionicons name="checkmark-circle" size={20} color={colors.statusFinished} />
           )}

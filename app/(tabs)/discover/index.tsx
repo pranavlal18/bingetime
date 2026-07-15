@@ -8,6 +8,8 @@ import {
   TextInput,
   Pressable,
   StyleSheet,
+  ScrollView,
+  Dimensions,
   ActivityIndicator,
   RefreshControl,
   Keyboard,
@@ -29,9 +31,12 @@ import { getImageUrl } from '@/lib/tmdb'
 import DiscoverCard from '@/components/discover/DiscoverCard'
 import TrendingSection from '@/components/discover/TrendingSection'
 import RecommendedSection from '@/components/discover/RecommendedSection'
+import SkeletonBlock from '@/components/skeletons/SkeletonBlock'
 import { useTheme } from '@/contexts/ThemeContext'
 import { typography, spacing, borderRadius } from '@/theme'
 import type { DiscoverResult, MediaFilter } from '@/lib/queries/discover'
+
+const SCREEN_WIDTH = Dimensions.get('window').width
 
 // ── Main Screen ──
 
@@ -325,17 +330,6 @@ export default function DiscoverScreen() {
     [colors]
   )
 
-  // ── Loading state ──
-
-  if (trendingLoading && !isSearching) {
-    return (
-      <View style={[styles.container, styles.centered, { paddingTop: insets.top }]}>
-        <ActivityIndicator size="large" color={colors.primary} />
-        <Text style={styles.loadingText}>Discovering content...</Text>
-      </View>
-    )
-  }
-
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
       {/* TopAppBar */}
@@ -367,36 +361,95 @@ export default function DiscoverScreen() {
         onClear={() => setSearchText('')}
       />
 
-      {/* Single FlashList — Search/genre above, trending in footer */}
-      <FlashList
-        data={isSearching ? (searchResults || []) : []}
-        keyExtractor={searchKeyExtractor}
-        renderItem={renderSearchItem}
-        ListFooterComponent={listFooterElement}
-        ListEmptyComponent={
-          searchLoading && isSearching ? (
-            <ActivityIndicator size="large" color={colors.primary} style={styles.loadingContainer} />
-          ) : (
-            !isSearching ? null : undefined
-          )
-        }
-        contentContainerStyle={[
-          styles.listContent,
-          !isSearching && { flexGrow: 1 },
-          isSearching && { paddingHorizontal: spacing.marginMobile },
-        ]}
-        refreshControl={
-          <RefreshControl
-            refreshing={isRefetching}
-            onRefresh={refetch}
-            tintColor={colors.primary}
-            colors={[colors.primary]}
-          />
-        }
-        showsVerticalScrollIndicator={false}
-        keyboardShouldPersistTaps="handled"
-        extraData={{ addingIds, removingIds }}
-      />
+      {trendingLoading && !isSearching ? (
+        /* ── Skeleton layout ── */
+        <View style={{ flex: 1, paddingTop: 8 }}>
+          <ScrollView showsVerticalScrollIndicator={false}>
+          {/* Trending section header */}
+          <View
+            style={{
+              flexDirection: 'row',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              paddingHorizontal: 20,
+              marginBottom: 12,
+            }}
+          >
+            <SkeletonBlock width={160} height={22} borderRadius={4} />
+            <SkeletonBlock width={60} height={16} borderRadius={4} />
+          </View>
+
+          {/* Trending posters horizontal */}
+          <View style={{ flexDirection: 'row', paddingLeft: 20, gap: 16, marginBottom: 24 }}>
+            <SkeletonBlock
+              width={SCREEN_WIDTH * 0.58}
+              height={SCREEN_WIDTH * 0.58 * 1.5}
+              borderRadius={16}
+            />
+            <SkeletonBlock
+              width={SCREEN_WIDTH * 0.58}
+              height={SCREEN_WIDTH * 0.58 * 1.5}
+              borderRadius={16}
+            />
+          </View>
+
+          {/* Recommended section header */}
+          <View style={{ paddingHorizontal: 20, marginBottom: 12 }}>
+            <SkeletonBlock width={200} height={22} borderRadius={4} />
+          </View>
+
+          {/* Recommended posters horizontal */}
+          <View style={{ flexDirection: 'row', paddingLeft: 20, gap: 16 }}>
+            <SkeletonBlock
+              width={SCREEN_WIDTH * 0.32}
+              height={SCREEN_WIDTH * 0.32 * 1.5}
+              borderRadius={12}
+            />
+            <SkeletonBlock
+              width={SCREEN_WIDTH * 0.32}
+              height={SCREEN_WIDTH * 0.32 * 1.5}
+              borderRadius={12}
+            />
+            <SkeletonBlock
+              width={SCREEN_WIDTH * 0.32}
+              height={SCREEN_WIDTH * 0.32 * 1.5}
+              borderRadius={12}
+            />
+          </View>
+          </ScrollView>
+        </View>
+      ) : (
+        /* ── Single FlashList — Search/genre above, trending in footer ── */
+        <FlashList
+          data={isSearching ? (searchResults || []) : []}
+          keyExtractor={searchKeyExtractor}
+          renderItem={renderSearchItem}
+          ListFooterComponent={listFooterElement}
+          ListEmptyComponent={
+            searchLoading && isSearching ? (
+              <ActivityIndicator size="large" color={colors.primary} style={styles.loadingContainer} />
+            ) : (
+              !isSearching ? null : undefined
+            )
+          }
+          contentContainerStyle={[
+            styles.listContent,
+            !isSearching && { flexGrow: 1 },
+            isSearching && { paddingHorizontal: spacing.marginMobile },
+          ]}
+          refreshControl={
+            <RefreshControl
+              refreshing={isRefetching}
+              onRefresh={refetch}
+              tintColor={colors.primary}
+              colors={[colors.primary]}
+            />
+          }
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+          extraData={{ addingIds, removingIds }}
+        />
+      )}
     </View>
   )
 }

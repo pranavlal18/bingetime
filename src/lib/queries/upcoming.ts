@@ -40,9 +40,11 @@ function getDayLabel(airDate: Date, today: Date): string {
 }
 
 // ── Fetch upcoming episodes ──
-const MAX_CONCURRENT = 2
+const MAX_CONCURRENT = 8
 
-const BATCH_DELAY = 2500 // ms between batches — keeps requests under TMDb's 40 req/10sec free-tier limit
+// No artificial delay - TMDb free tier: 40 req/10s = 4 req/s sustained
+// 8 concurrent with immediate next batch = ~8 req/s burst, then settles to 4/s
+// This is well within limits and much faster
 
 interface ShowWithNextAir {
   showId: string
@@ -58,7 +60,12 @@ interface ShowWithNextAir {
 
 async function fetchNextAirForShow(tmdbId: number): Promise<Omit<ShowWithNextAir, 'showId' | 'showName' | 'posterPath'> | null> {
   try {
-    const details = await getShowBasicDetails(tmdbId)
+    const details = await Promise.race([
+      getShowBasicDetails(tmdbId),
+      new Promise<null>((_, reject) =>
+        setTimeout(() => reject(new Error('TMDb timeout')), 10000)
+      ),
+    ])
     if (!details) return null
 
     const nextEp = details.next_episode_to_air
@@ -81,34 +88,29 @@ async function fetchUpcomingEpisodes(userId: string): Promise<EpisodeSection[]> 
   const now = new Date()
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
 
-  // Fetch shows that have tmdb_id
+  // Fetch only user's watchlisted shows that have tmdb_id
   const { data: shows } = await supabase
     .from('shows')
-    .select('id, tmdb_id, name, poster_path')
+    .select('id, tmdb_id, name, poster_path, status, user_shows!inner(show_id)')
     .not('tmdb_id', 'is', null)
+    .eq('user_shows.user_id', userId)
+    .eq('user_shows.is_watchlist', true)
     .order('name', { ascending: true })
 
   if (!shows || shows.length === 0) return []
 
-  // Join with user_shows to filter by watchlist
-  const showIds = shows.map((s) => s.id)
-  const { data: userShows } = await supabase
-    .from('user_shows')
-    .select('show_id')
-    .eq('user_id', userId)
-    .eq('is_watchlist', true)
-    .in('show_id', showIds)
+  // Skip shows that are ended/canceled — they won't have upcoming episodes
+  const activeShows = shows.filter(
+    (s) => s.status && !['Ended', 'Canceled'].includes(s.status)
+  )
 
-  if (!userShows || userShows.length === 0) return []
+  if (activeShows.length === 0) return []
 
-  const userShowIds = new Set(userShows.map((us) => us.show_id))
-  const followedShows = shows.filter((s) => userShowIds.has(s.id))
-
-  // Batch fetch TMDb data for each show
+  // Batch fetch TMDb data for each show (no artificial delay — TMDb allows 40 req/10s)
   const results: ShowWithNextAir[] = []
 
-  for (let i = 0; i < followedShows.length; i += MAX_CONCURRENT) {
-    const batch = followedShows.slice(i, i + MAX_CONCURRENT)
+  for (let i = 0; i < activeShows.length; i += MAX_CONCURRENT) {
+    const batch = activeShows.slice(i, i + MAX_CONCURRENT)
     const batchResults = await Promise.all(
       batch.map(async (show) => {
         const airInfo = await fetchNextAirForShow(show.tmdb_id!)
@@ -124,10 +126,6 @@ async function fetchUpcomingEpisodes(userId: string): Promise<EpisodeSection[]> 
     )
 
     results.push(...batchResults.filter((r): r is ShowWithNextAir => r !== null))
-
-    if (i + MAX_CONCURRENT < followedShows.length) {
-      await new Promise((resolve) => setTimeout(resolve, BATCH_DELAY))
-    }
   }
 
   // Filter to future/today only and sort by air date
@@ -201,8 +199,8 @@ export function useUpcomingEpisodes() {
   return useQuery({
     queryKey: upcomingKeys.list(user?.id ?? ''),
     queryFn: () => fetchUpcomingEpisodes(user?.id ?? ''),
-    staleTime: 1000 * 60 * 60, // 1 hour — air dates don't change often
-    gcTime: 1000 * 60 * 120, // 2 hours
+    staleTime: 1000 * 60 * 60 * 24, // 24h — air dates shift once per day
+    gcTime: 1000 * 60 * 60 * 24 * 14, // 14 days — survives long tab inactivity
     enabled: !!user,
   })
 }

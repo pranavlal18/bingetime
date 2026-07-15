@@ -11,7 +11,7 @@ import {
 import { Image } from 'expo-image'
 import { Ionicons } from '@expo/vector-icons'
 import { router } from 'expo-router'
-import { getImageUrl } from '@/lib/queries/shows'
+import { getImageUrl, isHaventWatched } from '@/lib/queries/shows'
 import ProgressBar from './ProgressBar'
 
 import { typography, borderRadius, spacing } from '@/theme'
@@ -24,9 +24,10 @@ const CARD_WIDTH = (SCREEN_WIDTH - 40 - 16) / 2 // 40 outer margins, 16 gap = 2 
 interface ShowCardProps {
   show: ShowWithUserData
   onMarkWatched?: (showId: string) => void
+  isNewSeason?: boolean
 }
 
-export default function ShowCard({ show }: ShowCardProps) {
+export default function ShowCard({ show, isNewSeason = false }: ShowCardProps) {
   const { colors } = useTheme()
 
   const handlePress = useCallback(() => {
@@ -46,6 +47,9 @@ export default function ShowCard({ show }: ShowCardProps) {
   const isUpToDate = allCaughtUp && !isComplete
 
   const hasProgress = seenEps > 0 || (totalEps !== null && totalEps > 0)
+
+  const showHaventWatched = isHaventWatched(show)
+  const showNewSeason = isNewSeason
 
   const styles = useMemo(() => StyleSheet.create({
   card: {
@@ -88,6 +92,26 @@ export default function ShowCard({ show }: ShowCardProps) {
     borderRadius: 12,
     padding: spacing.unit,
   },
+  inactiveBadge: {
+    position: 'absolute',
+    top: 8,
+    left: 8,
+    backgroundColor: colors.tertiaryContainer,
+    borderRadius: 12,
+    padding: spacing.unit,
+  },
+  newSeasonBadge: {
+    position: 'absolute',
+    top: 8,
+    left: 8,
+    backgroundColor: colors.primaryContainer,
+    borderRadius: 12,
+    paddingHorizontal: 6,
+    paddingVertical: spacing.unit,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+  },
   title: {
     fontSize: typography.bodyXs.fontSize,
     color: colors.onSurface,
@@ -114,6 +138,20 @@ export default function ShowCard({ show }: ShowCardProps) {
       ) : (
         <View style={styles.posterPlaceholder}>
           <Ionicons name="tv-outline" size={32} color={colors.outlineVariant} />
+        </View>
+      )}
+
+      {/* New Season badge (highest priority) */}
+      {showNewSeason && (
+        <View style={styles.newSeasonBadge}>
+          <Ionicons name="sparkles" size={14} color={colors.onPrimaryContainer} />
+        </View>
+      )}
+
+      {/* Haven't watched badge */}
+      {!showNewSeason && showHaventWatched && !isComplete && !isUpToDate && (
+        <View style={styles.inactiveBadge}>
+          <Ionicons name="time-outline" size={18} color={colors.onTertiaryContainer} />
         </View>
       )}
 

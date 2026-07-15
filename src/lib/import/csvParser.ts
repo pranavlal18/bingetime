@@ -3,14 +3,17 @@
 import Papa from 'papaparse'
 import { Asset } from 'expo-asset'
 import { Platform } from 'react-native'
+import { 
+  readAsStringAsync, 
+  copyAsync, 
+  EncodingType, 
+  documentDirectory 
+} from 'expo-file-system/legacy'
 import type {
   FollowedTvShowRow,
   UserTvShowDataRow,
   TrackingV2Row,
-  ShowSeenEpisodeLatestRow,
-  UserShowSpecialStatusRow,
   TrackingProdRecordRow,
-  ListsProdListRow,
 } from './types'
 
 // ── Static asset map (Metro needs static require() calls) ──
@@ -19,10 +22,7 @@ const csvAssets: Record<string, number> = {
   'followed_tv_show.csv': require('../../../assets/csv/followed_tv_show.csv'),
   'user_tv_show_data.csv': require('../../../assets/csv/user_tv_show_data.csv'),
   'tracking-prod-records-v2.csv': require('../../../assets/csv/tracking-prod-records-v2.csv'),
-  'show_seen_episode_latest.csv': require('../../../assets/csv/show_seen_episode_latest.csv'),
-  'user_show_special_status.csv': require('../../../assets/csv/user_show_special_status.csv'),
   'tracking-prod-records.csv': require('../../../assets/csv/tracking-prod-records.csv'),
-  'lists-prod-lists.csv': require('../../../assets/csv/lists-prod-lists.csv'),
 }
 
 /** Read a text file from a local URI, works on both native and web */
@@ -31,11 +31,18 @@ async function readFile(uri: string): Promise<string> {
     const res = await fetch(uri)
     return res.text()
   }
-  // Native — use expo-file-system (legacy API, the new File/Directory API is not needed for simple reads)
-  const { readAsStringAsync, EncodingType } = await import(
-    'expo-file-system/legacy'
-  )
-  return readAsStringAsync(uri, { encoding: EncodingType.UTF8 })
+
+  // Native — Try direct read first (this works best for content:// URIs)
+  try {
+    return await readAsStringAsync(uri, { encoding: EncodingType.UTF8 })
+  } catch (error) {
+    console.log('Direct read failed, attempting copy to safe path:', error)
+    
+    // Fallback: copy to a secure document directory location
+    const safeUri = `${documentDirectory}import_temp.csv`
+    await copyAsync({ from: uri, to: safeUri })
+    return await readAsStringAsync(safeUri, { encoding: EncodingType.UTF8 })
+  }
 }
 
 /** Read a CSV file from bundled assets and parse it */
@@ -86,25 +93,10 @@ export async function readTrackingV2(): Promise<TrackingV2Row[]> {
   return readCsv<TrackingV2Row>('tracking-prod-records-v2.csv')
 }
 
-export async function readShowSeenEpisodeLatest(): Promise<ShowSeenEpisodeLatestRow[]> {
-  const rows = await readCsv<ShowSeenEpisodeLatestRow>('show_seen_episode_latest.csv')
-  return rows.filter((r) => r.tv_show_id && r.tv_show_name)
-}
-
-export async function readUserShowSpecialStatus(): Promise<UserShowSpecialStatusRow[]> {
-  const rows = await readCsv<UserShowSpecialStatusRow>('user_show_special_status.csv')
-  return rows.filter((r) => r.tv_show_id && r.status === 'for_later')
-}
-
 export async function readTrackingProdRecords(): Promise<TrackingProdRecordRow[]> {
   const allRows = await readCsv<TrackingProdRecordRow>('tracking-prod-records.csv')
   // Filter to only movie rows (entity_type === 'movie')
   return allRows.filter((r) => r.entity_type === 'movie' && r.movie_name)
-}
-
-export async function readListsProdLists(): Promise<ListsProdListRow[]> {
-  const rows = await readCsv<ListsProdListRow>('lists-prod-lists.csv')
-  return rows.filter((r) => r.name || r.objects)
 }
 
 // ── Combined reader for all files ──
@@ -113,23 +105,114 @@ export interface AllCsvData {
   followedShows: FollowedTvShowRow[]
   userShowData: UserTvShowDataRow[]
   trackingV2: TrackingV2Row[]
-  seenEpisodeLatest: ShowSeenEpisodeLatestRow[]
-  specialStatus: UserShowSpecialStatusRow[]
   movieRecords: TrackingProdRecordRow[]
-  listRows: ListsProdListRow[]
 }
 
 export async function readAllCsvs(): Promise<AllCsvData> {
-  const [followedShows, userShowData, trackingV2, seenEpisodeLatest, specialStatus, movieRecords, listRows] =
+  const [followedShows, userShowData, trackingV2, movieRecords] =
     await Promise.all([
       readFollowedTvShows(),
       readUserTvShowData(),
       readTrackingV2(),
-      readShowSeenEpisodeLatest(),
-      readUserShowSpecialStatus(),
       readTrackingProdRecords(),
-      readListsProdLists(),
     ])
 
-  return { followedShows, userShowData, trackingV2, seenEpisodeLatest, specialStatus, movieRecords, listRows }
+  return { followedShows, userShowData, trackingV2, movieRecords }
+}
+
+// ── File picker helpers ──
+
+export type CsvFileType =
+  | 'followed_tv_show'
+  | 'user_tv_show_data'
+  | 'tracking_prod_records_v2'
+  | 'tracking_prod_records'
+  | 'unknown'
+
+const CSV_SIGNATURES: Record<string, string[]> = {
+  followed_tv_show: ['tv_show_id', 'tv_show_name', 'active', 'created_at', 'updated_at'],
+  user_tv_show_data: ['tv_show_id', 'tv_show_name', 'is_favorited', 'nb_episodes_seen'],
+  tracking_prod_records_v2: ['s_id', 'key', 'ep_id', 'ep_no', 's_no'],
+  tracking_prod_records: ['type', 'entity_type', 'movie_name'],
+}
+
+/** Detect which TV Time CSV file a set of headers belongs to */
+export function detectCsvType(headers: string[]): CsvFileType {
+  const normalized = headers.map((h) => h.trim().toLowerCase())
+  for (const [type, sig] of Object.entries(CSV_SIGNATURES)) {
+    if (sig.every((col) => normalized.includes(col))) {
+      return type as CsvFileType
+    }
+  }
+  return 'unknown'
+}
+
+/** Parse raw CSV text into typed rows (no filtering) */
+export function parseCsvFromString<T = Record<string, string>>(
+  content: string
+): { headers: string[]; data: T[] } {
+  const result = Papa.parse<T>(content, {
+    header: true,
+    skipEmptyLines: true,
+    dynamicTyping: false,
+  })
+  return {
+    headers: result.meta.fields ?? [],
+    data: result.data,
+  }
+}
+
+/** Read a CSV file from an arbitrary URI (e.g. from expo-document-picker) */
+export async function readCsvFromUri(
+  uri: string
+): Promise<{ headers: string[]; data: Record<string, string>[] }> {
+  const content = await readFile(uri)
+  return parseCsvFromString(content)
+}
+
+/** Read and detect a single picked CSV file */
+export async function parsePickedFile(
+  uri: string,
+  fileName?: string
+): Promise<{ type: CsvFileType; data: Record<string, string>[]; headers: string[] }> {
+  const { headers, data } = await readCsvFromUri(uri)
+  const type = detectCsvType(headers)
+  return { type, data, headers }
+}
+
+/** Assemble individually picked CSV data into AllCsvData */
+export function assembleAllCsvData(
+  picked: Array<{ type: CsvFileType; data: Record<string, string>[] }>
+): AllCsvData {
+  const result: AllCsvData = {
+    followedShows: [],
+    userShowData: [],
+    trackingV2: [],
+    movieRecords: [],
+  }
+
+  for (const file of picked) {
+    switch (file.type) {
+      case 'followed_tv_show':
+        result.followedShows = file.data.filter(
+          (r) => r.tv_show_id && r.tv_show_name
+        ) as any
+        break
+      case 'user_tv_show_data':
+        result.userShowData = file.data.filter(
+          (r) => r.tv_show_id && r.tv_show_name
+        ) as any
+        break
+      case 'tracking_prod_records_v2':
+        result.trackingV2 = file.data as any
+        break
+      case 'tracking_prod_records':
+        result.movieRecords = file.data.filter(
+          (r) => r.entity_type === 'movie' && r.movie_name
+        ) as any
+        break
+    }
+  }
+
+  return result
 }

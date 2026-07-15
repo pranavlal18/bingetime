@@ -11,8 +11,6 @@ interface AppState extends AppSettings {
   setNotificationsEnabled: (enabled: boolean) => void
   isImportComplete: boolean
   setImportComplete: (done: boolean) => void
-  importStarted: boolean
-  setImportStarted: (started: boolean) => void
   statsPeriod: 'week' | 'month'
   setStatsPeriod: (period: 'week' | 'month') => void
 }
@@ -26,7 +24,6 @@ export const useAppStore = create<AppState>()(
       theme: 'cinematic-dark',
       notificationsEnabled: false,
       isImportComplete: false,
-      importStarted: false,
       statsPeriod: 'week',
 
       setShowsViewMode: (mode) => set({ showsViewMode: mode }),
@@ -34,7 +31,6 @@ export const useAppStore = create<AppState>()(
       setTheme: (theme) => set({ theme }),
       setNotificationsEnabled: (enabled) => set({ notificationsEnabled: enabled }),
       setImportComplete: (done) => set({ isImportComplete: done }),
-      setImportStarted: (started) => set({ importStarted: started }),
       setStatsPeriod: (period) => set({ statsPeriod: period }),
     }),
     {

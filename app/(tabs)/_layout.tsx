@@ -23,6 +23,7 @@ export default function TabLayout() {
 
   return (
     <Tabs screenOptions={screenOptions}>
+     
       <Tabs.Screen
         name="shows/index"
         options={{
@@ -41,7 +42,7 @@ export default function TabLayout() {
           ),
         }}
       />
-      <Tabs.Screen
+       <Tabs.Screen
         name="discover/index"
         options={{
           title: 'Discover',

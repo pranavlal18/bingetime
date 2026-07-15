@@ -205,6 +205,8 @@ export function useAddToLibrary() {
       queryClient.invalidateQueries({ queryKey: ['movies'] })
       queryClient.invalidateQueries({ queryKey: ['shows'] })
       queryClient.invalidateQueries({ queryKey: ['profile'] })
+      // Refresh stats (tab counts, remaining, watch time, etc.)
+      queryClient.invalidateQueries({ queryKey: ['stats'] })
     },
     onError: (error) => {
       console.error('❌ [useAddToLibrary] Error:', error.message)
@@ -238,6 +240,8 @@ export function useRemoveFromLibrary() {
       queryClient.invalidateQueries({ queryKey: ['movies'] })
       queryClient.invalidateQueries({ queryKey: ['shows'] })
       queryClient.invalidateQueries({ queryKey: ['profile'] })
+      // Refresh stats (tab counts, remaining, watch time, etc.)
+      queryClient.invalidateQueries({ queryKey: ['stats'] })
     },
     onError: (error) => {
       console.error('❌ [useRemoveFromLibrary] Error:', error.message)

@@ -68,12 +68,15 @@ export default function EpisodeCard({ data, sectionKind, onMarkWatched }: Episod
   const isWatchedHistory = sectionKind === 'watched-history'
   const isUpcoming = sectionKind === 'upcoming'
 
+  const isHaventWatchedSection = sectionKind === 'haven-watched'
+
   // Badge label
   const badgeLabel = useMemo(() => {
+    if (isHaventWatchedSection) return "HAVEN'T WATCHED"
     if (data.isPremiere) return 'PREMIERE'
     if (data.isFinale) return 'FINALE'
     return null
-  }, [data.isPremiere, data.isFinale])
+  }, [data.isPremiere, data.isFinale, isHaventWatchedSection])
 
   const isNewEp = useMemo(() => isNew(data.airDate ?? null, data.isWatched), [data.airDate, data.isWatched])
 
@@ -169,6 +172,20 @@ export default function EpisodeCard({ data, sectionKind, onMarkWatched }: Episod
     fontSize: 10,
     fontWeight: '700',
     color: colors.onErrorContainer,
+    letterSpacing: 1,
+  },
+  havenBadge: {
+    alignSelf: 'flex-start',
+    backgroundColor: colors.tertiaryContainer,
+    paddingHorizontal: 6,
+    paddingVertical: spacing.unit - 2,
+    borderRadius: borderRadius.sm,
+    marginTop: spacing.unit,
+  },
+  havenBadgeText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: colors.onTertiaryContainer,
     letterSpacing: 1,
   },
   rightSection: {
@@ -315,8 +332,8 @@ export default function EpisodeCard({ data, sectionKind, onMarkWatched }: Episod
 
           {/* Badge */}
           {badgeLabel && (
-            <View style={styles.badge}>
-              <Text style={styles.badgeText}>{badgeLabel}</Text>
+            <View style={isHaventWatchedSection ? styles.havenBadge : styles.badge}>
+              <Text style={isHaventWatchedSection ? styles.havenBadgeText : styles.badgeText}>{badgeLabel}</Text>
             </View>
           )}
         </View>

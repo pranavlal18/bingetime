@@ -280,7 +280,6 @@ export function useCustomLists() {
 export function useMarkWatched() {
   const { user } = useAuth()
   const queryClient = useQueryClient()
-  const setImportStarted = useAppStore((s) => s.setImportStarted)
 
   return useMutation({
     mutationFn: async (showId: string) => {

@@ -116,6 +116,10 @@ export default function ContinueWatchingSection({
       const allCaughtUp = totalEps !== null && totalEps > 0 && seenEps >= totalEps
       const isComplete = allCaughtUp && (item.status === 'Ended' || item.status === 'Canceled')
       const isUpToDate = allCaughtUp && !isComplete
+      const newSeason = item.next_air_episode != null &&
+        item.last_watched_episode_data?.season_number != null &&
+        item.next_air_episode.season_number > item.last_watched_episode_data.season_number &&
+        item.next_air_episode.episode_number === 1
 
       return (
         <Pressable style={styles.card} onPress={() => router.push(`/show/${item.id}`)}>
@@ -135,6 +139,13 @@ export default function ContinueWatchingSection({
             )}
 
             {/* Poster only — no decorative play icon (misleading) */}
+
+            {/* New Season badge */}
+            {newSeason && (
+              <View style={{ position: 'absolute', top: 4, left: 4, backgroundColor: colors.primaryContainer, borderRadius: 8, padding: 3 }}>
+                <Ionicons name="sparkles" size={12} color={colors.onPrimaryContainer} />
+              </View>
+            )}
 
             {/* Status badge */}
             {isComplete && (

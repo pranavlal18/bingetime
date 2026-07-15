@@ -173,6 +173,8 @@ export function useMarkMovieWatched() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: movieKeys.all })
       queryClient.invalidateQueries({ queryKey: ['profile'] })
+      // Refresh stats (weekly chart, watch time, catch-up rate, etc.)
+      queryClient.invalidateQueries({ queryKey: ['stats'] })
     },
   })
 }
@@ -246,6 +248,8 @@ export function useToggleMovieWatched() {
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: movieKeys.all })
       queryClient.invalidateQueries({ queryKey: ['profile'] })
+      // Refresh stats (weekly chart, watch time, catch-up rate, etc.)
+      queryClient.invalidateQueries({ queryKey: ['stats'] })
     },
   })
 }
@@ -272,6 +276,8 @@ export function useToggleMovieWatchlist() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: movieKeys.all })
       queryClient.invalidateQueries({ queryKey: ['profile'] })
+      // Refresh stats (tab counts, remaining, watch time, etc.)
+      queryClient.invalidateQueries({ queryKey: ['stats'] })
     },
   })
 }
