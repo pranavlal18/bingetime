@@ -89,6 +89,8 @@ export default function EpisodeCard({ data, sectionKind, onMarkWatched }: Episod
     paddingVertical: spacing.stackSm + 2,
     paddingHorizontal: spacing.marginMobile,
     backgroundColor: colors.surface,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: 'rgba(255,255,255,0.06)',
   },
   posterContainer: {
     width: 56,

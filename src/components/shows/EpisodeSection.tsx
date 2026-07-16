@@ -14,7 +14,7 @@ export default function EpisodeSection({ title }: EpisodeSectionProps) {
 
   const styles = useMemo(() => StyleSheet.create({
     container: {
-      marginTop: spacing.stackMd,
+      marginTop: spacing.stackSm + spacing.unit,
     },
     headerPill: {
       alignSelf: 'flex-start',
@@ -22,7 +22,7 @@ export default function EpisodeSection({ title }: EpisodeSectionProps) {
       paddingHorizontal: spacing.gutter,
       paddingVertical: spacing.stackSm - 2,
       borderRadius: borderRadius.full,
-      marginBottom: spacing.stackSm,
+      marginBottom: spacing.unit + 2,
       marginHorizontal: spacing.marginMobile,
     },
     headerText: {

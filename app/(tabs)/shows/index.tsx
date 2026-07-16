@@ -471,7 +471,7 @@ export default function ShowsScreen() {
         gridToggle: {
           position: 'absolute',
           right: spacing.marginMobile,
-          top: spacing.stackSm + 4,
+          top: 2,
           width: 44,
           height: 44,
           borderRadius: borderRadius.full,
