@@ -190,6 +190,7 @@ export function useMonthlyActivity() {
     queryKey: statsKeys.monthly(user?.id ?? ''),
     queryFn: () => fetchMonthlyActivity(user?.id ?? ''),
     staleTime: 1000 * 60 * 5,
+    gcTime: 1000 * 60 * 60,
     enabled: !!user,
   })
 }
@@ -277,6 +278,7 @@ export function useWatchStreaks() {
     queryKey: statsKeys.streaks(user?.id ?? ''),
     queryFn: () => fetchStreaks(user?.id ?? ''),
     staleTime: 1000 * 60 * 5,
+    gcTime: 1000 * 60 * 60,
     enabled: !!user,
   })
 }
@@ -330,6 +332,7 @@ export function useDayOfWeekStats() {
     queryKey: statsKeys.dayOfWeek(user?.id ?? ''),
     queryFn: () => fetchDayOfWeekStats(user?.id ?? ''),
     staleTime: 1000 * 60 * 5,
+    gcTime: 1000 * 60 * 60,
     enabled: !!user,
   })
 }
@@ -390,6 +393,7 @@ export function useMovieGenreStats() {
     queryKey: statsKeys.movieGenres(user?.id ?? ''),
     queryFn: () => fetchMovieGenreStats(user?.id ?? ''),
     staleTime: 1000 * 60 * 5,
+    gcTime: 1000 * 60 * 60,
     enabled: !!user,
   })
 }
@@ -425,6 +429,7 @@ export function useShowStatusBreakdown() {
     queryKey: statsKeys.showStatus(user?.id ?? ''),
     queryFn: () => fetchShowStatusBreakdown(user?.id ?? ''),
     staleTime: 1000 * 60 * 5,
+    gcTime: 1000 * 60 * 60,
     enabled: !!user,
   })
 }
@@ -465,6 +470,7 @@ export function useMovieWatchedHistory() {
     queryKey: statsKeys.movieHistory(user?.id ?? ''),
     queryFn: () => fetchMovieWatchedHistory(user?.id ?? ''),
     staleTime: 1000 * 60 * 5,
+    gcTime: 1000 * 60 * 60,
     enabled: !!user,
   })
 }

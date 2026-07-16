@@ -3,24 +3,35 @@ import '../global.css'
 import { useEffect, useState } from 'react'
 import { Stack } from 'expo-router'
 import { StatusBar } from 'expo-status-bar'
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { QueryClient } from '@tanstack/react-query'
+import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client'
+import { createAsyncStoragePersister } from '@tanstack/query-async-storage-persister'
+import AsyncStorage from '@react-native-async-storage/async-storage'
 import { GestureHandlerRootView } from 'react-native-gesture-handler'
-import { StyleSheet, ActivityIndicator, View, Linking, Alert } from 'react-native'
+import { StyleSheet, ActivityIndicator, View, Linking, Alert, Text } from 'react-native'
 import { useAuth, AuthProvider } from '@/contexts/AuthContext'
 import { ThemeProvider, useTheme } from '@/contexts/ThemeContext'
 import { useSegments, useRouter } from 'expo-router'
 import { useNotificationScheduler } from '@/hooks/useNotificationScheduler'
 import * as Notifications from 'expo-notifications'
+import { OfflineBanner } from '@/components/ui/OfflineBanner'
 import { ErrorBoundary } from '@/components/ErrorBoundary'
+import Toast from 'react-native-toast-message'
 
 export const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       staleTime: 1000 * 60 * 5,
-      gcTime: 1000 * 60 * 30,
+      gcTime: 1000 * 60 * 60 * 24,
       retry: 2,
+      networkMode: 'offlineFirst',
     },
   },
+})
+
+const asyncStoragePersister = createAsyncStoragePersister({
+  storage: AsyncStorage,
+  throttleTime: 3000,
 })
 
 // Inner layout that has access to auth context
@@ -70,7 +81,7 @@ function InnerLayout() {
     }
 
     // Handle initial URL if app was opened via deep link
-    Linking.getInitialURL().then(handleDeepLink)
+    Linking.getInitialURL().then(handleDeepLink).catch(err => console.error('🔗 [InnerLayout] Initial deep link failed:', err))
 
     // Listen for subsequent deep links
     const subscription = Linking.addEventListener('url', ({ url }) => handleDeepLink(url))
@@ -90,11 +101,6 @@ function InnerLayout() {
     )
     return () => sub.remove()
   }, [router])
-
-  // Initialize NativeWind dark mode
-  useEffect(() => {
-    (StyleSheet as any).setFlag?.('darkMode', 'class')
-  }, [])
 
   // Notification scheduler component (must be inside QueryClientProvider)
   function NotificationScheduler() {
@@ -117,7 +123,13 @@ function InnerLayout() {
 
   return (
     <GestureHandlerRootView style={styles.root}>
-      <QueryClientProvider client={queryClient}>
+      <PersistQueryClientProvider
+        client={queryClient}
+        persistOptions={{
+          persister: asyncStoragePersister,
+          maxAge: 1000 * 60 * 60 * 24,
+        }}
+      >
         <StatusBar style={isLightTheme ? 'dark' : 'light'} />
         <NotificationScheduler />
         <Stack screenOptions={{ headerShown: false }}>
@@ -152,7 +164,8 @@ function InnerLayout() {
             options={{ animation: 'slide_from_right' }}
           />
         </Stack>
-      </QueryClientProvider>
+        <Toast />
+      </PersistQueryClientProvider>
     </GestureHandlerRootView>
   )
 }
@@ -180,12 +193,12 @@ function EnvGuard({ children }: { children: React.ReactNode }) {
     }
   }, [])
 
-  // Block rendering if env vars are missing (only in dev — in production the app
-  // will limp along and the Alert won't show, but queries will fail with clear errors)
-  if (missing && missing.length > 0 && __DEV__) {
+  // Block rendering if env vars are missing
+  if (missing && missing.length > 0) {
     return (
       <View style={[styles.root, styles.loadingContainer]}>
-        <ActivityIndicator size="large" color="#d0bcff" />
+        <Text style={{ color: 'red', fontWeight: 'bold' }}>Configuration Error</Text>
+        <Text style={{ color: 'red' }}>Missing: {missing.join(', ')}</Text>
       </View>
     )
   }
@@ -196,6 +209,7 @@ function EnvGuard({ children }: { children: React.ReactNode }) {
 export default function RootLayout() {
   return (
     <GestureHandlerRootView style={styles.root}>
+      <OfflineBanner />
       <EnvGuard>
         <AuthProvider>
           <ThemeProvider>

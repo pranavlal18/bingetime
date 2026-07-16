@@ -10,7 +10,7 @@
       "resizeMode": "contain",
       "backgroundColor": "#1a1a2e"
     },
-    "userInterfaceStyle": "automatic",
+    "userInterfaceStyle": "light",
     "scheme": "bingetime",
     "ios": {
       "supportsTablet": true,
@@ -39,6 +39,12 @@
       "expo-image",
       "expo-font",
       "expo-notifications"
-    ]
+    ],
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "a44b8f2a-fe30-404d-a637-df7b49487350"
+      }
+    }
   }
 }

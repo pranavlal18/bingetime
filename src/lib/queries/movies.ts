@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabase'
 import { getImageUrl, getMovieDetails, searchMovie } from '@/lib/tmdb'
 import { useAuth } from '@/contexts/AuthContext'
 import type { Movie, UserMovie } from '@/types'
+import Toast from 'react-native-toast-message'
 
 // ── Types for joined query result ──
 
@@ -243,6 +244,11 @@ export function useToggleMovieWatched() {
       if (context?.previousList) {
         queryClient.setQueryData(movieKeys.list(user?.id ?? ''), context.previousList)
       }
+      Toast.show({
+        type: 'error',
+        text1: 'Failed to update watch status',
+        text2: 'Please check your connection.',
+      })
     },
 
     onSettled: () => {
@@ -278,6 +284,13 @@ export function useToggleMovieWatchlist() {
       queryClient.invalidateQueries({ queryKey: ['profile'] })
       // Refresh stats (tab counts, remaining, watch time, etc.)
       queryClient.invalidateQueries({ queryKey: ['stats'] })
+    },
+    onError: () => {
+      Toast.show({
+        type: 'error',
+        text1: 'Failed to update watchlist',
+        text2: 'Please check your connection.',
+      })
     },
   })
 }
@@ -504,7 +517,7 @@ async function toggleMovieFavorite(movieId: string, userId: string): Promise<voi
   const current = um?.is_favorited ?? false
   const newValue = !current
 
-  await supabase
+  const { error } = await supabase
     .from('user_movies')
     .update({
       is_favorited: newValue,
@@ -512,6 +525,8 @@ async function toggleMovieFavorite(movieId: string, userId: string): Promise<voi
     })
     .eq('movie_id', movieId)
     .eq('user_id', userId)
+
+  if (error) throw new Error(`Failed to toggle movie favorite: ${error.message}`)
 }
 
 export function useToggleMovieFavorite() {
@@ -522,6 +537,13 @@ export function useToggleMovieFavorite() {
     mutationFn: (movieId: string) => toggleMovieFavorite(movieId, user?.id ?? ''),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: movieKeys.all })
+    },
+    onError: () => {
+      Toast.show({
+        type: 'error',
+        text1: 'Failed to update favorite',
+        text2: 'Please check your connection.',
+      })
     },
   })
 }

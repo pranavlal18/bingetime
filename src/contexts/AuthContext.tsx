@@ -5,6 +5,7 @@ import { createContext, useContext, useEffect, useState, ReactNode } from 'react
 import { Session, User, AuthError } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 import { queryClient } from '../../app/_layout'
+import AsyncStorage from '@react-native-async-storage/async-storage'
 
 interface AuthContextType {
   user: User | null
@@ -35,6 +36,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setSession(session)
       setUser(session?.user ?? null)
       setLoading(false)
+    }).catch(err => {
+        console.error('🔐 [AuthContext] getSession failed:', err)
+        setLoading(false)
     })
 
     // Listen for auth changes
@@ -67,6 +71,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signOut = async () => {
     queryClient.clear()
+    await AsyncStorage.removeItem('REACT_QUERY_OFFLINE_CACHE')
     await supabase.auth.signOut()
   }
 

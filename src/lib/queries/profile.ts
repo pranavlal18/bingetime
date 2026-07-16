@@ -23,11 +23,13 @@ export interface FavoriteShow extends Show {
   episodes_seen: number
   favorited_at: string | null
   average_runtime: number | null
+  genres: string[] | null
 }
 
 export interface WatchlistShow extends Show {
   episodes_seen: number
   average_runtime: number | null
+  genres: string[] | null
 }
 
 export interface WatchlistMovie extends Movie {
@@ -163,6 +165,7 @@ async function fetchFavorites(userId: string): Promise<FavoriteShow[]> {
       total_episodes: show.total_episodes,
       last_air_date: show.last_air_date,
       average_runtime: show.average_runtime ?? null,
+      genres: show.genres ?? null,
       episodes_seen: row.episodes_seen ?? 0,
       favorited_at: row.favorited_at ?? null,
     }
@@ -204,6 +207,7 @@ async function fetchWatchlistShows(userId: string): Promise<WatchlistShow[]> {
       total_episodes: show.total_episodes,
       last_air_date: show.last_air_date,
       average_runtime: show.average_runtime ?? null,
+      genres: show.genres ?? null,
       episodes_seen: row.episodes_seen ?? 0,
     }
   })

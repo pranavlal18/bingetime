@@ -4,7 +4,9 @@ import { useQuery, useMutation, useQueryClient, QueryClient } from '@tanstack/re
 import { supabase } from '@/lib/supabase'
 import { getImageUrl, getShowBasicDetails } from '@/lib/tmdb'
 import { useAuth } from '@/contexts/AuthContext'
-import { showKeys, episodeKeys, type ShowWithUserData, type NextAirEpisode, profileKeys } from './sharedTypes'
+import { showKeys, episodeKeys, profileKeys } from '@/types'
+import { type ShowWithUserData, type NextAirEpisode } from '@/types'
+import Toast from 'react-native-toast-message'
 
 export type { ShowWithUserData, NextAirEpisode }
 
@@ -22,6 +24,7 @@ function mapRow(row: any): ShowWithUserData {
     total_episodes: row.total_episodes,
     last_air_date: row.last_air_date,
     average_runtime: row.average_runtime ?? null,
+    genres: row.genres ?? null,
     // User show data
     episodes_seen: us.episodes_seen ?? 0,
     is_following: us.is_following ?? true,
@@ -83,6 +86,7 @@ async function fetchShows(
       total_episodes: show.total_episodes,
       last_air_date: show.last_air_date,
       average_runtime: show.average_runtime ?? null,
+      genres: show.genres ?? null,
       // User show data
       user_shows: row,
       episodes_seen: row.episodes_seen ?? 0,
@@ -344,10 +348,13 @@ async function fetchContinueWatching(userId: string): Promise<ShowWithUserData[]
       const newCount = (actual === 0 && show.episodes_seen > 0) ? show.episodes_seen : actual
       if (newCount !== show.episodes_seen) {
         show.episodes_seen = newCount
-        supabase
+        const { error } = await supabase
           .from('user_shows')
           .upsert({ show_id: show.id, episodes_seen: newCount, is_following: true, user_id: userId }, { onConflict: 'show_id,user_id' })
-          .then() // fire-and-forget, no await
+        
+        if (error) {
+            console.error(`[fetchContinueWatching] Upsert failed for ${show.id}:`, error)
+        }
       }
     }
   }
@@ -448,8 +455,7 @@ async function markEpisodeWatched(
   )
 
   if (insertError) {
-    console.warn(`Failed to insert user_episode: ${insertError.message}`)
-    // Don't throw — the episodes_seen increment will reconcile on next sync
+    throw new Error(`Failed to insert user_episode: ${insertError.message}`)
   }
 
   // 4. Increment episodes_seen + set last_watched_episode_data
@@ -562,6 +568,11 @@ export function useMarkWatched() {
           queryClient.setQueryData(key, data)
         }
       }
+      Toast.show({
+        type: 'error',
+        text1: 'Action failed',
+        text2: 'Please check your connection and try again.',
+      })
     },
 
     onSettled: (_data, _error, { showId }) => {
@@ -592,7 +603,7 @@ async function toggleFavorite(showId: string, userId: string): Promise<void> {
   const current = us?.is_favorited ?? false
   const newValue = !current
 
-  await supabase
+  const { error } = await supabase
     .from('user_shows')
     .update({
       is_favorited: newValue,
@@ -600,6 +611,8 @@ async function toggleFavorite(showId: string, userId: string): Promise<void> {
     })
     .eq('show_id', showId)
     .eq('user_id', userId)
+
+  if (error) throw new Error(`Failed to toggle favorite: ${error.message}`)
 }
 
 export function useToggleFavorite() {
@@ -613,6 +626,13 @@ export function useToggleFavorite() {
       if (user) {
         queryClient.invalidateQueries({ queryKey: profileKeys.favorites(user.id) })
       }
+    },
+    onError: () => {
+      Toast.show({
+        type: 'error',
+        text1: 'Failed to update favorites',
+        text2: 'Please check your connection.',
+      })
     },
   })
 }
