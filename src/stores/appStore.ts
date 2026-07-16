@@ -9,8 +9,6 @@ interface AppState extends AppSettings {
   setTheme: (theme: ThemeKey) => void
   notificationsEnabled: boolean
   setNotificationsEnabled: (enabled: boolean) => void
-  isImportComplete: boolean
-  setImportComplete: (done: boolean) => void
   statsPeriod: 'week' | 'month'
   setStatsPeriod: (period: 'week' | 'month') => void
 }
@@ -23,14 +21,12 @@ export const useAppStore = create<AppState>()(
       moviesViewMode: 'poster-grid',
       theme: 'cinematic-dark',
       notificationsEnabled: false,
-      isImportComplete: false,
       statsPeriod: 'week',
 
       setShowsViewMode: (mode) => set({ showsViewMode: mode }),
       setMoviesViewMode: (mode) => set({ moviesViewMode: mode }),
       setTheme: (theme) => set({ theme }),
       setNotificationsEnabled: (enabled) => set({ notificationsEnabled: enabled }),
-      setImportComplete: (done) => set({ isImportComplete: done }),
       setStatsPeriod: (period) => set({ statsPeriod: period }),
     }),
     {

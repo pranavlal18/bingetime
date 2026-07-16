@@ -675,7 +675,6 @@ export default function ProfileScreen() {
   const insets = useSafeAreaInsets()
   const notificationsEnabled = useAppStore((s) => s.notificationsEnabled)
   const setNotificationsEnabled = useAppStore((s) => s.setNotificationsEnabled)
-  const setImportComplete = useAppStore((s) => s.setImportComplete)
 
   const { colors, themeKey, setTheme, availableThemes } = useTheme()
   const [showThemePicker, setShowThemePicker] = useState(false)
@@ -724,11 +723,6 @@ export default function ProfileScreen() {
       { text: 'Sign out', style: 'destructive', onPress: () => signOut() },
     ])
   }, [signOut])
-
-  const handleImport = useCallback(() => {
-    setImportComplete(false)
-    router.push('/import')
-  }, [setImportComplete])
 
   // Dynamic styles that depend on theme
   const styles = useMemo(
@@ -1057,15 +1051,7 @@ export default function ProfileScreen() {
               >
                 <Text style={{ color: '#FFF', fontFamily: 'Inter', fontSize: 14, fontWeight: '600' }}>Discover Content</Text>
               </Pressable>
-              <Pressable
-                style={[
-                  styles.emptyActionSecondary,
-                  { backgroundColor: colors.surfaceContainer, paddingVertical: 12, paddingHorizontal: 24, borderRadius: 10, flex: 1, alignItems: 'center', borderWidth: 1, borderColor: colors.outlineVariant }
-                ]}
-                onPress={() => router.push('/import')}
-              >
-                <Text style={{ color: colors.onSurface, fontFamily: 'Inter', fontSize: 14, fontWeight: '600' }}>Import from TV Time</Text>
-              </Pressable>
+
             </View>
             <Pressable
               style={[
@@ -1280,11 +1266,6 @@ export default function ProfileScreen() {
                 await cancelAllReminders()
               }
             }}
-          />
-          <SettingsRow
-            icon="sync-outline"
-            label="Import TV Time Data"
-            onPress={handleImport}
           />
           <SettingsRow
             icon="log-out-outline"

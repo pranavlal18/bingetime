@@ -83,15 +83,6 @@ export interface List {
   item_ids: string[]
 }
 
-// ── Import ──
-export interface CSVImportProgress {
-  step: string
-  current: number
-  total: number
-  status: 'pending' | 'processing' | 'done' | 'error'
-  error?: string
-}
-
 // ── TMDb API Responses ──
 export interface TMDbFindResponse {
   tv_results: Array<{
@@ -203,68 +194,6 @@ export interface TMDbShowDetails {
     still_path: string | null
     vote_average: number
   } | null
-}
-
-// ── CSV Row Types (raw from export) ──
-export interface FollowedTvShowRow {
-  tv_show_id: string
-  tv_show_name: string
-  active: string
-  created_at: string
-  updated_at: string
-}
-
-export interface UserTvShowDataRow {
-  tv_show_id: string
-  tv_show_name: string
-  is_favorited: string
-  nb_episodes_seen: string
-  is_followed: string
-}
-
-export interface TrackingRecordV2Row {
-  s_id: string
-  series_name: string
-  season_number: string
-  episode_number: string
-  rewatch_count: string
-  created_at: string
-  // tracking-stats rows have different shape
-  runtime?: string
-  movie_watch_count?: string
-  ep_watch_count?: string
-  total_movies_runtime?: string
-  total_series_runtime?: string
-}
-
-export interface ShowSeenEpisodeLatestRow {
-  tv_show_id: string
-  tv_show_name: string
-  episode_id: string
-  updated_at: string
-  created_at: string
-}
-
-export interface UserShowSpecialStatusRow {
-  tv_show_id: string
-  tv_show_name: string
-  status: string
-}
-
-export interface TrackingProdRecordRow {
-  type: string
-  movie_name?: string
-  series_name?: string
-  runtime?: string
-  release_date?: string
-  watches?: string
-  // Many columns, we only need movie-related ones
-}
-
-export interface ListsProdListRow {
-  name: string
-  objects: string
-  description: string
 }
 
 // ── App Settings ──
