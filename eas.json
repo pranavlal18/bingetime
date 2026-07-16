@@ -1,13 +1,33 @@
 {
   "build": {
+    "development": {
+      "android": {
+        "buildType": "apk"
+      },
+      "env": {
+        "EXPO_PUBLIC_SUPABASE_URL": "@EXPO_PUBLIC_SUPABASE_URL",
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "@EXPO_PUBLIC_SUPABASE_ANON_KEY",
+        "EXPO_PUBLIC_TMDB_API_KEY": "@EXPO_PUBLIC_TMDB_API_KEY"
+      }
+    },
     "preview": {
       "android": {
         "buildType": "apk"
+      },
+      "env": {
+        "EXPO_PUBLIC_SUPABASE_URL": "@EXPO_PUBLIC_SUPABASE_URL",
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "@EXPO_PUBLIC_SUPABASE_ANON_KEY",
+        "EXPO_PUBLIC_TMDB_API_KEY": "@EXPO_PUBLIC_TMDB_API_KEY"
       }
     },
     "production": {
       "android": {
         "buildType": "app-bundle"
+      },
+      "env": {
+        "EXPO_PUBLIC_SUPABASE_URL": "@EXPO_PUBLIC_SUPABASE_URL",
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "@EXPO_PUBLIC_SUPABASE_ANON_KEY",
+        "EXPO_PUBLIC_TMDB_API_KEY": "@EXPO_PUBLIC_TMDB_API_KEY"
       }
     }
   }

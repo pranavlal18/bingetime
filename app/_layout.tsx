@@ -3,36 +3,29 @@ import '../global.css'
 import { useEffect, useState } from 'react'
 import { Stack } from 'expo-router'
 import { StatusBar } from 'expo-status-bar'
-import { QueryClient } from '@tanstack/react-query'
 import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client'
-import { createAsyncStoragePersister } from '@tanstack/query-async-storage-persister'
-import AsyncStorage from '@react-native-async-storage/async-storage'
 import { GestureHandlerRootView } from 'react-native-gesture-handler'
-import { StyleSheet, ActivityIndicator, View, Linking, Alert, Text } from 'react-native'
+import { StyleSheet, ActivityIndicator, View, Linking, Alert, Text, Platform } from 'react-native'
 import { useAuth, AuthProvider } from '@/contexts/AuthContext'
 import { ThemeProvider, useTheme } from '@/contexts/ThemeContext'
 import { useSegments, useRouter } from 'expo-router'
 import { useNotificationScheduler } from '@/hooks/useNotificationScheduler'
-import * as Notifications from 'expo-notifications'
 import { OfflineBanner } from '@/components/ui/OfflineBanner'
 import { ErrorBoundary } from '@/components/ErrorBoundary'
 import Toast from 'react-native-toast-message'
+import { queryClient, asyncStoragePersister } from '@/lib/queryClient'
+import Constants, { ExecutionEnvironment } from 'expo-constants'
 
-export const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      staleTime: 1000 * 60 * 5,
-      gcTime: 1000 * 60 * 60 * 24,
-      retry: 2,
-      networkMode: 'offlineFirst',
-    },
-  },
-})
+// Check if we're in Expo Go (which doesn't support push notifications on Android SDK 53+)
+const isExpoGo = Constants.executionEnvironment === ExecutionEnvironment.StoreClient
+const supportsPushNotifications = Platform.OS !== 'web' && !(isExpoGo && Platform.OS === 'android')
 
-const asyncStoragePersister = createAsyncStoragePersister({
-  storage: AsyncStorage,
-  throttleTime: 3000,
-})
+// Only import Notifications if supported
+let Notifications: any = null
+if (supportsPushNotifications) {
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  Notifications = require('expo-notifications')
+}
 
 // Inner layout that has access to auth context
 function InnerLayout() {
@@ -71,29 +64,25 @@ function InnerLayout() {
     const handleDeepLink = async (url: string | null) => {
       if (!url) return
       if (__DEV__) console.log('🔗 [InnerLayout] Deep link received:', url)
-      // Supabase redirects to: bingetime://auth/callback?code=...&type=signup
       if (url.includes('auth/callback')) {
         if (__DEV__) console.log('🔗 [InnerLayout] Auth callback detected, waiting for session...')
-        // Let Supabase handle the code exchange
-        // The onAuthStateChange listener in AuthContext will pick up the new session
         return
       }
     }
 
-    // Handle initial URL if app was opened via deep link
     Linking.getInitialURL().then(handleDeepLink).catch(err => console.error('🔗 [InnerLayout] Initial deep link failed:', err))
 
-    // Listen for subsequent deep links
     const subscription = Linking.addEventListener('url', ({ url }) => handleDeepLink(url))
     return () => subscription.remove()
   }, [])
 
-  // Navigate to show when user taps a notification
+  // Navigate to show when user taps a notification (only if notifications supported)
   useEffect(() => {
+    if (!supportsPushNotifications || !Notifications) return
+
     const sub = Notifications.addNotificationResponseReceivedListener(
-      (response) => {
-        const { showId, showName } =
-          response.notification.request.content.data ?? {}
+      (response: any) => {
+        const { showId, showName } = response.notification.request.content.data ?? {}
         if (showId) {
           router.push(`/show/${showId}`)
         }
@@ -131,7 +120,7 @@ function InnerLayout() {
         }}
       >
         <StatusBar style={isLightTheme ? 'dark' : 'light'} />
-        <NotificationScheduler />
+        {supportsPushNotifications && <NotificationScheduler />}
         <Stack screenOptions={{ headerShown: false }}>
           <Stack.Screen name="(auth)" />
           <Stack.Screen name="(tabs)" />
@@ -193,7 +182,6 @@ function EnvGuard({ children }: { children: React.ReactNode }) {
     }
   }, [])
 
-  // Block rendering if env vars are missing
   if (missing && missing.length > 0) {
     return (
       <View style={[styles.root, styles.loadingContainer]}>

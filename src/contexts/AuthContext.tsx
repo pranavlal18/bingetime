@@ -4,7 +4,7 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react'
 import { Session, User, AuthError } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
-import { queryClient } from '../../app/_layout'
+import { queryClient } from '@/lib/queryClient'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 
 interface AuthContextType {
