@@ -6,6 +6,7 @@ import { Image } from 'expo-image'
 import { Swipeable } from 'react-native-gesture-handler'
 import { Ionicons } from '@expo/vector-icons'
 import { router } from 'expo-router'
+import * as Haptics from 'expo-haptics'
 import { getImageUrl } from '@/lib/tmdb'
 import { typography, spacing, borderRadius } from '@/theme'
 import { useTheme } from '@/contexts/ThemeContext'
@@ -46,6 +47,7 @@ export default function EpisodeCard({ data, sectionKind, onMarkWatched }: Episod
       Animated.timing(glowAnim, { toValue: 1, duration: 200, useNativeDriver: false }),
       Animated.timing(glowAnim, { toValue: 0, duration: 300, useNativeDriver: false }),
     ]).start()
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
     onMarkWatched?.(data.showId, data.seasonNumber, data.episodeNumber)
     swipeableRef.current?.close()
   }, [data.showId, data.seasonNumber, data.episodeNumber, onMarkWatched, glowAnim])
@@ -207,13 +209,13 @@ export default function EpisodeCard({ data, sectionKind, onMarkWatched }: Episod
   checkmarkContainer: {
     justifyContent: 'center',
     alignItems: 'center',
-    width: 36,
-    height: 36,
+    width: 40,
+    height: 40,
   },
   checkCircle: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
+    width: 30,
+    height: 30,
+    borderRadius: 15,
     borderWidth: 2,
     borderColor: colors.outlineVariant,
     justifyContent: 'center',
@@ -356,15 +358,15 @@ export default function EpisodeCard({ data, sectionKind, onMarkWatched }: Episod
               ) : (
                 <Pressable onPress={handleMark} hitSlop={8}>
                   <Animated.View style={[styles.checkCircle, { backgroundColor: glowBg }]}>
-                    <Ionicons name="checkmark" size={14} color={colors.onSurfaceVariant} />
+                    <Ionicons name="checkmark" size={18} color={colors.onSurfaceVariant} />
                     {/* White checkmark overlay that fades in during glow */}
                     <Animated.View
                       style={[
                         StyleSheet.absoluteFill,
-                        { borderRadius: 12, justifyContent: 'center', alignItems: 'center', opacity: glowIconOpacity },
+                        { borderRadius: 15, justifyContent: 'center', alignItems: 'center', opacity: glowIconOpacity },
                       ]}
                     >
-                      <Ionicons name="checkmark" size={14} color={colors.onPrimary} />
+                      <Ionicons name="checkmark" size={18} color={colors.onPrimary} />
                     </Animated.View>
                   </Animated.View>
                 </Pressable>

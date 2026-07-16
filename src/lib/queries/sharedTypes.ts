@@ -36,6 +36,7 @@ export interface ShowWithUserData extends Show {
   is_favorited: boolean
   is_watchlist: boolean
   last_watched_episode_data: UserShow['last_watched_episode_data']
+  created_at: string | null
   next_air_episode: NextAirEpisode | null
 }
 

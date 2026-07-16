@@ -6,6 +6,7 @@ import { Image } from 'expo-image'
 import { Swipeable } from 'react-native-gesture-handler'
 import { Ionicons } from '@expo/vector-icons'
 import { router } from 'expo-router'
+import * as Haptics from 'expo-haptics'
 import { getImageUrl } from '@/lib/queries/movies'
 
 import { typography, borderRadius, spacing } from '@/theme'
@@ -144,6 +145,7 @@ const MovieCard = memo(function MovieCard({ movie, onMarkWatched }: MovieCardPro
       <Pressable
         style={styles.swipeAction}
         onPress={() => {
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
           onMarkWatched(movie.id)
           swipeableRef.current?.close()
         }}

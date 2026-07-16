@@ -317,7 +317,7 @@ export interface EpisodeCardData {
   showStatus?: string | null
 }
 
-export type EpisodeSectionKind = 'watched-history' | 'watch-next' | 'haven-watched' | 'upcoming'
+export type EpisodeSectionKind = 'watched-history' | 'watch-next' | 'haven-watched' | 'upcoming' | 'finished' | 'up-to-date' | 'not-started'
 
 export interface EpisodeSection {
   kind: EpisodeSectionKind

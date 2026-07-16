@@ -28,6 +28,7 @@ function mapRow(row: any): ShowWithUserData {
     is_favorited: us.is_favorited ?? false,
     is_watchlist: us.is_watchlist ?? false,
     last_watched_episode_data: us.last_watched_episode_data ?? null,
+    created_at: us.created_at ?? null,
     next_air_episode: null, // Enriched later in fetchShows
   }
 }
@@ -727,12 +728,14 @@ export function computeNextEpisode(show: ShowWithUserData): NextEpisodeInfo | nu
 const HAVENT_WATCHED_THRESHOLD_DAYS = 21
 
 export function isHaventWatched(show: ShowWithUserData): boolean {
+  // Only consider shows in the user's watchlist
+  if (!show.is_watchlist) return false
+
   // Never watched any episode
   if (show.episodes_seen === 0) {
-    // Check if added 21+ days ago (never started)
-    const lastData = show.last_watched_episode_data
-    if (lastData?.updated_at) {
-      const daysSinceAdded = (Date.now() - new Date(lastData.updated_at).getTime()) / (1000 * 60 * 60 * 24)
+    // Check if added 21+ days ago (never started) using created_at
+    if (show.created_at) {
+      const daysSinceAdded = (Date.now() - new Date(show.created_at).getTime()) / (1000 * 60 * 60 * 24)
       return daysSinceAdded >= HAVENT_WATCHED_THRESHOLD_DAYS
     }
     return false

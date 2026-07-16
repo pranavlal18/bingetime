@@ -15,6 +15,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Image } from 'expo-image'
 import { Ionicons } from '@expo/vector-icons'
 import { LinearGradient } from 'expo-linear-gradient'
+import * as Haptics from 'expo-haptics'
 import { useShow, useMarkWatched, useToggleFavorite, useUpdateShowRuntime } from '@/lib/queries/shows'
 import { useSeasonEpisodes, useToggleEpisodeWatched, useBatchMarkWatched } from '@/lib/queries/episodes'
 import { getShowDetails, getImageUrl } from '@/lib/tmdb'
@@ -657,6 +658,9 @@ export default function ShowDetailScreen() {
               return next
             })
           },
+          onSuccess: () => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
+          },
         }
       )
     },
@@ -688,6 +692,7 @@ export default function ShowDetailScreen() {
       seasonNumber: resolvedSeason,
       episodeNumbers,
     })
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success)
   }, [season, id, resolvedSeason, batchMarkWatched])
 
   // ── Modal ──

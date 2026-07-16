@@ -17,6 +17,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Image } from 'expo-image'
 import { Ionicons } from '@expo/vector-icons'
 import { LinearGradient } from 'expo-linear-gradient'
+import * as Haptics from 'expo-haptics'
 import { useMovie, useToggleMovieWatched, useToggleMovieFavorite } from '@/lib/queries/movies'
 import { getMovieDetails, getImageUrl } from '@/lib/tmdb'
 import { useQuery } from '@tanstack/react-query'
@@ -259,7 +260,11 @@ export default function MovieDetailScreen() {
   const displayTitle = movie?.title || tmdbDetails?.title || 'Unknown'
 
   const handleToggleWatched = useCallback(() => {
-    if (movie) toggleWatchedMutation.mutate(movie.id)
+    if (movie) {
+      toggleWatchedMutation.mutate(movie.id, {
+        onSuccess: () => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light),
+      })
+    }
   }, [movie, toggleWatchedMutation])
 
   const handleBack = useCallback(() => {

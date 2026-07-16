@@ -89,12 +89,12 @@ export default function ShowsScreen() {
 
   // 2a. Extract unique TMDb IDs per show (for season boundary info from getShowBasicDetails)
   const showPairs = useMemo(() => {
-    const seen = new Set<string>()
+    const seen = new Set<number>()
     return [...rawWatchNext, ...rawHaventWatched]
       .filter((ep): ep is NextEpisodeInfo & { tmdbId: number } => ep.tmdbId != null)
       .filter(ep => {
-        if (seen.has(ep.showId)) return false
-        seen.add(ep.showId)
+        if (seen.has(ep.tmdbId)) return false
+        seen.add(ep.tmdbId)
         return true
       })
       .map(ep => ({ showId: ep.showId, tmdbId: ep.tmdbId }))

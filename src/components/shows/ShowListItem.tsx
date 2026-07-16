@@ -11,6 +11,7 @@ import { Image } from 'expo-image'
 import { Swipeable } from 'react-native-gesture-handler'
 import { Ionicons } from '@expo/vector-icons'
 import { router } from 'expo-router'
+import * as Haptics from 'expo-haptics'
 import { getImageUrl, isHaventWatched } from '@/lib/queries/shows'
 import ProgressBar from './ProgressBar'
 import { typography, borderRadius, spacing } from '@/theme'
@@ -153,6 +154,7 @@ export default function ShowListItem({ show, onMarkWatched, isNewSeason = false 
       <Pressable
         style={styles.swipeAction}
         onPress={() => {
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
           onMarkWatched(show.id)
           swipeableRef.current?.close()
         }}
