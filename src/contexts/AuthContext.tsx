@@ -25,9 +25,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     // Get initial session
-    console.log('🔐 [AuthContext] Getting initial session...')
+    if (__DEV__) console.log('🔐 [AuthContext] Getting initial session...')
     supabase.auth.getSession().then(({ data: { session }, error }) => {
-      console.log('🔐 [AuthContext] Initial session:', {
+      if (__DEV__) console.log('🔐 [AuthContext] Initial session:', {
         user: session?.user?.email ?? null,
         session: !!session,
         error: error?.message ?? null,
@@ -38,11 +38,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     })
 
     // Listen for auth changes
-    console.log('🔐 [AuthContext] Subscribing to auth state changes...')
+    if (__DEV__) console.log('🔐 [AuthContext] Subscribing to auth state changes...')
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event, session) => {
-      console.log('🔐 [AuthContext] Auth state changed:', {
+      if (__DEV__) console.log('🔐 [AuthContext] Auth state changed:', {
         event,
         user: session?.user?.email ?? null,
         session: !!session,

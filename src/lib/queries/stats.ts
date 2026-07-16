@@ -557,13 +557,13 @@ export function useRepairRuntime(onProgress?: (fixed: number, total: number) => 
             .eq('id', show.id)
 
           if (updateError) {
-            console.error(`Failed to update ${show.name}:`, updateError)
+            if (__DEV__) console.error(`Failed to update ${show.name}:`, updateError)
             skipped++
           } else {
             fixed++
           }
         } catch (err) {
-          console.error(`Error processing ${show.name}:`, err)
+          if (__DEV__) console.error(`Error processing ${show.name}:`, err)
           skipped++
         }
 
@@ -630,13 +630,13 @@ export function useRepairShowGenres(onProgress?: (fixed: number, total: number) 
             .eq('id', show.id)
 
           if (updateError) {
-            console.error(`Failed to update genres for ${show.name}:`, updateError)
+            if (__DEV__) console.error(`Failed to update genres for ${show.name}:`, updateError)
             skipped++
           } else {
             fixed++
           }
         } catch (err) {
-          console.error(`Error processing ${show.name}:`, err)
+          if (__DEV__) console.error(`Error processing ${show.name}:`, err)
           skipped++
         }
 

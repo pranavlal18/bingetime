@@ -110,10 +110,10 @@ export default function DiscoverScreen() {
       setAddingIds((prev) => new Set(prev).add(item.tmdbId))
       addMutation.mutate(item, {
         onSuccess: () => {
-          console.log('✅ [DiscoverScreen] Add mutation succeeded')
+          if (__DEV__) console.log('✅ [DiscoverScreen] Add mutation succeeded')
         },
         onError: (error: Error) => {
-          console.error('❌ [DiscoverScreen] Add error:', error.message)
+          if (__DEV__) console.error('❌ [DiscoverScreen] Add error:', error.message)
           Alert.alert('Failed to add', error.message)
           localLibraryRef.current.delete(item.tmdbId)
         },
@@ -135,10 +135,10 @@ export default function DiscoverScreen() {
       setRemovingIds((prev) => new Set(prev).add(item.tmdbId))
       removeMutation.mutate(item, {
         onSuccess: () => {
-          console.log('✅ [DiscoverScreen] Remove mutation succeeded')
+          if (__DEV__) console.log('✅ [DiscoverScreen] Remove mutation succeeded')
         },
         onError: (error: Error) => {
-          console.error('❌ [DiscoverScreen] Remove error:', error.message)
+          if (__DEV__) console.error('❌ [DiscoverScreen] Remove error:', error.message)
           Alert.alert('Failed to remove', error.message)
           localLibraryRef.current.delete(item.tmdbId)
         },
@@ -423,6 +423,7 @@ export default function DiscoverScreen() {
         <FlashList
           data={isSearching ? (searchResults || []) : []}
           keyExtractor={searchKeyExtractor}
+
           renderItem={renderSearchItem}
           ListFooterComponent={listFooterElement}
           ListEmptyComponent={

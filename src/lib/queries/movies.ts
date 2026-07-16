@@ -72,13 +72,13 @@ async function fetchMovies(userId: string): Promise<MovieWithUserData[]> {
     .select('*, user_movies!inner(*)')
     .eq('user_movies.user_id', userId)
 
-  console.log('🔍 [fetchMovies] Query result:', { dataLength: data?.length, error: error?.message })
+  if (__DEV__) console.log('🔍 [fetchMovies] Query result:', { dataLength: data?.length, error: error?.message })
 
   if (error) throw new Error(`Failed to fetch movies: ${error.message}`)
   if (!data) return []
 
   let result = data.map(mapRow)
-  console.log('🔍 [fetchMovies] After mapping:', { count: result.length, watchlist: result.filter(m => m.is_watchlist).length, watched: result.filter(m => m.watched).length })
+  if (__DEV__) console.log('🔍 [fetchMovies] After mapping:', { count: result.length, watchlist: result.filter(m => m.is_watchlist).length, watched: result.filter(m => m.watched).length })
   // Filter: only show items that are in the user's library
   result = result.filter((m) => m.is_watchlist)
   return sortMovies(result)

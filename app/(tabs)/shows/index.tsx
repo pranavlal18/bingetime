@@ -680,6 +680,7 @@ export default function ShowsScreen() {
           <FlashList
             data={upcomingItems}
             keyExtractor={episodeKeyExtractor}
+
             renderItem={renderEpisodeItem}
             key="upcoming"
             contentContainerStyle={[

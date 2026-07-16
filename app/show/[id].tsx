@@ -561,10 +561,10 @@ export default function ShowDetailScreen() {
         { showId: show.id, averageRuntime: tmdbAverageRuntime },
         {
           onSuccess: () => {
-            console.log('✅ [ShowDetail] Saved average_runtime to DB:', tmdbAverageRuntime)
+            if (__DEV__) console.log('✅ [ShowDetail] Saved average_runtime to DB:', tmdbAverageRuntime)
           },
           onError: (err) => {
-            console.error('❌ [ShowDetail] Failed to save average_runtime:', err)
+            if (__DEV__) console.error('❌ [ShowDetail] Failed to save average_runtime:', err)
           },
         }
       )

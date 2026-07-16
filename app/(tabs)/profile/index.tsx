@@ -599,11 +599,13 @@ const SettingsToggle = memo(function SettingsToggle({
   label,
   value,
   onValueChange,
+  infoText,
 }: {
   icon: keyof typeof Ionicons.glyphMap
   label: string
   value: boolean
   onValueChange: (value: boolean) => void
+  infoText?: string
 }) {
   const { colors } = useTheme()
   return (
@@ -618,7 +620,7 @@ const SettingsToggle = memo(function SettingsToggle({
         borderBottomColor: 'rgba(255,255,255,0.05)',
       }}
     >
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 16 }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
         <Ionicons name={icon} size={20} color={colors.secondary} />
         <Text
           style={{
@@ -630,6 +632,14 @@ const SettingsToggle = memo(function SettingsToggle({
         >
           {label}
         </Text>
+        {infoText && (
+          <Pressable
+            hitSlop={8}
+            onPress={() => Alert.alert(label, infoText)}
+          >
+            <Ionicons name="information-circle-outline" size={18} color={colors.onSurfaceVariant} />
+          </Pressable>
+        )}
       </View>
       <Switch
         value={value}
@@ -1257,6 +1267,7 @@ export default function ProfileScreen() {
             icon="notifications-outline"
             label="Notifications"
             value={notificationsEnabled}
+            infoText="Get notified when new episodes of your watchlisted shows are airing. Notifications are scheduled for each upcoming episode."
             onValueChange={async (value) => {
               if (value) {
                 const granted = await requestNotificationPermissions()

@@ -80,7 +80,7 @@ export default function AddContentScreen() {
       })) as SearchResult[]
       setResults(filtered)
     } catch (err) {
-      console.error('Search error:', err)
+      if (__DEV__) console.error('Search error:', err)
       setError('Search failed. Please try again.')
       setResults([])
     } finally {

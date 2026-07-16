@@ -30,10 +30,15 @@
       "favicon": "./assets/favicon.png",
       "bundler": "metro"
     },
+    "notification": {
+      "iosDisplayInForeground": true,
+      "androidMode": "default"
+    },
     "plugins": [
       "expo-router",
       "expo-image",
-      "expo-font"
+      "expo-font",
+      "expo-notifications"
     ]
   }
 }

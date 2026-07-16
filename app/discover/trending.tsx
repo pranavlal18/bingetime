@@ -194,7 +194,7 @@ export default function TrendingScreen() {
       setAddingIds((prev) => new Set(prev).add(item.tmdbId))
       addMutation.mutate(item, {
         onError: (error: Error) => {
-          console.error('[TrendingScreen] Add error:', error.message)
+          if (__DEV__) console.error('[TrendingScreen] Add error:', error.message)
           Alert.alert('Failed to add', error.message)
           localLibraryRef.current.delete(item.tmdbId)
         },
@@ -216,7 +216,7 @@ export default function TrendingScreen() {
       setRemovingIds((prev) => new Set(prev).add(item.tmdbId))
       removeMutation.mutate(item, {
         onError: (error: Error) => {
-          console.error('[TrendingScreen] Remove error:', error.message)
+          if (__DEV__) console.error('[TrendingScreen] Remove error:', error.message)
           Alert.alert('Failed to remove', error.message)
           localLibraryRef.current.delete(item.tmdbId)
         },
@@ -391,6 +391,7 @@ export default function TrendingScreen() {
       <FlashList
         data={data || []}
         keyExtractor={keyExtractor}
+
         renderItem={renderItem}
         numColumns={2}
         contentContainerStyle={styles.gridContent}

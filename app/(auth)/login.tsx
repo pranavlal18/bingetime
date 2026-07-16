@@ -183,16 +183,16 @@ export default function LoginScreen() {
     setError(null)
     setLoading(true)
 
-    console.log('🔑 [LoginScreen] Attempting sign in:', { email })
+    if (__DEV__) console.log('🔑 [LoginScreen] Attempting sign in:', { email })
     const { error, data } = await supabase.auth.signInWithPassword({ email, password })
     setLoading(false)
 
     if (error) {
-      console.log('❌ [LoginScreen] Sign in error:', error.message)
+      if (__DEV__) console.log('❌ [LoginScreen] Sign in error:', error.message)
       setError('Invalid email or password. Please try again.')
       return
     }
-    console.log('✅ [LoginScreen] Sign in success:', { user: data.user?.email })
+    if (__DEV__) console.log('✅ [LoginScreen] Sign in success:', { user: data.user?.email })
     // Success - router will handle navigation via auth guard
   }
 

@@ -66,7 +66,7 @@ async function fetchShows(
 
   const { data, error } = await query
 
-  console.log('🔍 [fetchShows] Query result:', { dataLength: data?.length, error: error?.message })
+  if (__DEV__) console.log('🔍 [fetchShows] Query result:', { dataLength: data?.length, error: error?.message })
 
   if (error) throw new Error(`Failed to fetch shows: ${error.message}`)
   if (!data) return []
@@ -95,7 +95,7 @@ async function fetchShows(
     }
   })
 
-  console.log('🔍 [fetchShows] After mapping:', { count: result.length, watchlist: result.filter(s => s.is_watchlist).length })
+  if (__DEV__) console.log('🔍 [fetchShows] After mapping:', { count: result.length, watchlist: result.filter(s => s.is_watchlist).length })
 
   // NO FILTER - show ALL shows in user's library (user_shows table IS the library)
   // The is_watchlist filter was hiding shows that were imported without that flag

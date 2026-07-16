@@ -194,7 +194,7 @@ export function useAddToLibrary() {
       return addMovieToLibrary(item, user.id)
     },
     onSuccess: (libraryId, item) => {
-      console.log('✅ [useAddToLibrary] Added to library:', libraryId)
+      if (__DEV__) console.log('✅ [useAddToLibrary] Added to library:', libraryId)
       
       // Manually update the discover cache so it's not stale when switching tabs
       queryClient.setQueriesData<DiscoverResult[]>({ queryKey: ['discover'] }, (old) => {
@@ -215,7 +215,7 @@ export function useAddToLibrary() {
       }
     },
     onError: (error) => {
-      console.error('❌ [useAddToLibrary] Error:', error.message)
+      if (__DEV__) console.error('❌ [useAddToLibrary] Error:', error.message)
     },
   })
 }
@@ -234,7 +234,7 @@ export function useRemoveFromLibrary() {
       return removeMovieFromLibrary(item.libraryId, user.id)
     },
     onSuccess: (_data, item) => {
-      console.log('✅ [useRemoveFromLibrary] Removed from library')
+      if (__DEV__) console.log('✅ [useRemoveFromLibrary] Removed from library')
       
       // Manually update the discover cache so it's not stale when switching tabs
       queryClient.setQueriesData<DiscoverResult[]>({ queryKey: ['discover'] }, (old) => {
@@ -250,7 +250,7 @@ export function useRemoveFromLibrary() {
       queryClient.invalidateQueries({ queryKey: ['stats'] })
     },
     onError: (error) => {
-      console.error('❌ [useRemoveFromLibrary] Error:', error.message)
+      if (__DEV__) console.error('❌ [useRemoveFromLibrary] Error:', error.message)
     },
   })
 }
@@ -278,7 +278,7 @@ async function addShowToLibrary(item: DiscoverResult, userId: string): Promise<s
   const [external, details] = await Promise.all([
     tmdb.getExternalIds(item.tmdbId, 'tv'),
     tmdb.getShowDetails(item.tmdbId).catch((err) => {
-      console.warn(`[addShowToLibrary] getShowDetails failed for ${item.title}:`, err)
+      if (__DEV__) console.warn(`[addShowToLibrary] getShowDetails failed for ${item.title}:`, err)
       return null
     }),
   ])
@@ -289,13 +289,13 @@ async function addShowToLibrary(item: DiscoverResult, userId: string): Promise<s
     const sum = details.episode_run_time.reduce((acc, val) => acc + val, 0)
     const avgMinutes = sum / details.episode_run_time.length
     averageRuntime = Math.round(avgMinutes * 60) // convert to seconds
-    console.log(`[addShowToLibrary] ${item.title}: episode_run_time = ${details.episode_run_time}, avgRuntime = ${averageRuntime}s`)
+    if (__DEV__) console.log(`[addShowToLibrary] ${item.title}: episode_run_time = ${details.episode_run_time}, avgRuntime = ${averageRuntime}s`)
   } else {
-    console.warn(`[addShowToLibrary] ${item.title}: NO episode_run_time data from TMDb`)
+    if (__DEV__) console.warn(`[addShowToLibrary] ${item.title}: NO episode_run_time data from TMDb`)
   }
 
   // 3. Upsert show record (tvdb_id is unique NOT NULL)
-  console.log('🔍 [addShowToLibrary] Upserting show:', { tmdbId: item.tmdbId, tvdbId: external.tvdb_id, title: item.title, totalEps: details?.number_of_episodes, averageRuntime })
+  if (__DEV__) console.log('🔍 [addShowToLibrary] Upserting show:', { tmdbId: item.tmdbId, tvdbId: external.tvdb_id, title: item.title, totalEps: details?.number_of_episodes, averageRuntime })
   const { data: show, error: showError } = await supabase
     .from('shows')
     .upsert(
@@ -315,14 +315,14 @@ async function addShowToLibrary(item: DiscoverResult, userId: string): Promise<s
     .single()
 
   if (showError) {
-    console.error('🔍 [addShowToLibrary] Show upsert failed:', showError)
+    if (__DEV__) console.error('🔍 [addShowToLibrary] Show upsert failed:', showError)
     throw new Error(`Failed to add show: ${showError.message}`)
   }
-  console.log('🔍 [addShowToLibrary] Show upserted:', { showId: show?.id })
+  if (__DEV__) console.log('🔍 [addShowToLibrary] Show upserted:', { showId: show?.id })
   const showId = show?.id
 
   // 4. Upsert into user_shows (mark as following + watchlist)
-  console.log('🔍 [addShowToLibrary] Upserting user_shows:', { showId, is_watchlist: true })
+  if (__DEV__) console.log('🔍 [addShowToLibrary] Upserting user_shows:', { showId, is_watchlist: true })
   const { error: usError } = await supabase.from('user_shows').upsert(
     {
       show_id: showId,
@@ -333,17 +333,17 @@ async function addShowToLibrary(item: DiscoverResult, userId: string): Promise<s
     { onConflict: 'show_id,user_id' }
   )
   if (usError) {
-    console.error('🔍 [addShowToLibrary] user_shows upsert failed:', usError)
+    if (__DEV__) console.error('🔍 [addShowToLibrary] user_shows upsert failed:', usError)
     throw new Error(`Failed to add show to library: ${usError.message}`)
   }
-  console.log('🔍 [addShowToLibrary] Success')
+  if (__DEV__) console.log('🔍 [addShowToLibrary] Success')
 
   return showId
 }
 
 async function addMovieToLibrary(item: DiscoverResult, userId: string): Promise<string> {
   // 1. Upsert movie record
-  console.log('🔍 [addMovieToLibrary] Upserting movie:', { tmdbId: item.tmdbId, title: item.title })
+  if (__DEV__) console.log('🔍 [addMovieToLibrary] Upserting movie:', { tmdbId: item.tmdbId, title: item.title })
   const { data: movie, error: movieError } = await supabase
     .from('movies')
     .upsert(
@@ -359,14 +359,14 @@ async function addMovieToLibrary(item: DiscoverResult, userId: string): Promise<
     .single()
 
   if (movieError) {
-    console.error('🔍 [addMovieToLibrary] Movie upsert failed:', movieError)
+    if (__DEV__) console.error('🔍 [addMovieToLibrary] Movie upsert failed:', movieError)
     throw new Error(`Failed to add movie: ${movieError.message}`)
   }
-  console.log('🔍 [addMovieToLibrary] Movie upserted:', { movieId: movie?.id })
+  if (__DEV__) console.log('🔍 [addMovieToLibrary] Movie upserted:', { movieId: movie?.id })
   const movieId = movie?.id
 
   // 2. Upsert into user_movies (mark as watchlist)
-  console.log('🔍 [addMovieToLibrary] Upserting user_movies:', { movieId, is_watchlist: true })
+  if (__DEV__) console.log('🔍 [addMovieToLibrary] Upserting user_movies:', { movieId, is_watchlist: true })
   const { error: umError } = await supabase.from('user_movies').upsert(
     {
       movie_id: movieId,
@@ -376,10 +376,10 @@ async function addMovieToLibrary(item: DiscoverResult, userId: string): Promise<
     { onConflict: 'movie_id,user_id' }
   )
   if (umError) {
-    console.error('🔍 [addMovieToLibrary] user_movies upsert failed:', umError)
+    if (__DEV__) console.error('🔍 [addMovieToLibrary] user_movies upsert failed:', umError)
     throw new Error(`Failed to add movie to library: ${umError.message}`)
   }
-  console.log('🔍 [addMovieToLibrary] Success')
+  if (__DEV__) console.log('🔍 [addMovieToLibrary] Success')
 
   return movieId
 }

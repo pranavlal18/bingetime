@@ -195,14 +195,14 @@ export default function RegisterScreen() {
     }
     setError('')
     setLoading(true)
-    console.log('📝 [RegisterScreen] Attempting sign up:', { email })
+    if (__DEV__) console.log('📝 [RegisterScreen] Attempting sign up:', { email })
     const { error, data } = await signUp(email, password)
     setLoading(false)
     if (error) {
-      console.log('❌ [RegisterScreen] Sign up error:', error.message)
+      if (__DEV__) console.log('❌ [RegisterScreen] Sign up error:', error.message)
       setError('An error occurred during registration. Please try again.')
     } else {
-      console.log('✅ [RegisterScreen] Sign up success:', { user: data.user?.email })
+      if (__DEV__) console.log('✅ [RegisterScreen] Sign up success:', { user: data.user?.email })
       Alert.alert(
         'Account created!',
         'Please check your email to verify your account, then sign in.',

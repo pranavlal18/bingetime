@@ -81,7 +81,7 @@ export class ErrorBoundary extends Component<Props, State> {
   }
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    console.error('🔥 [ErrorBoundary] Caught:', error.message, errorInfo.componentStack)
+    if (__DEV__) console.error('🔥 [ErrorBoundary] Caught:', error.message, errorInfo.componentStack)
   }
 
   render() {

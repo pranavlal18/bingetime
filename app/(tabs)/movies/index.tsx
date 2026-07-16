@@ -247,7 +247,7 @@ function MoviesScreenContent() {
       const q = searchQuery.trim().toLowerCase()
       return segmentFiltered.filter((m) => m.title.toLowerCase().includes(q))
     } catch (e) {
-      console.error('🔥 [MoviesTab] filter error:', e)
+      if (__DEV__) console.error('🔥 [MoviesTab] filter error:', e)
       return []
     }
   }, [movies, activeSegment, searchQuery])
@@ -511,6 +511,7 @@ function MoviesScreenContent() {
         <FlashList
           data={filteredMovies}
           keyExtractor={keyExtractor}
+
           renderItem={renderItem}
           numColumns={isGrid ? 2 : 1}
           key={isGrid ? 'grid' : 'list'}
