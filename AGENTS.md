@@ -47,7 +47,6 @@ All vars use `EXPO_PUBLIC_*` prefix (Expo convention for client-side env vars).
 
 - **Metro**: `metro.config.js` pushes `'csv'` to `assetExts` — required for bundled CSV imports.
 - **Babel**: `react-native-reanimated/plugin` must be **last** in `plugins` array.
-- **TV Time import**: TVDB IDs (`tv_show_id`) resolve to TMDb via `/find/{tvdb_id}?external_source=tvdb_id`. Never call TheTVDB API directly (now paid).
 - **Movie data only in v1 CSV**: `tracking-prod-records.csv` (v1) is the sole source of movie watch data. Do not treat it as superseded — `tracking-prod-records-v2.csv` has zero movie rows.
 - **Supabase join pattern**: All queries use `'*, user_shows(*)'` (or `user_movies(*)`).
 - **React Query `staleTime`**: 2m shows, 5m movies, 10m trending, 1h TMDb details. `gcTime`: 30m. `retry`: 2.
