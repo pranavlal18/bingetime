@@ -5,16 +5,16 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#1a1a2e"
+    },
     "userInterfaceStyle": "light",
     "scheme": "bingetime",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.bingetime.app",
-      "splash": {
-        "image": "./assets/splash-icon.png",
-        "resizeMode": "contain",
-        "backgroundColor": "#1a1a2e"
-      }
+      "bundleIdentifier": "com.bingetime.app"
     },
     "android": {
       "adaptiveIcon": {
@@ -24,12 +24,7 @@
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
       "package": "com.bingetime.app",
-      "predictiveBackGestureEnabled": false,
-      "splash": {
-        "image": "./assets/splash-icon.png",
-        "resizeMode": "contain",
-        "backgroundColor": "#1a1a2e"
-      }
+      "predictiveBackGestureEnabled": false
     },
     "web": {
       "favicon": "./assets/favicon.png",
