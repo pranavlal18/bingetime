@@ -163,20 +163,26 @@ function EnvGuard({ children }: { children: React.ReactNode }) {
   const [missing, setMissing] = useState<string[] | null>(null)
 
   useEffect(() => {
-    const required = [
-      { key: 'EXPO_PUBLIC_SUPABASE_URL', label: 'Supabase URL' },
-      { key: 'EXPO_PUBLIC_SUPABASE_ANON_KEY', label: 'Supabase Anon Key' },
-      { key: 'EXPO_PUBLIC_TMDB_API_KEY', label: 'TMDb API Key' },
-    ]
-    const missingVars = required.filter(
-      ({ key }) => !process.env[key]
-    )
+    const extra = Constants.expoConfig?.extra
+    const missingVars: string[] = []
+
+    // Use static references so Babel can inline EXPO_PUBLIC_* at build time
+    if (!extra?.supabaseUrl && !process.env.EXPO_PUBLIC_SUPABASE_URL) {
+      missingVars.push('Supabase URL')
+    }
+    if (!extra?.supabaseAnonKey && !process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY) {
+      missingVars.push('Supabase Anon Key')
+    }
+    if (!extra?.tmdbApiKey && !process.env.EXPO_PUBLIC_TMDB_API_KEY) {
+      missingVars.push('TMDb API Key')
+    }
+
     if (missingVars.length > 0) {
-      setMissing(missingVars.map((v) => v.label))
+      setMissing(missingVars)
       if (__DEV__) {
         Alert.alert(
           'Missing Environment Variables',
-          `Required env vars not set:\n${missingVars.map((v) => `• ${v.label}`).join('\n')}\n\nCheck your .env file.`
+          `Required env vars not set:\n${missingVars.map((v) => `• ${v}`).join('\n')}\n\nCheck your .env file.`
         )
       }
     }

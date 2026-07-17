@@ -1,0 +1,56 @@
+import { ExpoConfig, ConfigContext } from 'expo/config';
+
+export default ({ config }: ConfigContext): ExpoConfig => ({
+  ...config,
+  name: 'BingeTime',
+  slug: 'bingetime',
+  version: '1.0.0',
+  orientation: 'portrait',
+  icon: './assets/icon.png',
+  userInterfaceStyle: 'light',
+  scheme: 'bingetime',
+  ios: {
+    supportsTablet: true,
+    bundleIdentifier: 'com.bingetime.app',
+  },
+  android: {
+    adaptiveIcon: {
+      backgroundColor: '#0F0F0F',
+      foregroundImage: './assets/android-icon-foreground.png',
+      backgroundImage: './assets/android-icon-background.png',
+      monochromeImage: './assets/android-icon-monochrome.png',
+    },
+    package: 'com.bingetime.app',
+  },
+  web: {
+    favicon: './assets/favicon.png',
+    bundler: 'metro',
+  },
+  plugins: [
+    'expo-router',
+    'expo-image',
+    'expo-font',
+    [
+      'expo-notifications',
+      {
+        iosDisplayInForeground: true,
+        androidMode: 'default',
+      },
+    ],
+  ],
+  extra: {
+    supabaseUrl: process.env.EXPO_PUBLIC_SUPABASE_URL,
+    supabaseAnonKey: process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY,
+    tmdbApiKey: process.env.EXPO_PUBLIC_TMDB_API_KEY,
+    router: {},
+    eas: {
+      projectId: 'a44b8f2a-fe30-404d-a637-df7b49487350',
+    },
+  },
+  runtimeVersion: {
+    policy: 'appVersion',
+  },
+  updates: {
+    url: 'https://u.expo.dev/a44b8f2a-fe30-404d-a637-df7b49487350',
+  },
+});
