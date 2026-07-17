@@ -5,16 +5,16 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
-    "splash": {
-      "image": "./assets/splash-icon.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#1a1a2e"
-    },
     "userInterfaceStyle": "light",
     "scheme": "bingetime",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.bingetime.app"
+      "bundleIdentifier": "com.bingetime.app",
+      "splash": {
+        "image": "./assets/splash-icon.png",
+        "resizeMode": "contain",
+        "backgroundColor": "#1a1a2e"
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -24,21 +24,28 @@
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
       "package": "com.bingetime.app",
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "splash": {
+        "image": "./assets/splash-icon.png",
+        "resizeMode": "contain",
+        "backgroundColor": "#1a1a2e"
+      }
     },
     "web": {
       "favicon": "./assets/favicon.png",
       "bundler": "metro"
     },
-    "notification": {
-      "iosDisplayInForeground": true,
-      "androidMode": "default"
-    },
     "plugins": [
       "expo-router",
       "expo-image",
       "expo-font",
-      "expo-notifications"
+      [
+        "expo-notifications",
+        {
+          "iosDisplayInForeground": true,
+          "androidMode": "default"
+        }
+      ]
     ],
     "extra": {
       "router": {},
