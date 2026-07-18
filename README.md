@@ -4,6 +4,8 @@ A personal TV show and movie tracker built with Expo, React Native, Supabase, an
 
 ⭐ Star this repo if you like it!
 
+![BingeTime Screenshot](./ss/btss.jpg)
+
 ## Tech Stack
 
 [![Expo](https://img.shields.io/badge/Expo-57-000020?logo=expo)](https://expo.dev)
