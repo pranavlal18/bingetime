@@ -11,6 +11,8 @@ interface AppState extends AppSettings {
   setNotificationsEnabled: (enabled: boolean) => void
   statsPeriod: 'week' | 'month'
   setStatsPeriod: (period: 'week' | 'month') => void
+  hasRunReleaseDateSync: boolean
+  setHasRunReleaseDateSync: (done: boolean) => void
 }
 
 export const useAppStore = create<AppState>()(
@@ -22,12 +24,14 @@ export const useAppStore = create<AppState>()(
       theme: 'cinematic-dark',
       notificationsEnabled: false,
       statsPeriod: 'week',
+      hasRunReleaseDateSync: false,
 
       setShowsViewMode: (mode) => set({ showsViewMode: mode }),
       setMoviesViewMode: (mode) => set({ moviesViewMode: mode }),
       setTheme: (theme) => set({ theme }),
       setNotificationsEnabled: (enabled) => set({ notificationsEnabled: enabled }),
       setStatsPeriod: (period) => set({ statsPeriod: period }),
+      setHasRunReleaseDateSync: (done) => set({ hasRunReleaseDateSync: done }),
     }),
     {
       name: 'bingetime-settings',

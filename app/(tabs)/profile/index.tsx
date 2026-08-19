@@ -22,7 +22,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useAppStore } from '@/stores/appStore'
 import { useAuth } from '@/contexts/AuthContext'
 import { getImageUrl } from '@/lib/tmdb'
-import { useShows } from '@/lib/queries/shows'
+import { useShows, useContinueWatching, useTitleCredits } from '@/lib/queries/shows'
 import { useMovies, useFavoriteMovies } from '@/lib/queries/movies'
 import {
   useProfileStats,
@@ -703,7 +703,24 @@ export default function ProfileScreen() {
   const { data: watchTime, isLoading: watchTimeLoading } = useWatchTimeBreakdown()
   const { data: shows, isLoading: showsLoading } = useShows()
   const { data: movies, isLoading: moviesLoading } = useMovies()
+  const { data: continueWatching } = useContinueWatching()
   const { data: favoriteShows } = useFavorites()
+
+  // Source title for the avatar: compare recency of top watched show vs top watched movie
+  const topShow = continueWatching?.[0]
+  const showTimeStr = topShow?.last_watched_episode_data?.updated_at || topShow?.last_watched_episode_data?.watched_at
+  const showTime = showTimeStr ? new Date(showTimeStr).getTime() : 0
+
+  const topMovie = movies?.find((m) => m.watched && m.watched_at) || movies?.[0]
+  const movieTimeStr = topMovie?.watched_at
+  const movieTime = movieTimeStr ? new Date(movieTimeStr).getTime() : 0
+
+  const isMovieMoreRecent = movieTime > 0 && movieTime > showTime
+  const activeItem = isMovieMoreRecent ? topMovie : (topShow || topMovie)
+  const sourceMediaType: 'tv' | 'movie' = (isMovieMoreRecent || (!topShow && topMovie)) ? 'movie' : 'tv'
+  const sourceTmdbId = activeItem?.tmdb_id ?? null
+
+  const { data: credits } = useTitleCredits(sourceTmdbId, sourceMediaType)
   const { data: favoriteMovies } = useFavoriteMovies()
 
   // Theme label
@@ -724,6 +741,15 @@ export default function ProfileScreen() {
     if (!movies) return []
     return movies.filter((m) => m.watched)
   }, [movies])
+
+  // Avatar = a RANDOM cast member's headshot (not the lead, not the poster)
+// Avatar = the lead actor's headshot (not the poster, not the lead)
+  const pfpCast = useMemo(() => {
+    const cast = credits?.cast ?? []
+    // Find the first cast member with a profile photo (lead actor)
+    const lead = cast.find((c) => c.profile_path)
+    return lead ? [lead.profile_path as string] : []
+  }, [credits])
 
   const isLoading_ = statsLoading || showsLoading || moviesLoading || authLoading
 
@@ -1032,9 +1058,29 @@ export default function ProfileScreen() {
         <View style={styles.userHeader}>
           <View style={styles.avatarRing}>
             <View style={styles.avatarContainer}>
-              <Text style={styles.avatarInitials}>
-                {user ? getInitials(user.email || '') : 'AT'}
-              </Text>
+              {pfpCast.length > 0 ? (
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', width: '100%', height: '100%' }}>
+                  {pfpCast.map((p, i) => (
+                    <Image
+                      key={i}
+                      source={{ uri: getImageUrl(p, 'w185')! }}
+                      style={
+                        pfpCast.length === 1
+                          ? { width: '100%', height: '100%' }
+                          : pfpCast.length === 2
+                            ? { width: '50%', height: '100%' }
+                            : { width: '50%', height: '50%' }
+                      }
+                      contentFit="cover"
+                      cachePolicy="disk"
+                    />
+                  ))}
+                </View>
+              ) : (
+                <Text style={styles.avatarInitials}>
+                  {user ? getInitials(user.email || '') : 'AT'}
+                </Text>
+              )}
             </View>
           </View>
           <Text style={styles.userName}>
@@ -1296,3 +1342,4 @@ export default function ProfileScreen() {
     </View>
   )
 }
+

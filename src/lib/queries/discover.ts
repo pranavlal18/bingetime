@@ -16,6 +16,7 @@ export interface DiscoverResult {
   title: string
   poster_path: string | null
   year: string | null
+  releaseDate: string | null
   overview: string | null
   inLibrary: boolean
   libraryId?: string
@@ -33,14 +34,14 @@ export const discoverKeys = {
 
 function mapResult(item: any): DiscoverResult {
   const isMovie = item.media_type === 'movie'
+  const release = isMovie ? item.release_date : item.first_air_date
   return {
     tmdbId: item.id,
     mediaType: isMovie ? 'movie' : 'tv',
     title: isMovie ? item.title : item.name,
     poster_path: item.poster_path ?? null,
-    year: isMovie
-      ? (item.release_date?.slice(0, 4) ?? null)
-      : (item.first_air_date?.slice(0, 4) ?? null),
+    year: release?.slice(0, 4) ?? null,
+    releaseDate: release ?? null,
     overview: item.overview ?? null,
     inLibrary: false,
   }
@@ -342,8 +343,20 @@ async function addShowToLibrary(item: DiscoverResult, userId: string): Promise<s
 }
 
 async function addMovieToLibrary(item: DiscoverResult, userId: string): Promise<string> {
-  // 1. Upsert movie record
-  if (__DEV__) console.log('🔍 [addMovieToLibrary] Upserting movie:', { tmdbId: item.tmdbId, title: item.title })
+  // 1. Resolve full release_date from TMDb (Discover only returns the year/heuristic date)
+  let releaseDate: string | null = item.releaseDate ?? null
+  if (!releaseDate) {
+    try {
+      const details = await tmdb.getMovieDetails(item.tmdbId)
+      releaseDate = details.release_date ?? null
+    } catch {
+      // Fall back to year-only placeholder if TMDb fetch fails
+      releaseDate = item.year ? `${item.year}-01-01` : null
+    }
+  }
+
+  // 2. Upsert movie record
+  if (__DEV__) console.log('🔍 [addMovieToLibrary] Upserting movie:', { tmdbId: item.tmdbId, title: item.title, releaseDate })
   const { data: movie, error: movieError } = await supabase
     .from('movies')
     .upsert(
@@ -351,7 +364,7 @@ async function addMovieToLibrary(item: DiscoverResult, userId: string): Promise<
         tmdb_id: item.tmdbId,
         title: item.title,
         poster_path: item.poster_path,
-        release_date: item.year ? `${item.year}-01-01` : null,
+        release_date: releaseDate,
       },
       { onConflict: 'tmdb_id' }
     )

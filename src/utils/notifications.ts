@@ -126,6 +126,41 @@ export async function cancelAllReminders() {
 }
 
 /**
+ * Schedules a local notification for a movie's release day.
+ * Fires at 9:00 AM device-local on the release date.
+ */
+export async function scheduleMovieReleaseReminder(
+  movieTitle: string,
+  movieId: string,
+  releaseDate: string
+) {
+  const mod = await getNotificationsModule()
+  if (!mod) return
+
+  const airDate = new Date(releaseDate)
+  // Invalid date or already in the past
+  if (isNaN(airDate.getTime())) return
+
+  airDate.setHours(9, 0, 0, 0) // 9:00 AM device-local on release day
+
+  // Only schedule if that moment is still in the future
+  if (airDate <= new Date()) return
+
+  await mod.scheduleNotificationAsync({
+    content: {
+      title: `${movieTitle} — Releases Today`,
+      body: 'In theaters today. Time for a movie night?',
+      data: { movieId, movieTitle, type: 'movie' },
+    },
+    trigger: {
+      type: 'date',
+      date: airDate,
+      channelId: 'episode-reminders',
+    },
+  })
+}
+
+/**
  * Returns all currently scheduled notifications.
  * Returns empty array if the module is unavailable (Expo Go on Android).
  */

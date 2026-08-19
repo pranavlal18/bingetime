@@ -20,6 +20,7 @@ import { router } from 'expo-router'
 import * as Haptics from 'expo-haptics'
 import { useMovies, useToggleMovieWatched, useRefreshMovieReleaseDates } from '@/lib/queries/movies'
 import { useAppStore } from '@/stores/appStore'
+import { useEffect } from 'react'
 import { useTheme } from '@/contexts/ThemeContext'
 import { getImageUrl } from '@/lib/tmdb'
 import AnimatedPoster from '@/components/ui/AnimatedPoster'
@@ -43,11 +44,20 @@ function MoviesScreenContent() {
   const [isSearchVisible, setIsSearchVisible] = useState(false)
   const viewMode = useAppStore((s) => s.moviesViewMode)
   const setViewMode = useAppStore((s) => s.setMoviesViewMode)
+  const hasRunReleaseDateSync = useAppStore((s) => s.hasRunReleaseDateSync)
+  const setHasRunReleaseDateSync = useAppStore((s) => s.setHasRunReleaseDateSync)
   const { colors } = useTheme()
 
   const { data: movies, isLoading, isRefetching, refetch } = useMovies()
   const toggleWatched = useToggleMovieWatched()
   const refreshReleaseDates = useRefreshMovieReleaseDates()
+
+  // One-time migration: fix release_date for movies added before real dates were stored
+  useEffect(() => {
+    if (hasRunReleaseDateSync) return
+    setHasRunReleaseDateSync(true)
+    refreshReleaseDates.mutate()
+  }, [hasRunReleaseDateSync, setHasRunReleaseDateSync, refreshReleaseDates])
 
   const isGrid = viewMode === 'poster-grid'
 

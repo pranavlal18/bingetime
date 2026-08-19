@@ -89,6 +89,24 @@ export async function getExternalIds(tmdbId: number, mediaType: 'tv' | 'movie' =
   return tmdbFetch<{ tvdb_id?: number; imdb_id?: string }>(`/${mediaType}/${tmdbId}/external_ids`)
 }
 
+/** A single cast member (actor headshot + character name) */
+export interface TMDbCastMember {
+  id: number
+  name: string
+  character: string
+  profile_path: string | null
+}
+
+/** Credits response (only the cast array is needed here) */
+export interface TMDbCredits {
+  cast: TMDbCastMember[]
+}
+
+/** Get cast credits for a show or movie — used for the profile avatar collage */
+export async function getTitleCredits(tmdbId: number, mediaType: 'tv' | 'movie' = 'tv') {
+  return tmdbFetch<TMDbCredits>(`/${mediaType}/${tmdbId}/credits`)
+}
+
 /** Get show recommendations */
 export async function getRecommendations(tmdbId: number) {
   return tmdbFetch<TMDbSearchResponse>(`/tv/${tmdbId}/recommendations`)

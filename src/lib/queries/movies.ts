@@ -50,6 +50,7 @@ export const movieKeys = {
   list: (userId: string) => ['movies', 'list', userId] as const,
   detail: (id: string) => ['movies', 'detail', id] as const,
   favorites: (userId: string) => ['movies', 'favorites', userId] as const,
+  upcoming: (userId: string) => ['movies', 'upcoming', userId] as const,
 }
 
 // ── Sorting ──
@@ -545,6 +546,50 @@ export function useToggleMovieFavorite() {
         text2: 'Please check your connection.',
       })
     },
+  })
+}
+
+// ── Fetch upcoming movies (watchlist, not yet released) ──
+
+export interface UpcomingMovie {
+  id: string
+  tmdbId: number
+  title: string
+  posterPath: string | null
+  releaseDate: string | null
+}
+
+async function fetchUpcomingMovies(userId: string): Promise<UpcomingMovie[]> {
+  const today = new Date().toISOString().slice(0, 10) // "YYYY-MM-DD"
+  const { data, error } = await supabase
+    .from('movies')
+    .select('id, tmdb_id, title, poster_path, release_date')
+    .eq('user_movies.user_id', userId)
+    .eq('user_movies.is_watchlist', true)
+    .not('release_date', 'is', null)
+    .gt('release_date', today)
+    .order('release_date', { ascending: true })
+
+  if (error) throw new Error(`Failed to fetch upcoming movies: ${error.message}`)
+  if (!data) return []
+
+  return data.map((m: any) => ({
+    id: m.id,
+    tmdbId: m.tmdb_id,
+    title: m.title,
+    posterPath: m.poster_path ?? null,
+    releaseDate: m.release_date ?? null,
+  }))
+}
+
+export function useUpcomingMovies() {
+  const { user } = useAuth()
+
+  return useQuery({
+    queryKey: movieKeys.upcoming(user?.id ?? ''),
+    queryFn: () => fetchUpcomingMovies(user?.id ?? ''),
+    staleTime: 1000 * 60 * 5,
+    enabled: !!user,
   })
 }
 

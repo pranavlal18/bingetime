@@ -117,6 +117,19 @@ function InnerLayout() {
         persistOptions={{
           persister: asyncStoragePersister,
           maxAge: 1000 * 60 * 60 * 24,
+          // Persist the whole cache as ONE AsyncStorage row; large, re-fetchable
+          // lists (334 shows) + detail caches overflow Android's ~2MB CursorWindow.
+          // Exclude those families (and transient TMDb API calls, which can be
+          // pending/in-flight at persist time and then reject on rehydrate).
+          // Keep only small/bounded queries (profile, etc.).
+          dehydrateOptions: {
+            shouldDehydrateQuery: (query) => {
+              if (query.state.status === 'pending') return false
+              const key = query.queryKey
+              const head = Array.isArray(key) ? (key[0] as string) : (key as unknown as string)
+              return !['shows', 'movies', 'upcoming', 'episodes', 'stats', 'tmdb'].includes(head)
+            },
+          },
         }}
       >
         <StatusBar style={isLightTheme ? 'dark' : 'light'} />

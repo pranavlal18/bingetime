@@ -41,6 +41,7 @@ const LibraryToggle = memo(function LibraryToggle({
       title,
       poster_path: posterPath,
       year,
+      releaseDate: null,
       overview: null,
       inLibrary,
       libraryId,
