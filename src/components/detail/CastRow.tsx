@@ -21,8 +21,10 @@ const SKELETON_KEYS = ['s0', 's1', 's2', 's3', 's4', 's5']
 export default function CastRow({ cast, isLoading }: CastRowProps) {
   const { colors } = useTheme()
 
-  const styles = StyleSheet.create({
-    section: {
+  const styles = useMemo(
+    () =>
+      StyleSheet.create({
+      section: {
       paddingVertical: spacing.stackMd,
     },
     label: {
@@ -89,7 +91,9 @@ export default function CastRow({ cast, isLoading }: CastRowProps) {
       backgroundColor: colors.surfaceContainerHighest,
       opacity: 0.5,
     },
-  })
+    }),
+    [colors],
+  )
 
   // TMDb returns cast pre-ordered by billing importance — take top N.
   const members = useMemo(() => (cast ?? []).slice(0, MAX_CAST), [cast])

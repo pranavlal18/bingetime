@@ -1,5 +1,6 @@
 // ─── DetailTabs — segmented control pinned below the detail-page hero ───
 
+import { useMemo } from 'react'
 import { Pressable, Text, View, StyleSheet } from 'react-native'
 import * as Haptics from 'expo-haptics'
 import { typography, spacing, borderRadius } from '@/theme'
@@ -21,8 +22,10 @@ interface DetailTabsProps {
 export default function DetailTabs({ tabs, active, onChange }: DetailTabsProps) {
   const { colors } = useTheme()
 
-  const styles = StyleSheet.create({
-    track: {
+  const styles = useMemo(
+    () =>
+      StyleSheet.create({
+      track: {
       flexDirection: 'row',
       backgroundColor: colors.surfaceContainerHighest,
       borderRadius: borderRadius.full,
@@ -55,7 +58,9 @@ export default function DetailTabs({ tabs, active, onChange }: DetailTabsProps) 
     segmentTextActive: {
       color: colors.onPrimary,
     },
-  })
+    }),
+    [colors],
+  )
 
   return (
     <View style={styles.track}>
