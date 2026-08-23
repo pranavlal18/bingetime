@@ -1,0 +1,143 @@
+// ─── CreditCard — poster card used by Known For row and All Credits grid ───
+//
+// Card width == poster width (poster fills the card at 2:3 aspect ratio), so
+// all text is constrained to the poster's exact bounds and can never overflow.
+// Every text line has a reserved fixed height — content length can never change
+// card dimensions — and cards in the same grid row align on one baseline.
+
+import { useMemo } from 'react'
+import { Text, View, StyleSheet, Pressable } from 'react-native'
+import { Image } from 'expo-image'
+import { Ionicons } from '@expo/vector-icons'
+import * as Haptics from 'expo-haptics'
+import { borderRadius } from '@/theme'
+import { getImageUrl } from '@/lib/tmdb'
+import { useTheme } from '@/contexts/ThemeContext'
+
+/** Locked size modes — see Artist Page design contract. */
+const TITLE_LINE_NORMAL = 18 // 13px / 500, two reserved lines = h36
+const TITLE_LINE_COMPACT = 16 // 12px / 500, two reserved lines = h32
+const META_LINE = 16 // 12px / 400
+
+interface CreditCardProps {
+  posterPath: string | null
+  title: string
+  /** Always-rendered meta line ('' when absent) so rows share a baseline. */
+  year?: string | null
+  /** Character (cast) or job (crew) shown as an extra meta line. */
+  roleLabel?: string | null
+  /**
+   * Fixed card width for horizontal scrollers (e.g. Known For row at 92px).
+   * Omit inside grids — the card defaults to flex:1 and shares column width.
+   */
+  width?: number
+  /** true → credits-grid sizing (12px title / h32 reserve). */
+  compact?: boolean
+  onPress: () => void
+}
+
+export default function CreditCard({
+  posterPath,
+  title,
+  year,
+  roleLabel,
+  width,
+  compact = false,
+  onPress,
+}: CreditCardProps) {
+  const { colors } = useTheme()
+
+  const styles = useMemo(
+    () =>
+      StyleSheet.create({
+        card: {
+          gap: 4,
+        },
+        cardFlex: {
+          flex: 1,
+        },
+        pressed: {
+          opacity: 0.6,
+        },
+        poster: {
+          width: '100%',
+          aspectRatio: 2 / 3,
+          borderRadius: borderRadius.lg,
+          backgroundColor: colors.surfaceContainerHighest,
+        },
+        posterFallback: {
+          justifyContent: 'center',
+          alignItems: 'center',
+        },
+        titleNormal: {
+          fontFamily: 'Inter',
+          fontSize: 13,
+          fontWeight: '500',
+          lineHeight: TITLE_LINE_NORMAL,
+          height: 2 * TITLE_LINE_NORMAL,
+          color: colors.onSurface,
+        },
+        titleCompact: {
+          fontFamily: 'Inter',
+          fontSize: 12,
+          fontWeight: '500',
+          lineHeight: TITLE_LINE_COMPACT,
+          height: 2 * TITLE_LINE_COMPACT,
+          color: colors.onSurface,
+        },
+        meta: {
+          fontFamily: 'Inter',
+          fontSize: 12,
+          fontWeight: '400',
+          lineHeight: META_LINE,
+          height: META_LINE,
+          color: colors.onSurfaceVariant,
+        },
+      }),
+    [colors],
+  )
+
+  const posterUrl = getImageUrl(posterPath ?? null, 'w185')
+
+  return (
+    <Pressable
+      style={({ pressed }) => [
+        styles.card,
+        width != null ? { width } : styles.cardFlex,
+        pressed && styles.pressed,
+      ]}
+      onPress={() => {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
+        onPress()
+      }}
+      accessibilityRole="button"
+      accessibilityLabel={`${title}${year ? ` (${year})` : ''}`}
+    >
+      {posterUrl ? (
+        <Image
+          source={{ uri: posterUrl }}
+          style={styles.poster}
+          contentFit="cover"
+          cachePolicy="memory-disk"
+          transition={150}
+        />
+      ) : (
+        <View style={[styles.poster, styles.posterFallback]}>
+          <Ionicons name="film-outline" size={24} color={colors.outlineVariant} />
+        </View>
+      )}
+      <Text numberOfLines={2} ellipsizeMode="tail" style={compact ? styles.titleCompact : styles.titleNormal}>
+        {title}
+      </Text>
+      {/* Always rendered so cards in a grid row share one baseline */}
+      <Text numberOfLines={1} style={styles.meta}>
+        {year ?? ''}
+      </Text>
+      {roleLabel !== undefined ? (
+        <Text numberOfLines={1} style={styles.meta}>
+          {roleLabel ?? ''}
+        </Text>
+      ) : null}
+    </Pressable>
+  )
+}
