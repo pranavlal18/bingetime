@@ -14,13 +14,14 @@ import { useTheme } from '@/contexts/ThemeContext'
 type CreditFilter='all'|'movie'|'tv'; type CreditSort='newest'|'oldest'|'popular'|'az'
 const FILTER_SEGMENTS: {key:CreditFilter,label:string}[]=[{key:'all',label:'All'},{key:'movie',label:'Movies'},{key:'tv',label:'TV'}]
 const SORT_OPTIONS: {key:CreditSort,label:string}[]=[{key:'newest',label:'Newest'},{key:'oldest',label:'Oldest'},{key:'popular',label:'Popular'},{key:'az',label:'A–Z'}]
-const GRID_COLUMNS=4
+const GRID_COLUMNS=2
+// Same length as Recommended for You: 32% of screen (see RecommendedSection CARD_WIDTH)
 function creditYear(c: TMDbCombinedCredit){ return (c.release_date??c.first_air_date??'').slice(0,4) }
 
 export default function PersonCreditsScreen(){
   const { id }=useLocalSearchParams<{id:string}>()
   const insets=useSafeAreaInsets(); const { colors }=useTheme(); const { width: windowWidth }=useWindowDimensions()
-  const cellWidth=useMemo(()=> (windowWidth - spacing.marginMobile*2 - 10*(GRID_COLUMNS-1))/GRID_COLUMNS, [windowWidth])
+  const cellWidth=useMemo(()=> windowWidth * 0.32, [windowWidth])
   const [filter,setFilter]=useState<CreditFilter>('all'); const [sort,setSort]=useState<CreditSort>('newest')
   const personId=/^\d+$/.test(id)?parseInt(id,10):null; const isValidId=personId!=null
   const { data: person, isLoading }=usePerson(isValidId?personId:undefined)
@@ -45,7 +46,7 @@ export default function PersonCreditsScreen(){
     sortChipTextActive:{ color: colors.onPrimary },
     list:{ flex:1 },
     listContent:{ paddingHorizontal: spacing.marginMobile, paddingBottom:40 },
-    columnWrapper:{ justifyContent:'flex-start', gap:10, marginBottom:14 },
+    columnWrapper:{ justifyContent:'flex-start', gap:16, marginBottom:16 },
     emptyText:{ fontSize: typography.bodyMd.fontSize, color: colors.onSurfaceVariant, textAlign:'center', paddingTop:48 },
   }),[colors])
 

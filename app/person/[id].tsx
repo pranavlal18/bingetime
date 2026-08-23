@@ -1,6 +1,6 @@
 // ─── Person Page — bio card, structured header, 76px Known For ───
 import { useMemo, useState } from 'react'
-import { View, Text, ScrollView, Pressable, StyleSheet, ActivityIndicator } from 'react-native'
+import { View, Text, ScrollView, Pressable, StyleSheet, ActivityIndicator, useWindowDimensions } from 'react-native'
 import { useLocalSearchParams, router, Stack } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Image } from 'expo-image'
@@ -13,13 +13,15 @@ import { useTheme } from '@/contexts/ThemeContext'
 
 const PORTRAIT_W = 112
 const PORTRAIT_H = 168
-const KNOWN_FOR_W = 76
-const KNOWN_FOR_GAP = 10
+// Match Recommended for You: 32% of screen width, 16px gap (see RecommendedSection)
+const KNOWN_FOR_GAP = 16
 
 export default function PersonPage() {
   const { id } = useLocalSearchParams<{ id: string }>()
   const insets = useSafeAreaInsets()
   const { colors } = useTheme()
+  const { width: windowWidth } = useWindowDimensions()
+  const KNOWN_FOR_W = windowWidth * 0.32
   const [bioExpanded, setBioExpanded] = useState(false)
   const personId = /^\d+$/.test(id) ? parseInt(id, 10) : null
   const { data: person, isLoading, error } = usePerson(personId)
