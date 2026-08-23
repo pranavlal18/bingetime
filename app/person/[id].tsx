@@ -193,8 +193,10 @@ export default function PersonPage() {
       lineHeight: typography.labelMd.lineHeight,
       color: colors.primary,
     },
-    knownForRow: {
+    knownForScroller: {
       marginHorizontal: -spacing.marginMobile,
+    },
+    knownForRow: {
       gap: KNOWN_FOR_GAP,
       paddingHorizontal: spacing.marginMobile,
     },
@@ -307,7 +309,7 @@ export default function PersonPage() {
                 <Text style={styles.seeAllText}>See All</Text>
               </Pressable>
             </View>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.knownForRow}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.knownForScroller} contentContainerStyle={styles.knownForRow}>
               {knownFor.map((credit: TMDbCombinedCredit, index) => {
                 const title = credit.title ?? credit.name ?? ''
                 const year = (credit.release_date ?? credit.first_air_date ?? '')?.slice(0, 4)

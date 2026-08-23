@@ -12,6 +12,7 @@ import {
   StyleSheet,
   FlatList,
   ActivityIndicator,
+  useWindowDimensions,
 } from 'react-native'
 import { useLocalSearchParams, router, Stack } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -50,6 +51,13 @@ export default function PersonCreditsScreen() {
   const { id } = useLocalSearchParams<{ id: string }>()
   const insets = useSafeAreaInsets()
   const { colors } = useTheme()
+  const { width: windowWidth } = useWindowDimensions()
+
+  // Bounded cell width so the last row never stretches: (screen − 40 padding − 32 gaps) / 5.
+  const cellWidth = useMemo(
+    () => (windowWidth - spacing.marginMobile * 2 - 8 * (GRID_COLUMNS - 1)) / GRID_COLUMNS,
+    [windowWidth],
+  )
 
   const [filter, setFilter] = useState<CreditFilter>('all')
   const [sort, setSort] = useState<CreditSort>('newest')
@@ -183,12 +191,9 @@ export default function PersonCreditsScreen() {
           paddingBottom: 40,
         },
         columnWrapper: {
-          justifyContent: 'space-between',
+          justifyContent: 'flex-start',
           gap: 8,
           marginBottom: spacing.stackMd,
-        },
-        measureCell: {
-          flex: 1,
         },
         emptyText: {
           fontSize: typography.bodyMd.fontSize,
@@ -236,6 +241,7 @@ export default function PersonCreditsScreen() {
           title={title}
           year={year || null}
           roleLabel={roleLabel}
+          width={cellWidth}
           compact
           onPress={() =>
             router.push(item.media_type === 'tv' ? `/show/${item.id}` : `/movie/${item.id}`)
@@ -246,7 +252,6 @@ export default function PersonCreditsScreen() {
         // Measurement gate: first cell MUST equal (screenWidth − 40 − 32) / 5.
         return (
           <View
-            style={styles.measureCell}
             onLayout={(e) => console.log('[measure] Credits grid cell width:', e.nativeEvent.layout.width)}
           >
             {card}
@@ -255,7 +260,7 @@ export default function PersonCreditsScreen() {
       }
       return card
     },
-    [styles],
+    [cellWidth],
   )
 
   // ── Invalid id ──
