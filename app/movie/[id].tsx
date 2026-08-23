@@ -23,6 +23,8 @@ import { getMovieDetails, getImageUrl } from '@/lib/tmdb'
 import { useQuery } from '@tanstack/react-query'
 import LibraryToggle from '@/components/ui/LibraryToggle'
 import FavoriteToggle from '@/components/ui/FavoriteToggle'
+import CastRow from '@/components/detail/CastRow'
+import { useTitleCredits } from '@/lib/queries/credits'
 import { typography, spacing, borderRadius } from '@/theme'
 import { useTheme } from '@/contexts/ThemeContext'
 
@@ -227,6 +229,31 @@ export default function MovieDetailScreen() {
     color: colors.onSurfaceVariant,
     lineHeight: typography.bodyMd.lineHeight,
   },
+  detailsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.stackMd,
+  },
+  detailItem: {
+    flex: 1,
+    minWidth: 120,
+    gap: 4,
+  },
+  detailLabel: {
+    fontFamily: 'Inter',
+    fontSize: typography.bodyXs.fontSize,
+    fontWeight: '600',
+    lineHeight: typography.bodyXs.lineHeight,
+    color: colors.outline,
+    textTransform: 'uppercase',
+  },
+  detailValue: {
+    fontFamily: 'Inter',
+    fontSize: typography.bodyMd.fontSize,
+    fontWeight: '500',
+    lineHeight: typography.bodyMd.lineHeight,
+    color: colors.onSurface,
+  },
 }), [colors])
 
   // Detect if the id param is a TMDb ID (numeric) vs a UUID
@@ -245,6 +272,8 @@ export default function MovieDetailScreen() {
     enabled: !!resolvedTmdbId,
     staleTime: 1000 * 60 * 60,
   })
+
+  const { data: credits, isLoading: castLoading } = useTitleCredits(resolvedTmdbId, 'movie')
 
   const backdropUrl = tmdbDetails ? getImageUrl(tmdbDetails.backdrop_path ?? null, 'w780') : null
   const posterUrl = getImageUrl(movie?.poster_path ?? null, 'w342')
@@ -432,6 +461,30 @@ export default function MovieDetailScreen() {
             <Text style={styles.sectionTitle}>Overview</Text>
             <Text style={styles.overviewText}>{overview}</Text>
           </View>
+
+          {/* ── Details grid ── */}
+          {(genreList || runtimeDisplay) && (
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Details</Text>
+              <View style={styles.detailsGrid}>
+                {genreList && genreList.length > 0 ? (
+                  <View style={styles.detailItem}>
+                    <Text style={styles.detailLabel}>Genres</Text>
+                    <Text style={styles.detailValue}>{genreList.join(', ')}</Text>
+                  </View>
+                ) : null}
+                {runtimeDisplay ? (
+                  <View style={styles.detailItem}>
+                    <Text style={styles.detailLabel}>Runtime</Text>
+                    <Text style={styles.detailValue}>{runtimeDisplay}</Text>
+                  </View>
+                ) : null}
+              </View>
+            </View>
+          )}
+
+          {/* ── Cast ── */}
+          <CastRow cast={credits?.cast} isLoading={castLoading} />
         </View>
       </Animated.ScrollView>
     </View>
