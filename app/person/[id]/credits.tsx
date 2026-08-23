@@ -178,7 +178,7 @@ export default function PersonCreditsScreen() {
         },
         columnWrapper: {
           justifyContent: 'space-between',
-          gap: 12,
+          gap: 10,
           marginBottom: spacing.stackMd,
         },
         emptyText: {
@@ -332,12 +332,12 @@ export default function PersonCreditsScreen() {
         style={styles.list}
         contentContainerStyle={styles.listContent}
         columnWrapperStyle={styles.columnWrapper}
-        numColumns={3}
+        numColumns={4}
         data={credits}
         keyExtractor={(c) => `${c.media_type}-${c.id}`}
         renderItem={renderItem}
         showsVerticalScrollIndicator={false}
-        initialNumToRender={12}
+        initialNumToRender={16}
         ListEmptyComponent={
           <Text style={styles.emptyText}>No credits found</Text>
         }
