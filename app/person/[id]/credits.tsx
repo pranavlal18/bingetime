@@ -227,6 +227,7 @@ export default function PersonCreditsScreen() {
           title={title}
           year={year || null}
           roleLabel={roleLabel}
+          compact
           onPress={() =>
             router.push(item.media_type === 'tv' ? `/show/${item.id}` : `/movie/${item.id}`)
           }
@@ -332,12 +333,12 @@ export default function PersonCreditsScreen() {
         style={styles.list}
         contentContainerStyle={styles.listContent}
         columnWrapperStyle={styles.columnWrapper}
-        numColumns={4}
+        numColumns={5}
         data={credits}
         keyExtractor={(c) => `${c.media_type}-${c.id}`}
         renderItem={renderItem}
         showsVerticalScrollIndicator={false}
-        initialNumToRender={16}
+        initialNumToRender={20}
         ListEmptyComponent={
           <Text style={styles.emptyText}>No credits found</Text>
         }

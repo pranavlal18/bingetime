@@ -14,7 +14,7 @@ import { useTheme } from '@/contexts/ThemeContext'
 
 const PORTRAIT_W = 120
 const PORTRAIT_H = 180
-const POSTER_W = 108
+const POSTER_W = 40
 
 export default function PersonPage() {
   const { id } = useLocalSearchParams<{ id: string }>()
@@ -311,6 +311,7 @@ export default function PersonPage() {
                     title={title}
                     year={year || null}
                     width={POSTER_W}
+                    compact
                     onPress={() =>
                       router.push(credit.media_type === 'tv' ? `/show/${credit.id}` : `/movie/${credit.id}`)
                     }

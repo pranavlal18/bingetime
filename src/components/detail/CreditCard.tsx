@@ -18,6 +18,9 @@ const TITLE_LINE = 20
 const TITLE_LINES = 2
 const META_LINE = 16
 
+// Small-card text mode (dense grids / narrow scrollers)
+const COMPACT_TITLE_LINE = 16
+
 interface CreditCardProps {
   posterPath: string | null
   title: string
@@ -29,6 +32,8 @@ interface CreditCardProps {
    * Omit inside grids — the card defaults to flex:1 and shares column width.
    */
   width?: number
+  /** Smaller typography for dense layouts. */
+  compact?: boolean
   onPress: () => void
 }
 
@@ -38,6 +43,7 @@ export default function CreditCard({
   year,
   roleLabel,
   width,
+  compact,
   onPress,
 }: CreditCardProps) {
   const { colors } = useTheme()
@@ -66,10 +72,10 @@ export default function CreditCard({
         },
         title: {
           fontFamily: 'Inter',
-          fontSize: typography.bodySm.fontSize,
+          fontSize: compact ? typography.labelSm.fontSize : typography.bodySm.fontSize,
           fontWeight: '500',
-          lineHeight: TITLE_LINE,
-          height: TITLE_LINES * TITLE_LINE,
+          lineHeight: compact ? COMPACT_TITLE_LINE : TITLE_LINE,
+          height: compact ? COMPACT_TITLE_LINE * 2 : TITLE_LINES * TITLE_LINE,
           color: colors.onSurface,
         },
         meta: {
@@ -81,7 +87,7 @@ export default function CreditCard({
           color: colors.onSurfaceVariant,
         },
       }),
-    [colors],
+    [colors, compact],
   )
 
   const posterUrl = getImageUrl(posterPath ?? null, 'w185')
