@@ -206,8 +206,7 @@ export default function PersonCreditsScreen() {
     ({ item }: { item: TMDbCombinedCredit }) => {
       const title = item.title ?? item.name ?? 'Unknown'
       const year = creditYear(item)
-      const subLine =
-        item.character?.trim() || item.job?.trim() || (year || null)
+      const subLine = item.character?.trim() || item.job?.trim() || null
       const posterUrl = getImageUrl(item.poster_path ?? null, 'w92')
       return (
         <View style={styles.row}>

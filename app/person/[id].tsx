@@ -250,7 +250,7 @@ export default function PersonPage() {
 
   let birthLine: string | null = null
   if (deathYear) {
-    birthLine = birthYear ? `${birthYear}–${deathYear}` : deathYear
+    birthLine = birthYear ? `${birthYear}–${deathYear}` : `–${deathYear}`
   } else {
     const parts = [birthYear, person.place_of_birth].filter(Boolean) as string[]
     birthLine = parts.length > 0 ? parts.join(' · ') : null
