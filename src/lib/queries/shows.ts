@@ -2,7 +2,7 @@
 
 import { useQuery, useMutation, useQueryClient, QueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
-import { getImageUrl, getShowBasicDetails, getTitleCredits } from '@/lib/tmdb'
+import { getImageUrl, getShowBasicDetails } from '@/lib/tmdb'
 import { useAuth } from '@/contexts/AuthContext'
 import { showKeys, episodeKeys, profileKeys } from '@/types'
 import { type ShowWithUserData, type NextAirEpisode } from '@/types'
@@ -408,21 +408,8 @@ export function useContinueWatching() {
   })
 }
 
-/** Cast credits for a title (show or movie) — used for the profile avatar collage. */
-export function useTitleCredits(
-  tmdbId: number | null | undefined,
-  mediaType: 'tv' | 'movie' = 'tv'
-) {
-  const { user } = useAuth()
-
-  return useQuery({
-    queryKey: ['credits', mediaType, tmdbId],
-    queryFn: () => getTitleCredits(tmdbId as number, mediaType),
-    enabled: !!tmdbId && !!user,
-    staleTime: 1000 * 60 * 60 * 24,
-    gcTime: 1000 * 60 * 60 * 24 * 14,
-  })
-}
+// Cast credits live in './credits' — re-exported so existing imports keep working.
+export { useTitleCredits } from './credits'
 
 // ── Mark next episode as watched ──
 
