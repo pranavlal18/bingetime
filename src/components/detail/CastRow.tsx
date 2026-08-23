@@ -1,7 +1,9 @@
-// ─── CastRow — TV Time-style horizontal cast scroller (display-only) ───
+// ─── CastRow — TV Time-style horizontal cast scroller (tappable members) ───
 
 import { useMemo } from 'react'
-import { Text, View, ScrollView, StyleSheet } from 'react-native'
+import { Text, View, ScrollView, StyleSheet, Pressable } from 'react-native'
+import { router } from 'expo-router'
+import * as Haptics from 'expo-haptics'
 import { Image } from 'expo-image'
 import type { TMDbCastMember } from '@/lib/tmdb'
 import { getImageUrl } from '@/lib/tmdb'
@@ -43,6 +45,9 @@ export default function CastRow({ cast, isLoading }: CastRowProps) {
       width: 72,
       alignItems: 'center',
       gap: 6,
+    },
+    memberPressed: {
+      opacity: 0.6,
     },
     avatar: {
       width: AVATAR_SIZE,
@@ -126,7 +131,16 @@ export default function CastRow({ cast, isLoading }: CastRowProps) {
         {members.map((member) => {
           const avatarUrl = getImageUrl(member.profile_path, 'w185')
           return (
-            <View key={member.id} style={styles.member}>
+            <Pressable
+              key={member.id}
+              style={({ pressed }) => [styles.member, pressed && styles.memberPressed]}
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
+                router.push(`/person/${member.id}`)
+              }}
+              accessibilityRole="button"
+              accessibilityLabel={`${member.name} — ${member.character}`}
+            >
               {avatarUrl ? (
                 <Image
                   source={{ uri: avatarUrl }}
@@ -144,7 +158,7 @@ export default function CastRow({ cast, isLoading }: CastRowProps) {
               {member.character ? (
                 <Text numberOfLines={1} style={styles.character}>{member.character}</Text>
               ) : null}
-            </View>
+            </Pressable>
           )
         })}
       </ScrollView>
