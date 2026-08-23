@@ -6,19 +6,15 @@ import { useLocalSearchParams, router, Stack } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Image } from 'expo-image'
 import { Ionicons } from '@expo/vector-icons'
-import * as Haptics from 'expo-haptics'
 import { usePerson, topKnownFor } from '@/lib/queries/people'
 import { getImageUrl, type TMDbCombinedCredit } from '@/lib/tmdb'
+import CreditCard from '@/components/detail/CreditCard'
 import { typography, spacing, borderRadius } from '@/theme'
 import { useTheme } from '@/contexts/ThemeContext'
 
 const PORTRAIT_W = 120
 const PORTRAIT_H = 180
 const POSTER_W = 108
-const POSTER_H = 162
-const TITLE_LINES = 2
-const TITLE_LINE = 20
-const YEAR_LINE = 16
 
 export default function PersonPage() {
   const { id } = useLocalSearchParams<{ id: string }>()
@@ -195,40 +191,6 @@ export default function PersonPage() {
       gap: spacing.stackMd,
       paddingHorizontal: spacing.marginMobile,
     },
-    creditCard: {
-      width: POSTER_W,
-      gap: 6,
-    },
-    creditPressed: {
-      opacity: 0.6,
-    },
-    poster: {
-      width: POSTER_W,
-      height: POSTER_H,
-      borderRadius: borderRadius.lg,
-      backgroundColor: colors.surfaceContainerHighest,
-    },
-    posterFallback: {
-      justifyContent: 'center',
-      alignItems: 'center',
-    },
-    creditTitle: {
-      fontFamily: 'Inter',
-      fontSize: typography.bodySm.fontSize,
-      fontWeight: '500',
-      lineHeight: TITLE_LINE,
-      // Fixed 2-line reserve so the year line aligns across all cards
-      height: TITLE_LINES * TITLE_LINE,
-      color: colors.onSurface,
-    },
-    creditYear: {
-      fontFamily: 'Inter',
-      fontSize: typography.labelSm.fontSize,
-      fontWeight: '400',
-      lineHeight: YEAR_LINE,
-      height: YEAR_LINE,
-      color: colors.onSurfaceVariant,
-    },
   }), [colors, insets.top])
 
   // Loading / error branches first, then main render
@@ -340,37 +302,19 @@ export default function PersonPage() {
             </View>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.knownForRow}>
               {knownFor.map((credit: TMDbCombinedCredit) => {
-                const posterUrl = getImageUrl(credit.poster_path ?? null, 'w185')
                 const title = credit.title ?? credit.name ?? ''
                 const year = (credit.release_date ?? credit.first_air_date ?? '')?.slice(0, 4)
                 return (
-                  <Pressable
+                  <CreditCard
                     key={`${credit.media_type}-${credit.id}`}
-                    style={({ pressed }) => [styles.creditCard, pressed && styles.creditPressed]}
-                    onPress={() => {
-                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
+                    posterPath={credit.poster_path ?? null}
+                    title={title}
+                    year={year || null}
+                    width={POSTER_W}
+                    onPress={() =>
                       router.push(credit.media_type === 'tv' ? `/show/${credit.id}` : `/movie/${credit.id}`)
-                    }}
-                    accessibilityRole="button"
-                    accessibilityLabel={`${title}${year ? ` (${year})` : ''}`}
-                  >
-                    {posterUrl ? (
-                      <Image
-                        source={{ uri: posterUrl }}
-                        style={styles.poster}
-                        contentFit="cover"
-                        cachePolicy="memory-disk"
-                        transition={150}
-                      />
-                    ) : (
-                      <View style={[styles.poster, styles.posterFallback]}>
-                        <Ionicons name="film-outline" size={24} color={colors.outlineVariant} />
-                      </View>
-                    )}
-                    <Text numberOfLines={2} style={styles.creditTitle}>{title}</Text>
-                    {/* Always rendered (empty when absent) so years align across cards */}
-                    <Text numberOfLines={1} style={styles.creditYear}>{year ?? ''}</Text>
-                  </Pressable>
+                    }
+                  />
                 )
               })}
             </ScrollView>

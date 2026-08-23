@@ -11,12 +11,11 @@ import {
 } from 'react-native'
 import { useLocalSearchParams, router, Stack } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import { Image } from 'expo-image'
 import { Ionicons } from '@expo/vector-icons'
 import * as Haptics from 'expo-haptics'
 import { usePerson, dedupeCredits } from '@/lib/queries/people'
-import { getImageUrl } from '@/lib/tmdb'
 import type { TMDbCombinedCredit } from '@/lib/tmdb'
+import CreditCard from '@/components/detail/CreditCard'
 import { typography, spacing, borderRadius } from '@/theme'
 import { useTheme } from '@/contexts/ThemeContext'
 
@@ -169,7 +168,7 @@ export default function PersonCreditsScreen() {
           color: colors.onPrimary,
         },
 
-        // ── List ──
+        // ── Grid ──
         list: {
           flex: 1,
         },
@@ -177,48 +176,10 @@ export default function PersonCreditsScreen() {
           paddingHorizontal: spacing.marginMobile,
           paddingBottom: 40,
         },
-        row: {
-          flexDirection: 'row',
-          alignItems: 'center',
+        columnWrapper: {
+          justifyContent: 'space-between',
           gap: 12,
-          paddingVertical: 8,
-        },
-        rowPressed: {
-          opacity: 0.6,
-        },
-        posterThumb: {
-          width: 40,
-          height: 60,
-          borderRadius: borderRadius.sm,
-          backgroundColor: colors.surfaceContainer,
-        },
-        posterPlaceholder: {
-          justifyContent: 'center',
-          alignItems: 'center',
-        },
-        rowTextColumn: {
-          flex: 1,
-          gap: 2,
-        },
-        rowTitle: {
-          fontFamily: 'Inter',
-          fontSize: typography.bodySm.fontSize,
-          fontWeight: '600',
-          lineHeight: typography.bodySm.lineHeight,
-          color: colors.onSurface,
-        },
-        rowSubLine: {
-          fontFamily: 'Inter',
-          fontSize: typography.bodyXs.fontSize,
-          fontWeight: '400',
-          lineHeight: typography.bodyXs.lineHeight,
-          color: colors.onSurfaceVariant,
-        },
-        rowYear: {
-          fontFamily: 'Inter',
-          fontSize: typography.bodyXs.fontSize,
-          fontWeight: '500',
-          color: colors.onSurfaceVariant,
+          marginBottom: spacing.stackMd,
         },
         emptyText: {
           fontSize: typography.bodyMd.fontSize,
@@ -259,49 +220,20 @@ export default function PersonCreditsScreen() {
     ({ item }: { item: TMDbCombinedCredit }) => {
       const title = item.title ?? item.name ?? 'Unknown'
       const year = creditYear(item)
-      const subLine = item.character?.trim() || item.job?.trim() || null
-      const posterUrl = getImageUrl(item.poster_path ?? null, 'w92')
+      const roleLabel = item.character?.trim() || item.job?.trim() || ''
       return (
-        <Pressable
-          style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
-          onPress={() => {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
+        <CreditCard
+          posterPath={item.poster_path ?? null}
+          title={title}
+          year={year || null}
+          roleLabel={roleLabel}
+          onPress={() =>
             router.push(item.media_type === 'tv' ? `/show/${item.id}` : `/movie/${item.id}`)
-          }}
-          accessibilityRole="button"
-          accessibilityLabel={`${title}${year ? ` (${year})` : ''}`}
-        >
-          {posterUrl ? (
-            <Image
-              source={{ uri: posterUrl }}
-              style={styles.posterThumb}
-              contentFit="cover"
-              cachePolicy="memory-disk"
-            />
-          ) : (
-            <View style={[styles.posterThumb, styles.posterPlaceholder]}>
-              <Ionicons
-                name={item.media_type === 'tv' ? 'tv-outline' : 'film-outline'}
-                size={18}
-                color={colors.outlineVariant}
-              />
-            </View>
-          )}
-          <View style={styles.rowTextColumn}>
-            <Text style={styles.rowTitle} numberOfLines={1}>
-              {title}
-            </Text>
-            {subLine ? (
-              <Text style={styles.rowSubLine} numberOfLines={1}>
-                {subLine}
-              </Text>
-            ) : null}
-          </View>
-          {year ? <Text style={styles.rowYear}>{year}</Text> : null}
-        </Pressable>
+          }
+        />
       )
     },
-    [styles, colors.outlineVariant],
+    [styles],
   )
 
   // ── Invalid id ──
@@ -395,15 +327,17 @@ export default function PersonCreditsScreen() {
         })}
       </View>
 
-      {/* ── Credits list ── */}
+      {/* ── Credits grid ── */}
       <FlatList
         style={styles.list}
         contentContainerStyle={styles.listContent}
+        columnWrapperStyle={styles.columnWrapper}
+        numColumns={3}
         data={credits}
         keyExtractor={(c) => `${c.media_type}-${c.id}`}
         renderItem={renderItem}
         showsVerticalScrollIndicator={false}
-        initialNumToRender={20}
+        initialNumToRender={12}
         ListEmptyComponent={
           <Text style={styles.emptyText}>No credits found</Text>
         }
