@@ -12,6 +12,9 @@ import { useTheme } from '@/contexts/ThemeContext'
 
 const MAX_CAST = 15
 const AVATAR_SIZE = 60
+const MEMBER_WIDTH = 96
+const NAME_LINE = 20
+const CHARACTER_LINE = 16
 
 interface CastRowProps {
   cast?: TMDbCastMember[]
@@ -39,10 +42,15 @@ export default function CastRow({ cast, isLoading }: CastRowProps) {
     },
     row: {
       gap: spacing.stackMd,
-      paddingRight: spacing.marginMobile,
+      paddingHorizontal: spacing.marginMobile,
+    },
+    // Bleed edge-to-edge past the parent's horizontal padding so partially
+    // scrolled cards clip at the true screen edge, not the content margin.
+    scroller: {
+      marginHorizontal: -spacing.marginMobile,
     },
     member: {
-      width: 72,
+      width: MEMBER_WIDTH,
       alignItems: 'center',
       gap: 6,
     },
@@ -67,19 +75,20 @@ export default function CastRow({ cast, isLoading }: CastRowProps) {
     },
     name: {
       fontFamily: 'Inter',
-      fontSize: typography.bodyXs.fontSize,
+      fontSize: typography.bodySm.fontSize,
       fontWeight: '600',
-      lineHeight: typography.bodyXs.lineHeight,
+      lineHeight: NAME_LINE,
+      height: NAME_LINE,
       color: colors.onSurface,
       textAlign: 'center',
     },
     character: {
       fontFamily: 'Inter',
-      fontSize: typography.bodyXs.fontSize - 1,
-      fontWeight: '500',
-      lineHeight: typography.bodyXs.lineHeight - 1,
+      fontSize: typography.labelSm.fontSize,
+      fontWeight: '400',
+      lineHeight: CHARACTER_LINE,
+      height: CHARACTER_LINE,
       color: colors.onSurfaceVariant,
-      opacity: 0.7,
       textAlign: 'center',
     },
     skeletonAvatar: {
@@ -90,11 +99,17 @@ export default function CastRow({ cast, isLoading }: CastRowProps) {
       opacity: 0.5,
     },
     skeletonLine: {
-      height: 10,
-      width: 56,
       borderRadius: borderRadius.sm,
       backgroundColor: colors.surfaceContainerHighest,
       opacity: 0.5,
+    },
+    skeletonName: {
+      height: NAME_LINE,
+      width: 64,
+    },
+    skeletonCharacter: {
+      height: CHARACTER_LINE,
+      width: 48,
     },
     }),
     [colors],
@@ -107,11 +122,12 @@ export default function CastRow({ cast, isLoading }: CastRowProps) {
     return (
       <View style={styles.section}>
         <Text style={styles.label}>Cast</Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.row}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.scroller} contentContainerStyle={styles.row}>
           {SKELETON_KEYS.map((k) => (
             <View key={k} style={styles.member}>
               <View style={styles.skeletonAvatar} />
-              <View style={styles.skeletonLine} />
+              <View style={[styles.skeletonLine, styles.skeletonName]} />
+              <View style={[styles.skeletonLine, styles.skeletonCharacter]} />
             </View>
           ))}
         </ScrollView>
@@ -127,7 +143,7 @@ export default function CastRow({ cast, isLoading }: CastRowProps) {
   return (
     <View style={styles.section}>
       <Text style={styles.label}>Cast</Text>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.row}>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.scroller} contentContainerStyle={styles.row}>
         {members.map((member) => {
           const avatarUrl = getImageUrl(member.profile_path, 'w185')
           return (
@@ -155,9 +171,8 @@ export default function CastRow({ cast, isLoading }: CastRowProps) {
                 </View>
               )}
               <Text numberOfLines={1} style={styles.name}>{member.name}</Text>
-              {member.character ? (
-                <Text numberOfLines={1} style={styles.character}>{member.character}</Text>
-              ) : null}
+              {/* Always rendered (empty when absent) so every card has identical height */}
+              <Text numberOfLines={1} style={styles.character}>{member.character ?? ''}</Text>
             </Pressable>
           )
         })}

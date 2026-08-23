@@ -14,8 +14,11 @@ import { useTheme } from '@/contexts/ThemeContext'
 
 const PORTRAIT_W = 120
 const PORTRAIT_H = 180
-const POSTER_W = 100
-const POSTER_H = 150
+const POSTER_W = 108
+const POSTER_H = 162
+const TITLE_LINES = 2
+const TITLE_LINE = 20
+const YEAR_LINE = 16
 
 export default function PersonPage() {
   const { id } = useLocalSearchParams<{ id: string }>()
@@ -166,11 +169,17 @@ export default function PersonPage() {
     },
 
     // ── Known For ──
+    // Section is NOT horizontally padded: the scroller spans full width so
+    // partially scrolled cards clip at the true screen edge (scroll affordance).
+    knownForSection: {
+      marginBottom: 24,
+    },
     knownForHeader: {
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'space-between',
       marginBottom: 12,
+      paddingHorizontal: spacing.marginMobile,
     },
     seeAllButton: {
       alignSelf: 'flex-start',
@@ -184,7 +193,7 @@ export default function PersonPage() {
     },
     knownForRow: {
       gap: spacing.stackMd,
-      paddingRight: spacing.marginMobile,
+      paddingHorizontal: spacing.marginMobile,
     },
     creditCard: {
       width: POSTER_W,
@@ -205,18 +214,20 @@ export default function PersonPage() {
     },
     creditTitle: {
       fontFamily: 'Inter',
-      fontSize: typography.bodyXs.fontSize,
-      fontWeight: '600',
-      lineHeight: typography.bodyXs.lineHeight,
+      fontSize: typography.bodySm.fontSize,
+      fontWeight: '500',
+      lineHeight: TITLE_LINE,
+      // Fixed 2-line reserve so the year line aligns across all cards
+      height: TITLE_LINES * TITLE_LINE,
       color: colors.onSurface,
     },
     creditYear: {
       fontFamily: 'Inter',
-      fontSize: typography.bodyXs.fontSize - 1,
+      fontSize: typography.labelSm.fontSize,
       fontWeight: '400',
-      lineHeight: typography.bodyXs.lineHeight - 1,
+      lineHeight: YEAR_LINE,
+      height: YEAR_LINE,
       color: colors.onSurfaceVariant,
-      opacity: 0.7,
     },
   }), [colors, insets.top])
 
@@ -315,7 +326,7 @@ export default function PersonPage() {
 
         {/* ── Known For ── */}
         {knownFor.length > 0 ? (
-          <View style={styles.section}>
+          <View style={styles.knownForSection}>
             <View style={styles.knownForHeader}>
               <Text style={styles.sectionTitle}>Known For</Text>
               <Pressable
@@ -357,7 +368,8 @@ export default function PersonPage() {
                       </View>
                     )}
                     <Text numberOfLines={2} style={styles.creditTitle}>{title}</Text>
-                    {year ? <Text style={styles.creditYear}>{year}</Text> : null}
+                    {/* Always rendered (empty when absent) so years align across cards */}
+                    <Text numberOfLines={1} style={styles.creditYear}>{year ?? ''}</Text>
                   </Pressable>
                 )
               })}
