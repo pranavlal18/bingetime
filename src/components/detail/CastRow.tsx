@@ -11,10 +11,14 @@ import { typography, spacing, borderRadius } from '@/theme'
 import { useTheme } from '@/contexts/ThemeContext'
 
 const MAX_CAST = 15
-const AVATAR_SIZE = 60
-const MEMBER_WIDTH = 96
+const AVATAR_SIZE = 52
+const MEMBER_WIDTH = 84
 const NAME_LINE = 20
-const CHARACTER_LINE = 16
+// Characters wrap up to 2 lines INSIDE the fixed card width; the space is
+// reserved on every card so long roles never change card dimensions.
+const CHARACTER_LINE = 15
+const CHARACTER_RESERVE = CHARACTER_LINE * 2
+const CARD_GAP = 12
 
 interface CastRowProps {
   cast?: TMDbCastMember[]
@@ -41,7 +45,7 @@ export default function CastRow({ cast, isLoading }: CastRowProps) {
       marginBottom: spacing.stackMd,
     },
     row: {
-      gap: spacing.stackMd,
+      gap: CARD_GAP,
       paddingHorizontal: spacing.marginMobile,
     },
     // Bleed edge-to-edge past the parent's horizontal padding so partially
@@ -87,7 +91,7 @@ export default function CastRow({ cast, isLoading }: CastRowProps) {
       fontSize: typography.labelSm.fontSize,
       fontWeight: '400',
       lineHeight: CHARACTER_LINE,
-      height: CHARACTER_LINE,
+      height: CHARACTER_RESERVE,
       color: colors.onSurfaceVariant,
       textAlign: 'center',
     },
@@ -108,8 +112,8 @@ export default function CastRow({ cast, isLoading }: CastRowProps) {
       width: 64,
     },
     skeletonCharacter: {
-      height: CHARACTER_LINE,
-      width: 48,
+      height: CHARACTER_RESERVE,
+      width: 44,
     },
     }),
     [colors],
@@ -171,8 +175,8 @@ export default function CastRow({ cast, isLoading }: CastRowProps) {
                 </View>
               )}
               <Text numberOfLines={1} style={styles.name}>{member.name}</Text>
-              {/* Always rendered (empty when absent) so every card has identical height */}
-              <Text numberOfLines={1} style={styles.character}>{member.character ?? ''}</Text>
+              {/* Wraps up to 2 lines inside the fixed card width; space always reserved */}
+              <Text numberOfLines={2} style={styles.character}>{member.character ?? ''}</Text>
             </Pressable>
           )
         })}
