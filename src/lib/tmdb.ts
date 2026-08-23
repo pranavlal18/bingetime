@@ -107,6 +107,47 @@ export async function getTitleCredits(tmdbId: number, mediaType: 'tv' | 'movie' 
   return tmdbFetch<TMDbCredits>(`/${mediaType}/${tmdbId}/credits`)
 }
 
+/** A single credit entry from /person/{id}/combined_credits */
+export interface TMDbCombinedCredit {
+  id: number
+  media_type: 'tv' | 'movie'
+  title?: string // movies
+  name?: string // tv
+  release_date?: string // movies
+  first_air_date?: string // tv
+  character?: string // cast entries
+  job?: string // crew entries
+  department?: string
+  poster_path?: string | null
+  popularity?: number
+  vote_average?: number
+  vote_count?: number
+  episode_count?: number // tv entries
+}
+
+/** Person details with combined credits appended */
+export interface TMDbPersonDetails {
+  id: number
+  name: string
+  biography: string | null
+  birthday: string | null
+  deathday: string | null
+  place_of_birth: string | null
+  known_for_department: string | null
+  profile_path: string | null
+  combined_credits?: {
+    cast: TMDbCombinedCredit[]
+    crew: TMDbCombinedCredit[]
+  }
+}
+
+/** Get person details with combined credits in one request */
+export async function getPersonDetails(tmdbId: number) {
+  return tmdbFetch<TMDbPersonDetails>(`/person/${tmdbId}`, {
+    append_to_response: 'combined_credits',
+  })
+}
+
 /** Get poster/image URL */
 export function getImageUrl(path: string | null, size: 'w92' | 'w154' | 'w185' | 'w342' | 'w500' | 'w780' | 'original' = 'w342'): string | null {
   if (!path) return null
