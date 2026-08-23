@@ -1,0 +1,328 @@
+// ─── Full Person Credits — all movie/TV credits with media filter ───
+
+import { useCallback, useMemo, useState } from 'react'
+import {
+  View,
+  Text,
+  Pressable,
+  StyleSheet,
+  FlatList,
+  ActivityIndicator,
+} from 'react-native'
+import { useLocalSearchParams, router, Stack } from 'expo-router'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import { Image } from 'expo-image'
+import { Ionicons } from '@expo/vector-icons'
+import * as Haptics from 'expo-haptics'
+import { usePerson, dedupeCredits } from '@/lib/queries/people'
+import { getImageUrl } from '@/lib/tmdb'
+import type { TMDbCombinedCredit } from '@/lib/tmdb'
+import { typography, spacing, borderRadius } from '@/theme'
+import { useTheme } from '@/contexts/ThemeContext'
+
+type CreditFilter = 'all' | 'movie' | 'tv'
+
+const FILTER_SEGMENTS: { key: CreditFilter; label: string }[] = [
+  { key: 'all', label: 'All' },
+  { key: 'movie', label: 'Movies' },
+  { key: 'tv', label: 'TV' },
+]
+
+function creditYear(credit: TMDbCombinedCredit): string {
+  const date = credit.release_date ?? credit.first_air_date ?? ''
+  return date.slice(0, 4)
+}
+
+export default function PersonCreditsScreen() {
+  const { id } = useLocalSearchParams<{ id: string }>()
+  const insets = useSafeAreaInsets()
+  const { colors } = useTheme()
+
+  const [filter, setFilter] = useState<CreditFilter>('all')
+
+  const personId = /^\d+$/.test(id) ? parseInt(id, 10) : null
+  const isValidId = personId != null
+
+  // Same cached query as the bio screen — no extra fetch.
+  const { data: person, isLoading } = usePerson(isValidId ? personId : undefined)
+
+  const styles = useMemo(
+    () =>
+      StyleSheet.create({
+        container: {
+          flex: 1,
+          backgroundColor: colors.surface,
+        },
+        centered: {
+          justifyContent: 'center',
+          alignItems: 'center',
+        },
+        errorText: {
+          fontSize: typography.bodyMd.fontSize,
+          color: colors.onSurfaceVariant,
+          marginTop: 12,
+          marginBottom: 16,
+        },
+        goBackButton: {
+          paddingHorizontal: 20,
+          paddingVertical: 10,
+          backgroundColor: colors.surfaceContainer,
+          borderRadius: borderRadius.md,
+          borderWidth: 1,
+          borderColor: colors.outlineVariant,
+        },
+        goBackText: {
+          color: colors.primary,
+          fontSize: typography.bodySm.fontSize,
+          fontWeight: '600',
+        },
+
+        // ── Header ──
+        header: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: 8,
+          paddingHorizontal: spacing.marginMobile,
+          paddingBottom: 12,
+        },
+        headerBackButton: {
+          width: 36,
+          height: 36,
+          borderRadius: borderRadius.full,
+          justifyContent: 'center',
+          alignItems: 'center',
+          marginLeft: -8,
+        },
+        headerTitle: {
+          fontFamily: 'Inter',
+          fontSize: typography.headlineSm.fontSize,
+          fontWeight: '700',
+          lineHeight: typography.headlineSm.lineHeight,
+          color: colors.onSurface,
+        },
+
+        // ── Segmented filter (pill track) ──
+        track: {
+          flexDirection: 'row',
+          marginHorizontal: spacing.marginMobile,
+          marginBottom: spacing.stackSm,
+          padding: 3,
+          borderRadius: borderRadius.full,
+          backgroundColor: colors.surfaceContainerHighest,
+        },
+        segment: {
+          flex: 1,
+          paddingVertical: 7,
+          borderRadius: borderRadius.full,
+          alignItems: 'center',
+        },
+        segmentActive: {
+          backgroundColor: colors.primary,
+        },
+        segmentText: {
+          fontFamily: 'Inter',
+          fontSize: typography.labelMd.fontSize,
+          fontWeight: '600',
+          lineHeight: typography.labelMd.lineHeight,
+          color: colors.onSurfaceVariant,
+        },
+        segmentTextActive: {
+          color: colors.onPrimary,
+        },
+
+        // ── List ──
+        list: {
+          flex: 1,
+        },
+        listContent: {
+          paddingHorizontal: spacing.marginMobile,
+          paddingBottom: 40,
+        },
+        row: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: 12,
+          paddingVertical: 8,
+        },
+        posterThumb: {
+          width: 40,
+          height: 60,
+          borderRadius: borderRadius.sm,
+          backgroundColor: colors.surfaceContainer,
+        },
+        posterPlaceholder: {
+          justifyContent: 'center',
+          alignItems: 'center',
+        },
+        rowTextColumn: {
+          flex: 1,
+          gap: 2,
+        },
+        rowTitle: {
+          fontFamily: 'Inter',
+          fontSize: typography.bodySm.fontSize,
+          fontWeight: '600',
+          lineHeight: typography.bodySm.lineHeight,
+          color: colors.onSurface,
+        },
+        rowSubLine: {
+          fontFamily: 'Inter',
+          fontSize: typography.bodyXs.fontSize,
+          fontWeight: '400',
+          lineHeight: typography.bodyXs.lineHeight,
+          color: colors.onSurfaceVariant,
+        },
+        rowYear: {
+          fontFamily: 'Inter',
+          fontSize: typography.bodyXs.fontSize,
+          fontWeight: '500',
+          color: colors.onSurfaceVariant,
+        },
+        emptyText: {
+          fontSize: typography.bodyMd.fontSize,
+          color: colors.onSurfaceVariant,
+          textAlign: 'center',
+          paddingTop: 48,
+        },
+      }),
+    [colors],
+  )
+
+  const credits = useMemo(() => {
+    const all = dedupeCredits(person)
+    const filtered = filter === 'all' ? all : all.filter((c) => c.media_type === filter)
+    return [...filtered].sort((a, b) => {
+      const ya = a.release_date ?? a.first_air_date ?? ''
+      const yb = b.release_date ?? b.first_air_date ?? ''
+      return yb.localeCompare(ya)
+    })
+  }, [person, filter])
+
+  const handleBack = useCallback(() => {
+    router.back()
+  }, [])
+
+  const renderItem = useCallback(
+    ({ item }: { item: TMDbCombinedCredit }) => {
+      const title = item.title ?? item.name ?? 'Unknown'
+      const year = creditYear(item)
+      const subLine =
+        item.character?.trim() || item.job?.trim() || (year || null)
+      const posterUrl = getImageUrl(item.poster_path ?? null, 'w92')
+      return (
+        <View style={styles.row}>
+          {posterUrl ? (
+            <Image
+              source={{ uri: posterUrl }}
+              style={styles.posterThumb}
+              contentFit="cover"
+              cachePolicy="memory-disk"
+            />
+          ) : (
+            <View style={[styles.posterThumb, styles.posterPlaceholder]}>
+              <Ionicons
+                name={item.media_type === 'tv' ? 'tv-outline' : 'film-outline'}
+                size={18}
+                color={colors.outlineVariant}
+              />
+            </View>
+          )}
+          <View style={styles.rowTextColumn}>
+            <Text style={styles.rowTitle} numberOfLines={1}>
+              {title}
+            </Text>
+            {subLine ? (
+              <Text style={styles.rowSubLine} numberOfLines={1}>
+                {subLine}
+              </Text>
+            ) : null}
+          </View>
+          {year ? <Text style={styles.rowYear}>{year}</Text> : null}
+        </View>
+      )
+    },
+    [styles, colors.outlineVariant],
+  )
+
+  // ── Invalid id ──
+  if (!isValidId) {
+    return (
+      <View style={[styles.container, styles.centered, { paddingTop: insets.top }]}>
+        <Stack.Screen options={{ headerShown: false }} />
+        <Ionicons name="alert-circle-outline" size={48} color={colors.onSurfaceVariant} />
+        <Text style={styles.errorText}>Could not load person credits</Text>
+        <Pressable onPress={handleBack} style={styles.goBackButton}>
+          <Text style={styles.goBackText}>Go back</Text>
+        </Pressable>
+      </View>
+    )
+  }
+
+  // ── Loading ──
+  if (isLoading || !person) {
+    return (
+      <View style={[styles.container, styles.centered, { paddingTop: insets.top }]}>
+        <Stack.Screen options={{ headerShown: false }} />
+        <ActivityIndicator size="large" color={colors.primary} />
+      </View>
+    )
+  }
+
+  return (
+    <View style={[styles.container, { paddingTop: insets.top }]}>
+      <Stack.Screen options={{ headerShown: false }} />
+
+      {/* ── Header bar ── */}
+      <View style={styles.header}>
+        <Pressable
+          onPress={handleBack}
+          style={styles.headerBackButton}
+          accessibilityRole="button"
+          accessibilityLabel="Go back"
+        >
+          <Ionicons name="chevron-back" size={24} color={colors.primary} />
+        </Pressable>
+        <Text style={styles.headerTitle}>All Credits</Text>
+      </View>
+
+      {/* ── Segmented filter ── */}
+      <View style={styles.track}>
+        {FILTER_SEGMENTS.map((segment) => {
+          const isActive = segment.key === filter
+          return (
+            <Pressable
+              key={segment.key}
+              style={[styles.segment, isActive && styles.segmentActive]}
+              onPress={() => {
+                if (!isActive) {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
+                  setFilter(segment.key)
+                }
+              }}
+              accessibilityRole="tab"
+              accessibilityState={{ selected: isActive }}
+            >
+              <Text style={[styles.segmentText, isActive && styles.segmentTextActive]}>
+                {segment.label}
+              </Text>
+            </Pressable>
+          )
+        })}
+      </View>
+
+      {/* ── Credits list ── */}
+      <FlatList
+        style={styles.list}
+        contentContainerStyle={styles.listContent}
+        data={credits}
+        keyExtractor={(c) => `${c.media_type}-${c.id}`}
+        renderItem={renderItem}
+        showsVerticalScrollIndicator={false}
+        initialNumToRender={20}
+        ListEmptyComponent={
+          <Text style={styles.emptyText}>No credits found</Text>
+        }
+      />
+    </View>
+  )
+}
