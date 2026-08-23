@@ -21,11 +21,19 @@ import { typography, spacing, borderRadius } from '@/theme'
 import { useTheme } from '@/contexts/ThemeContext'
 
 type CreditFilter = 'all' | 'movie' | 'tv'
+type CreditSort = 'newest' | 'oldest' | 'popular' | 'az'
 
 const FILTER_SEGMENTS: { key: CreditFilter; label: string }[] = [
   { key: 'all', label: 'All' },
   { key: 'movie', label: 'Movies' },
   { key: 'tv', label: 'TV' },
+]
+
+const SORT_OPTIONS: { key: CreditSort; label: string }[] = [
+  { key: 'newest', label: 'Newest' },
+  { key: 'oldest', label: 'Oldest' },
+  { key: 'popular', label: 'Popular' },
+  { key: 'az', label: 'A–Z' },
 ]
 
 function creditYear(credit: TMDbCombinedCredit): string {
@@ -39,6 +47,7 @@ export default function PersonCreditsScreen() {
   const { colors } = useTheme()
 
   const [filter, setFilter] = useState<CreditFilter>('all')
+  const [sort, setSort] = useState<CreditSort>('newest')
 
   const personId = /^\d+$/.test(id) ? parseInt(id, 10) : null
   const isValidId = personId != null
@@ -130,6 +139,36 @@ export default function PersonCreditsScreen() {
           color: colors.onPrimary,
         },
 
+        // ── Sort chips ──
+        sortRow: {
+          flexDirection: 'row',
+          gap: spacing.stackSm,
+          marginHorizontal: spacing.marginMobile,
+          marginBottom: spacing.stackMd,
+        },
+        sortChip: {
+          paddingHorizontal: 14,
+          paddingVertical: 6,
+          borderRadius: borderRadius.full,
+          backgroundColor: colors.surfaceContainerHighest,
+          borderWidth: 1,
+          borderColor: colors.outlineVariant,
+        },
+        sortChipActive: {
+          backgroundColor: colors.primary,
+          borderColor: colors.primary,
+        },
+        sortChipText: {
+          fontFamily: 'Inter',
+          fontSize: typography.labelSm.fontSize,
+          fontWeight: '600',
+          lineHeight: typography.labelSm.lineHeight,
+          color: colors.onSurfaceVariant,
+        },
+        sortChipTextActive: {
+          color: colors.onPrimary,
+        },
+
         // ── List ──
         list: {
           flex: 1,
@@ -143,6 +182,9 @@ export default function PersonCreditsScreen() {
           alignItems: 'center',
           gap: 12,
           paddingVertical: 8,
+        },
+        rowPressed: {
+          opacity: 0.6,
         },
         posterThumb: {
           width: 40,
@@ -191,12 +233,23 @@ export default function PersonCreditsScreen() {
   const credits = useMemo(() => {
     const all = dedupeCredits(person)
     const filtered = filter === 'all' ? all : all.filter((c) => c.media_type === filter)
+    const titleOf = (c: TMDbCombinedCredit) => (c.title ?? c.name ?? '').toLowerCase()
     return [...filtered].sort((a, b) => {
       const ya = a.release_date ?? a.first_air_date ?? ''
       const yb = b.release_date ?? b.first_air_date ?? ''
-      return yb.localeCompare(ya)
+      switch (sort) {
+        case 'oldest':
+          return ya.localeCompare(yb) || titleOf(a).localeCompare(titleOf(b))
+        case 'popular':
+          return (b.popularity ?? 0) - (a.popularity ?? 0) || yb.localeCompare(ya)
+        case 'az':
+          return titleOf(a).localeCompare(titleOf(b))
+        case 'newest':
+        default:
+          return yb.localeCompare(ya) || titleOf(a).localeCompare(titleOf(b))
+      }
     })
-  }, [person, filter])
+  }, [person, filter, sort])
 
   const handleBack = useCallback(() => {
     router.back()
@@ -209,7 +262,15 @@ export default function PersonCreditsScreen() {
       const subLine = item.character?.trim() || item.job?.trim() || null
       const posterUrl = getImageUrl(item.poster_path ?? null, 'w92')
       return (
-        <View style={styles.row}>
+        <Pressable
+          style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
+          onPress={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
+            router.push(item.media_type === 'tv' ? `/show/${item.id}` : `/movie/${item.id}`)
+          }}
+          accessibilityRole="button"
+          accessibilityLabel={`${title}${year ? ` (${year})` : ''}`}
+        >
           {posterUrl ? (
             <Image
               source={{ uri: posterUrl }}
@@ -237,7 +298,7 @@ export default function PersonCreditsScreen() {
             ) : null}
           </View>
           {year ? <Text style={styles.rowYear}>{year}</Text> : null}
-        </View>
+        </Pressable>
       )
     },
     [styles, colors.outlineVariant],
@@ -303,6 +364,31 @@ export default function PersonCreditsScreen() {
             >
               <Text style={[styles.segmentText, isActive && styles.segmentTextActive]}>
                 {segment.label}
+              </Text>
+            </Pressable>
+          )
+        })}
+      </View>
+
+      {/* ── Sort chips ── */}
+      <View style={styles.sortRow}>
+        {SORT_OPTIONS.map((option) => {
+          const isActive = option.key === sort
+          return (
+            <Pressable
+              key={option.key}
+              style={[styles.sortChip, isActive && styles.sortChipActive]}
+              onPress={() => {
+                if (!isActive) {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
+                  setSort(option.key)
+                }
+              }}
+              accessibilityRole="button"
+              accessibilityState={{ selected: isActive }}
+            >
+              <Text style={[styles.sortChipText, isActive && styles.sortChipTextActive]}>
+                {option.label}
               </Text>
             </Pressable>
           )

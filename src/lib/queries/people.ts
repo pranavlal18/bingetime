@@ -31,13 +31,26 @@ export function dedupeCredits(person: TMDbPersonDetails | undefined): TMDbCombin
   return Array.from(byId.values())
 }
 
-/** Top-n most popular credited titles that have a poster — the "Known For" row. */
+/**
+ * Talk-show / reality-show "appearance" credits — actors guesting as themselves
+ * on Tonight Show-style programs. These pollute the Known For row and are
+ * almost always credited with a self/guest/host variant character name.
+ */
+const SELF_APPEARANCE_RE =
+  /^\s*(self|guest|guest star|guest appearance|host|co-host|herself|himself|themselves)\b/i
+
+export function isSelfAppearance(credit: TMDbCombinedCredit): boolean {
+  const role = credit.character?.trim() ?? ''
+  return role.length > 0 && SELF_APPEARANCE_RE.test(role)
+}
+
+/** Top-n most popular SCRIPTED credited titles that have a poster — the "Known For" row. */
 export function topKnownFor(
   person: TMDbPersonDetails | undefined,
   n = 8
 ): TMDbCombinedCredit[] {
   return dedupeCredits(person)
-    .filter((c) => !!c.poster_path && c.popularity != null)
+    .filter((c) => !!c.poster_path && c.popularity != null && !isSelfAppearance(c))
     .sort((a, b) => (b.popularity ?? 0) - (a.popularity ?? 0))
     .slice(0, n)
 }

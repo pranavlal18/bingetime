@@ -120,6 +120,9 @@ export interface TMDbCombinedCredit {
   department?: string
   poster_path?: string | null
   popularity?: number
+  vote_average?: number
+  vote_count?: number
+  episode_count?: number // tv entries
 }
 
 /** Person details with combined credits appended */
