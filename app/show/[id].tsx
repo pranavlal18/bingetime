@@ -25,6 +25,9 @@ import FavoriteToggle from '@/components/ui/FavoriteToggle'
 import { typography, spacing, borderRadius } from '@/theme'
 import { useTheme } from '@/contexts/ThemeContext'
 import EpisodeDetailModal from '@/components/episodes/EpisodeDetailModal'
+import DetailTabs, { type DetailTabKey } from '@/components/detail/DetailTabs'
+import CastRow from '@/components/detail/CastRow'
+import { useTitleCredits } from '@/lib/queries/credits'
 
 import { isAired, getDaysUntilAiring, isNew, formatRuntime } from '@/utils'
 import type { EpisodeWithStatus } from '@/lib/queries/episodes'
@@ -179,7 +182,7 @@ export default function ShowDetailScreen() {
         },
         posterOverlay: {
           position: 'absolute',
-          bottom: -POSTER_H * 0.3,
+          bottom: -14,
           right: spacing.marginMobile,
           width: POSTER_W,
           height: POSTER_H,
@@ -271,7 +274,16 @@ export default function ShowDetailScreen() {
         // Content body
         contentBody: {
           paddingHorizontal: spacing.marginMobile,
-          marginTop: POSTER_H * 0.3 - 8,
+          marginTop: spacing.stackMd,
+        },
+
+        // Sticky tab bar wrapper — opaque bg so episode rows scroll underneath
+        tabsSticky: {
+          backgroundColor: colors.surface,
+          paddingTop: spacing.stackSm,
+          paddingBottom: spacing.unit,
+          zIndex: 10,
+          elevation: 10,
         },
 
         // Synopsis
@@ -323,6 +335,20 @@ export default function ShowDetailScreen() {
           fontWeight: '500',
           lineHeight: typography.bodyMd.lineHeight,
           color: colors.onSurface,
+        },
+        statusPill: {
+          alignSelf: 'flex-start',
+          paddingHorizontal: 10,
+          paddingVertical: 3,
+          borderRadius: borderRadius.full,
+          backgroundColor: colors.surfaceContainerHighest,
+        },
+        statusPillText: {
+          fontFamily: 'Inter',
+          fontSize: typography.labelSm.fontSize,
+          fontWeight: '600',
+          lineHeight: typography.labelSm.lineHeight,
+          color: colors.onSurfaceVariant,
         },
 
         // Season selector
@@ -547,6 +573,8 @@ export default function ShowDetailScreen() {
     staleTime: 1000 * 60 * 60,
   })
 
+  const { data: credits, isLoading: castLoading } = useTitleCredits(resolvedTmdbId, 'tv')
+
   // Calculate average runtime from TMDb episode_run_time (minutes) -> convert to seconds
   const tmdbAverageRuntime = tmdbDetails?.episode_run_time && tmdbDetails.episode_run_time.length > 0
     ? Math.round((tmdbDetails.episode_run_time.reduce((a, b) => a + b, 0) / tmdbDetails.episode_run_time.length) * 60)
@@ -610,6 +638,10 @@ export default function ShowDetailScreen() {
         : 'Not Started'
 
   // ── State ──
+  // ── Tab state: derived default (watching → Episodes, otherwise Details), tap overrides ──
+  const [selectedTab, setSelectedTab] = useState<DetailTabKey | null>(null)
+  const activeTab: DetailTabKey =
+    selectedTab ?? ((show?.episodes_seen ?? 0) > 0 ? 'episodes' : 'details')
   const [selectedSeasonNumber, setSelectedSeasonNumber] = useState<number | null>(null)
   const [selectedEpisode, setSelectedEpisode] = useState<EpisodeWithStatus | null>(null)
   const [showEpisodeModal, setShowEpisodeModal] = useState(false)
@@ -758,6 +790,7 @@ export default function ShowDetailScreen() {
       <ScrollView
         ref={scrollRef}
         style={styles.scroll}
+        stickyHeaderIndices={[1]}
         contentContainerStyle={{
           paddingBottom: insets.bottom + 40,
         }}
@@ -869,49 +902,79 @@ export default function ShowDetailScreen() {
           )}
         </View>
 
+        {/* ── Sticky Details / Episodes tabs ── */}
+        <View style={styles.tabsSticky}>
+          <DetailTabs
+            tabs={[
+              { key: 'details', label: 'Details' },
+              { key: 'episodes', label: 'Episodes' },
+            ]}
+            active={activeTab}
+            onChange={(key) => setSelectedTab(key)}
+          />
+        </View>
+
         {/* ── Content Body ── */}
         <View style={styles.contentBody}>
-          {/* Synopsis */}
-          <View style={styles.synopsisSection}>
-            <Text style={styles.sectionLabel}>Synopsis</Text>
-            <Text style={styles.synopsisText}>{overview}</Text>
-          </View>
-
-          {/* Details */}
-          {((tmdbDetails?.networks && tmdbDetails.networks.length > 0) ||
-            (tmdbDetails?.genres && tmdbDetails.genres.length > 0) ||
-            averageRuntime) && (
-            <View style={styles.detailsSection}>
-              <Text style={styles.sectionLabel}>Details</Text>
-              <View style={styles.detailsGrid}>
-                {tmdbDetails?.networks && tmdbDetails.networks.length > 0 && (
-                  <View style={styles.detailItem}>
-                    <Text style={styles.detailLabel}>Network</Text>
-                    <Text style={styles.detailValue}>
-                      {tmdbDetails.networks.map((n) => n.name).join(', ')}
-                    </Text>
-                  </View>
-                )}
-                {tmdbDetails?.genres && tmdbDetails.genres.length > 0 && (
-                  <View style={styles.detailItem}>
-                    <Text style={styles.detailLabel}>Genres</Text>
-                    <Text style={styles.detailValue}>
-                      {tmdbDetails.genres.map((g) => g.name).join(', ')}
-                    </Text>
-                  </View>
-                )}
-                {averageRuntime && (
-                  <View style={styles.detailItem}>
-                    <Text style={styles.detailLabel}>Avg. Runtime</Text>
-                    <Text style={styles.detailValue}>
-                      {formatRuntime(averageRuntime)}
-                    </Text>
-                  </View>
-                )}
+          {activeTab === 'details' ? (
+            <>
+              {/* Synopsis */}
+              <View style={styles.synopsisSection}>
+                <Text style={styles.sectionLabel}>Synopsis</Text>
+                <Text style={styles.synopsisText}>{overview}</Text>
               </View>
-            </View>
-          )}
 
+              {/* Details */}
+              {((tmdbDetails?.networks && tmdbDetails.networks.length > 0) ||
+                (tmdbDetails?.genres && tmdbDetails.genres.length > 0) ||
+                averageRuntime ||
+                tmdbDetails?.status) && (
+                <View style={styles.detailsSection}>
+                  <Text style={styles.sectionLabel}>Details</Text>
+                  <View style={styles.detailsGrid}>
+                    {tmdbDetails?.status && (
+                      <View style={styles.detailItem}>
+                        <Text style={styles.detailLabel}>Status</Text>
+                        <View style={styles.statusPill}>
+                          <Text style={styles.statusPillText} numberOfLines={1}>
+                            {tmdbDetails.status}
+                          </Text>
+                        </View>
+                      </View>
+                    )}
+                    {tmdbDetails?.networks && tmdbDetails.networks.length > 0 && (
+                      <View style={styles.detailItem}>
+                        <Text style={styles.detailLabel}>Network</Text>
+                        <Text style={styles.detailValue}>
+                          {tmdbDetails.networks.map((n) => n.name).join(', ')}
+                        </Text>
+                      </View>
+                    )}
+                    {tmdbDetails?.genres && tmdbDetails.genres.length > 0 && (
+                      <View style={styles.detailItem}>
+                        <Text style={styles.detailLabel}>Genres</Text>
+                        <Text style={styles.detailValue}>
+                          {tmdbDetails.genres.map((g) => g.name).join(', ')}
+                        </Text>
+                      </View>
+                    )}
+                    {averageRuntime && (
+                      <View style={styles.detailItem}>
+                        <Text style={styles.detailLabel}>Avg. Runtime</Text>
+                        <Text style={styles.detailValue}>
+                          {formatRuntime(averageRuntime)}
+                        </Text>
+                      </View>
+                    )}
+                  </View>
+                </View>
+              )}
+
+              {/* Cast */}
+              <CastRow cast={credits?.cast} isLoading={castLoading} />
+            </>
+          ) : (
+            <>
           {/* Season Tabs */}
           {seasons.length > 0 && (
             <ScrollView
@@ -1075,6 +1138,8 @@ export default function ShowDetailScreen() {
                 })}
               </View>
             </View>
+          )}
+            </>
           )}
         </View>
       </ScrollView>
