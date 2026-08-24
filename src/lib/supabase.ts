@@ -1,6 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import Constants from 'expo-constants'
-import AsyncStorage from '@react-native-async-storage/async-storage'
+import { mmkvAsyncStorage } from './mmkv'
 
 // Supabase credentials — set these in your .env or use expo-constants
 // For local dev, you can hardcode them temporarily (never commit)
@@ -9,7 +9,9 @@ const supabaseAnonKey = Constants.expoConfig?.extra?.supabaseAnonKey ?? process.
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
-    storage: AsyncStorage,
+    // MMKV-backed (sync reads on cold start); mmkvAsyncStorage falls back to
+    // AsyncStorage on web/Expo Go.
+    storage: mmkvAsyncStorage,
     autoRefreshToken: true,
     persistSession: true,
     detectSessionInUrl: false,

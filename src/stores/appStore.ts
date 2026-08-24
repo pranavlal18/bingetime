@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
-import AsyncStorage from '@react-native-async-storage/async-storage'
+import { mmkvAsyncStorage } from '@/lib/mmkv'
 import type { AppSettings, ViewMode, ThemeKey } from '@/types'
 
 interface AppState extends AppSettings {
@@ -35,7 +35,9 @@ export const useAppStore = create<AppState>()(
     }),
     {
       name: 'bingetime-settings',
-      storage: createJSONStorage(() => AsyncStorage),
+      // MMKV-backed (sync reads, ~30x faster than AsyncStorage). The async
+      // adapter also lazy-migrates legacy AsyncStorage values on first read.
+      storage: createJSONStorage(() => mmkvAsyncStorage),
     }
   )
 )

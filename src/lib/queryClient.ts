@@ -1,7 +1,6 @@
 import { QueryClient } from '@tanstack/react-query'
 import { createAsyncStoragePersister } from '@tanstack/query-async-storage-persister'
-import AsyncStorage from '@react-native-async-storage/async-storage'
-import { mmkvStorage } from './mmkv'
+import { mmkvAsyncStorage } from './mmkv'
 
 export const queryClient = new QueryClient({
   defaultOptions: {
@@ -14,15 +13,10 @@ export const queryClient = new QueryClient({
   },
 })
 
-// Legacy AsyncStorage persister (kept for migration / fallback)
-export const asyncStoragePersister = createAsyncStoragePersister({
-  storage: AsyncStorage,
-  throttleTime: 3000,
-})
-
-// MMKV persister — sync, ~30MB limit, fast. Used for reliable caching.
+// MMKV persister — sync reads, ~30MB limit, fast. The async adapter lazily
+// migrates legacy AsyncStorage cache on first read.
 export const mmkvPersister = createAsyncStoragePersister({
-  storage: mmkvStorage as any,
+  storage: mmkvAsyncStorage,
   throttleTime: 1000,
 })
 

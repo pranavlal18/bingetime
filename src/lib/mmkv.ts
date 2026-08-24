@@ -33,14 +33,29 @@ export const mmkvStorage = {
   },
 }
 
-// Async version for explicit calls (web compatible)
+// Async version for explicit calls (web compatible). On native, a MMKV miss
+// transparently falls back to AsyncStorage and copies the value into MMKV —
+// a zero-config one-time migration for settings, query cache, and Supabase
+// session keys written by older app versions.
 export const mmkvAsyncStorage = {
   setItem: async (key: string, value: string) => {
     if (mmkvInstance) mmkvInstance.set(key, value)
     else await AsyncStorage.setItem(key, value)
   },
   getItem: async (key: string) => {
-    if (mmkvInstance) return mmkvInstance.getString(key) ?? null
+    if (mmkvInstance) {
+      const v = mmkvInstance.getString(key)
+      if (v != null) return v
+      // Lazy migration from legacy AsyncStorage
+      try {
+        const legacy = await AsyncStorage.getItem(key)
+        if (legacy != null) {
+          mmkvInstance.set(key, legacy)
+          return legacy
+        }
+      } catch {}
+      return null
+    }
     return AsyncStorage.getItem(key)
   },
   removeItem: async (key: string) => {
