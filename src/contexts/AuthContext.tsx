@@ -6,6 +6,7 @@ import { Session, User, AuthError } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 import { queryClient } from '@/lib/queryClient'
 import AsyncStorage from '@react-native-async-storage/async-storage'
+import { mmkv } from '@/lib/mmkv'
 
 interface AuthContextType {
   user: User | null
@@ -72,6 +73,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signOut = async () => {
     queryClient.clear()
     await AsyncStorage.removeItem('REACT_QUERY_OFFLINE_CACHE')
+    try {
+      mmkv?.delete('REACT_QUERY_OFFLINE_CACHE')
+    } catch {}
     await supabase.auth.signOut()
   }
 

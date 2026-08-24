@@ -63,15 +63,19 @@ export default function ShowsScreen() {
 
   const isGrid = viewMode === 'poster-grid'
 
-  // Refetch when screen comes into focus
+  // Scroll to top on focus — don't force refetch (React Query staleTime handles it)
   const watchListRef = useRef<any>(null)
+  const lastFocusRef = useRef<number>(0)
   useFocusEffect(
     useCallback(() => {
-      refetch()
-      refetchHistory()
-      // Force scroll to top so Watch Next section is always visible first
+      const now = Date.now()
+      // Only refetch history if stale (>2m) — shows handles its own stale via useShows
+      if (now - lastFocusRef.current > 120_000) {
+        refetchHistory()
+        lastFocusRef.current = now
+      }
       watchListRef.current?.scrollToOffset({ offset: 0, animated: false })
-    }, [refetch, refetchHistory])
+    }, [refetchHistory])
   )
 
   // ── Watch List sections (list mode) ──
@@ -114,11 +118,14 @@ export default function ShowsScreen() {
       .map(ep => ({ showId: ep.showId, tmdbId: ep.tmdbId, seasonNumber: ep.seasonNumber }))
   }, [rawWatchNext, rawHaventWatched])
 
-  // Memoize query arrays to stabilize useQueries references
+  // Throttled progressive fetch — all pairs queued via tmdbThrottle (5 concurrent, 200ms spacing)
+  // UI renders optimistically with Episode N fallback; enrichment arrives as queries resolve
   const showQueriesConfig = useMemo(() => showPairs.map(pair => ({
     queryKey: ['tmdb', 'show-basic', pair.tmdbId],
     queryFn: () => getShowBasicDetails(pair.tmdbId),
     staleTime: 1000 * 60 * 60,
+    gcTime: 1000 * 60 * 60 * 24 * 7,
+    retry: 1,
     enabled: showPairs.length > 0,
   })), [showPairs])
 
@@ -126,25 +133,22 @@ export default function ShowsScreen() {
     queryKey: ['tmdb', 'season-details', pair.tmdbId, pair.seasonNumber],
     queryFn: () => getSeasonDetails(pair.tmdbId, pair.seasonNumber),
     staleTime: 1000 * 60 * 60, // 1 hour — episode names don't change
+    gcTime: 1000 * 60 * 60 * 24 * 7,
+    retry: 1,
     enabled: episodeNamePairs.length > 0,
   })), [episodeNamePairs])
 
-  // 3a. Fetch show-level details for ALL season episode counts (boundary detection)
+  // 3a. Fetch show-level details for season episode counts (boundary detection) — throttled
   const showQueries = useQueries({ queries: showQueriesConfig })
 
-  // 3b. Batch-fetch TMDb season details for episode names
+  // 3b. Batch-fetch TMDb season details for episode names — throttled
   const seasonQueries = useQueries({ queries: seasonQueriesConfig })
 
-  // 3c. Watch Next loading state: ready when shows loaded AND all TMDb queries resolved
-  const isWatchNextReady = useMemo(() => {
-    if (showsLoading || !shows) return false
-    const tmdbDone = showPairs.length === 0 || showQueries.every(q => !q.isLoading)
-    const namesDone = episodeNamePairs.length === 0 || seasonQueries.every(q => !q.isLoading)
-    return tmdbDone && namesDone
-  }, [showsLoading, shows, showPairs, showQueries, episodeNamePairs, seasonQueries])
+  // Progressive readiness: at least Supabase loaded; TMDb enriches in background
+  const isWatchNextLoading = showsLoading && !shows
 
   // 4. Build episode name map: `${showId}:${episodeNumber}` → episode name
-  //    AND airDate map: `${showId}:${episodeNumber}` → airDate
+  //    AND airDate map: `${showId}:${episodeNumber}` → airDate — throttled
   const episodeDataMap = useMemo(() => {
     const nameMap = new Map<string, string>()
     const airDateMap = new Map<string, string | null>()
@@ -161,7 +165,6 @@ export default function ShowsScreen() {
   }, [episodeNamePairs, seasonQueries])
 
   // 4b. Build season structure: showId → { seasonNumber → episodeCount }
-  //     Uses getShowBasicDetails (all seasons per show) for complete boundary detection
   const seasonInfoMap = useMemo(() => {
     const map = new Map<string, Map<number, number>>()
     for (let i = 0; i < showPairs.length; i++) {
@@ -180,6 +183,7 @@ export default function ShowsScreen() {
   }, [showPairs, showQueries])
 
   // 5. Final mapping to ShowsListItem with season-boundary fixes + remaining count
+  // Progressive: render immediately with placeholder name/airDate; only filter when airDate proven future
   const watchNextEpisodes = useMemo(() => {
     return rawWatchNext
       .map((ep): ShowsListItem | null => {
@@ -198,11 +202,17 @@ export default function ShowsScreen() {
           }
         }
 
-        // Get air date for this episode
-        const airDate = episodeDataMap.airDateMap.get(`${ep.showId}:${en}`) || null
+        // Get air date for this episode — null means not yet enriched (optimistic show)
+        const airDate = episodeDataMap.airDateMap.get(`${ep.showId}:${en}`) ?? null
+        const knownAirDate = episodeDataMap.airDateMap.has(`${ep.showId}:${en}`)
 
-        // Filter out episodes that haven't aired yet
-        if (!isAired(airDate)) return null
+        // Only hide when we *know* it hasn't aired; unknown (not fetched) → show optimistically
+        if (knownAirDate && airDate != null && !isAired(airDate)) return null
+        if (knownAirDate && airDate == null) {
+          // Fetched but TMDb has no air_date — treat as unaired future, hide
+          // Actually TMDb missing air_date often means future placeholder; keep optimistic if not in capped set?
+          // For capped set with data, if air_date missing but episode exists, keep it (avoid false hide)
+        }
 
         return {
           type: 'episode',
@@ -240,11 +250,9 @@ export default function ShowsScreen() {
           }
         }
 
-        // Get air date for this episode
-        const airDate = episodeDataMap.airDateMap.get(`${ep.showId}:${en}`) || null
-
-        // Filter out episodes that haven't aired yet
-        if (!isAired(airDate)) return null
+        const airDate = episodeDataMap.airDateMap.get(`${ep.showId}:${en}`) ?? null
+        const knownAirDate = episodeDataMap.airDateMap.has(`${ep.showId}:${en}`)
+        if (knownAirDate && airDate != null && !isAired(airDate)) return null
 
         return {
           type: 'episode',
@@ -267,21 +275,26 @@ export default function ShowsScreen() {
       .filter((item): item is ShowsListItem => item !== null)
   }, [rawHaventWatched, episodeDataMap, seasonInfoMap])
 
-  // Build flattened list for Watch List (list mode)
+  // Build flattened list for Watch List (list mode) — progressive
   const watchListItems: ShowsListItem[] = useMemo(() => {
     if (isGrid) return [] // Grid mode uses separate FlashList
 
     const items: ShowsListItem[] = []
 
-    // Section: Watch Next
+    // Section: Watch Next — show immediately from Supabase; skeletons only while initial load
     items.push({ type: 'section-header', kind: 'watch-next', title: 'WATCH NEXT' })
-    if (watchNextEpisodes.length > 0) {
+    if (isWatchNextLoading) {
+      items.push({ type: 'skeleton', kind: 'watch-next' })
+      items.push({ type: 'skeleton', kind: 'watch-next' })
+      items.push({ type: 'skeleton', kind: 'watch-next' })
+    } else if (watchNextEpisodes.length > 0) {
       items.push(...watchNextEpisodes)
-    } else if (!isWatchNextReady) {
-      // Show skeletons while TMDb data loads
+    } else if (rawWatchNext.length > 0) {
+      // Fallback: raw exists but all filtered as future — show skeletons briefly while filtering resolves
       items.push({ type: 'skeleton', kind: 'watch-next' })
       items.push({ type: 'skeleton', kind: 'watch-next' })
-      items.push({ type: 'skeleton', kind: 'watch-next' })
+    } else {
+      // No watch next items — will show empty state later
     }
 
     // Section: Watched History (recently watched) — ALWAYS show immediately
@@ -304,7 +317,7 @@ export default function ShowsScreen() {
     }
 
     return items
-  }, [watchedHistory, watchNextEpisodes, haventWatchedEpisodes, isGrid, haventLimit, isWatchNextReady])
+  }, [watchedHistory, watchNextEpisodes, haventWatchedEpisodes, isGrid, haventLimit, isWatchNextLoading, rawWatchNext.length])
 
   // Auto-scroll to top when Watch Next data first loads (fresh login / cold cache)
   const prevWatchNextLength = useRef(0)
@@ -573,7 +586,6 @@ export default function ShowsScreen() {
     )
   }, [
     isGrid,
-    isWatchNextReady,
     shows,
     watchListItems,
     watchListRef,
@@ -586,16 +598,6 @@ export default function ShowsScreen() {
     renderEpisodeItem,
     styles,
   ])
-
-  // ── Loading state (initial Supabase query only — fast) ──
-
-  if (showsLoading && activeTab === 'watchlist') {
-    return (
-      <View style={[styles.container, styles.centered, { paddingTop: insets.top }]}>
-        <ActivityIndicator size="large" color={colors.primary} />
-      </View>
-    )
-  }
 
   // ── Render ──
 

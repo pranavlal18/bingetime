@@ -1,0 +1,36 @@
+name: supabase-keepalive
+
+# Keeps free-tier Supabase from pausing after 7 days of inactivity.
+# Pings user_shows every 3 days — a real DB read counts as activity.
+# Manual run: Actions → supabase-keepalive → Run workflow
+
+on:
+  schedule:
+    - cron: '0 9 */3 * *' # 09:00 UTC every 3 days
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Supabase (DB read)
+        run: |
+          set -e
+          URL="${SUPABASE_URL}/rest/v1/user_shows?select=show_id&limit=1"
+          echo "Pinging ${SUPABASE_URL} ..."
+          # anon key is sent as header — value comes from repo secret, never logged
+          HTTP=$(curl -s -o /tmp/resp.json -w "%{http_code}" \
+            -H "apikey: ${SUPABASE_ANON_KEY}" \
+            -H "Authorization: Bearer ${SUPABASE_ANON_KEY}" \
+            "$URL")
+          echo "HTTP $HTTP"
+          cat /tmp/resp.json | head -c 200; echo ""
+          if [ "$HTTP" -ge 200 ] && [ "$HTTP" -lt 400 ]; then
+            echo "✓ keepalive ok"
+          else
+            echo "::error::keepalive failed HTTP $HTTP"
+            exit 1
+          fi
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}

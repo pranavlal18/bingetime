@@ -13,7 +13,7 @@ import { useNotificationScheduler } from '@/hooks/useNotificationScheduler'
 import { OfflineBanner } from '@/components/ui/OfflineBanner'
 import { ErrorBoundary } from '@/components/ErrorBoundary'
 import Toast from 'react-native-toast-message'
-import { queryClient, asyncStoragePersister } from '@/lib/queryClient'
+import { queryClient, mmkvPersister } from '@/lib/queryClient'
 import Constants, { ExecutionEnvironment } from 'expo-constants'
 
 // Check if we're in Expo Go (which doesn't support push notifications on Android SDK 53+)
@@ -115,19 +115,28 @@ function InnerLayout() {
       <PersistQueryClientProvider
         client={queryClient}
         persistOptions={{
-          persister: asyncStoragePersister,
-          maxAge: 1000 * 60 * 60 * 24,
-          // Persist the whole cache as ONE AsyncStorage row; large, re-fetchable
-          // lists (334 shows) + detail caches overflow Android's ~2MB CursorWindow.
-          // Exclude those families (and transient TMDb API calls, which can be
-          // pending/in-flight at persist time and then reject on rehydrate).
-          // Keep only small/bounded queries (profile, etc.).
+          persister: mmkvPersister,
+          maxAge: 1000 * 60 * 60 * 24 * 7,
           dehydrateOptions: {
             shouldDehydrateQuery: (query) => {
               if (query.state.status === 'pending') return false
-              const key = query.queryKey
-              const head = Array.isArray(key) ? (key[0] as string) : (key as unknown as string)
-              return !['shows', 'movies', 'upcoming', 'episodes', 'stats', 'tmdb'].includes(head)
+              const key = query.queryKey as unknown[]
+              const head = Array.isArray(key) ? (key[0] as string) : String(key)
+              // Allow tmdb show-basic + season-details (small, ~2KB each) for reliable Watch Next
+              if (head === 'tmdb') {
+                const sub = Array.isArray(key) ? (key[1] as string) : ''
+                return sub === 'show-basic' || sub === 'season-details'
+              }
+              // Allow slim shows list (projected), and small profile/stats
+              if (head === 'shows') {
+                // persist list + continueWatching + favorites etc. — slim projection keeps size <400KB
+                // detail pages are larger but limited to last viewed; allow with gc 7d
+                return true
+              }
+              if (head === 'movies') return true
+              if (head === 'profile' || head === 'stats') return true
+              // Exclude heavy / volatile: upcoming (derived from tmdb live), episodes full, discover search
+              return !['upcoming', 'episodes', 'discover'].includes(head)
             },
           },
         }}

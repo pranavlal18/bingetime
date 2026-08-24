@@ -1,5 +1,6 @@
 import Constants from 'expo-constants'
 import type { TMDbFindResponse, TMDbSearchResponse, TMDbShowDetails, TMDbMovieDetails, TMDbSeasonDetails } from '@/types'
+import { throttledFetch } from './tmdbThrottle'
 
 const TMDB_API_KEY = Constants.expoConfig?.extra?.tmdbApiKey ?? process.env.EXPO_PUBLIC_TMDB_API_KEY ?? ''
 const TMDB_BASE = 'https://api.themoviedb.org/3'
@@ -10,7 +11,7 @@ async function tmdbFetch<T>(path: string, params: Record<string, string> = {}): 
   url.searchParams.set('language', 'en-US')
   Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v))
 
-  const res = await fetch(url.toString())
+  const res = await throttledFetch(url.toString())
   if (!res.ok) throw new Error(`TMDb error ${res.status}: ${res.statusText}`)
   return res.json()
 }
@@ -22,7 +23,7 @@ async function tmdbFetchAgnostic<T>(path: string, params: Record<string, string>
   // No language param = API returns results in the title's native language
   Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v))
 
-  const res = await fetch(url.toString())
+  const res = await throttledFetch(url.toString())
   if (!res.ok) throw new Error(`TMDb error ${res.status}: ${res.statusText}`)
   return res.json()
 }
