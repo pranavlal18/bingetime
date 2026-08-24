@@ -165,6 +165,14 @@ function InnerLayout() {
             name="favorite-movies"
             options={{ animation: 'slide_from_right' }}
           />
+          <Stack.Screen
+            name="person/[id]"
+            options={{ animation: 'slide_from_right' }}
+          />
+          <Stack.Screen
+            name="person/[id]/credits"
+            options={{ animation: 'slide_from_right' }}
+          />
         </Stack>
         <Toast />
       </PersistQueryClientProvider>
