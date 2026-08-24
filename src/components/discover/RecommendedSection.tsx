@@ -7,7 +7,9 @@ import { FlashList } from '@shopify/flash-list'
 import { Image } from 'expo-image'
 import { Ionicons } from '@expo/vector-icons'
 import { router } from 'expo-router'
+import { useQueryClient } from '@tanstack/react-query'
 import { getImageUrl } from '@/lib/tmdb'
+import { prefetchTitleDetails } from '@/lib/queries/prefetch'
 import { typography, borderRadius, spacing } from '@/theme'
 import { useTheme } from '@/contexts/ThemeContext'
 import type { DiscoverResult } from '@/lib/queries/discover'
@@ -45,7 +47,9 @@ const SmallCard = memo(function SmallCard({
   isRemoving,
   isInLibrary,
 }: SmallCardProps) {
+  const queryClient = useQueryClient()
   const posterUrl = getImageUrl(item.poster_path, 'w342')
+  const placeholderUrl = getImageUrl(item.poster_path, 'w92')
   const { colors } = useTheme()
   const styles = useMemo(() => StyleSheet.create({
   card: {
@@ -99,12 +103,13 @@ const SmallCard = memo(function SmallCard({
 }), [colors])
 
   const handlePress = useCallback(() => {
+    prefetchTitleDetails(item.mediaType, item.tmdbId, queryClient)
     if (item.mediaType === 'tv') {
         router.push(`/show/${item.libraryId || item.tmdbId}`)
     } else {
         router.push(`/movie/${item.libraryId || item.tmdbId}`)
     }
-  }, [item])
+  }, [item, queryClient])
 
   const isLoading = isAdding || isRemoving
 
@@ -115,6 +120,8 @@ const SmallCard = memo(function SmallCard({
         {posterUrl ? (
           <Image
             source={{ uri: posterUrl }}
+            placeholder={placeholderUrl ? { uri: placeholderUrl } : undefined}
+            recyclingKey={posterUrl ?? undefined}
             style={styles.poster}
             contentFit="cover"
             cachePolicy="memory-disk"

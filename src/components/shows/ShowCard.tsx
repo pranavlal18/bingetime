@@ -11,7 +11,9 @@ import {
 import { Image } from 'expo-image'
 import { Ionicons } from '@expo/vector-icons'
 import { router } from 'expo-router'
+import { useQueryClient } from '@tanstack/react-query'
 import { getImageUrl, isHaventWatched } from '@/lib/queries/shows'
+import { prefetchTitleDetails } from '@/lib/queries/prefetch'
 import ProgressBar from './ProgressBar'
 
 import { typography, borderRadius, spacing } from '@/theme'
@@ -29,12 +31,15 @@ interface ShowCardProps {
 
 export default function ShowCard({ show, isNewSeason = false }: ShowCardProps) {
   const { colors } = useTheme()
+  const queryClient = useQueryClient()
 
   const handlePress = useCallback(() => {
+    if (show.tmdb_id != null) prefetchTitleDetails('tv', show.tmdb_id, queryClient)
     router.push(`/show/${show.id}`)
-  }, [show.id])
+  }, [show.id, show.tmdb_id, queryClient])
 
   const posterUrl = getImageUrl(show.poster_path, 'w342')
+  const placeholderUrl = getImageUrl(show.poster_path, 'w92')
   const totalEps = show.total_episodes
   const seenEps = show.episodes_seen
 
@@ -131,6 +136,8 @@ export default function ShowCard({ show, isNewSeason = false }: ShowCardProps) {
       {posterUrl ? (
         <Image
           source={{ uri: posterUrl }}
+          placeholder={placeholderUrl ? { uri: placeholderUrl } : undefined}
+          recyclingKey={posterUrl ?? undefined}
           style={styles.poster}
           contentFit="cover"
           cachePolicy="memory-disk"

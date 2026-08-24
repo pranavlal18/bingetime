@@ -109,6 +109,7 @@ export default function ContinueWatchingSection({
   const renderItem = useCallback(
     ({ item }: { item: ShowWithUserData }) => {
       const posterUrl = getImageUrl(item.poster_path, 'w185')
+      const placeholderUrl = getImageUrl(item.poster_path, 'w92')
       const totalEps = item.total_episodes
       const seenEps = item.episodes_seen
       const hasProgress = totalEps !== null && totalEps > 0
@@ -128,6 +129,8 @@ export default function ContinueWatchingSection({
             {posterUrl ? (
               <Image
                 source={{ uri: posterUrl }}
+                placeholder={placeholderUrl ? { uri: placeholderUrl } : undefined}
+                recyclingKey={posterUrl ?? undefined}
                 style={styles.poster}
                 contentFit="cover"
                 cachePolicy="memory-disk"

@@ -6,13 +6,15 @@ import { FlashList } from '@shopify/flash-list'
 import { Image } from 'expo-image'
 import { Ionicons } from '@expo/vector-icons'
 import { router } from 'expo-router'
+import { useQueryClient } from '@tanstack/react-query'
 import { getImageUrl } from '@/lib/tmdb'
+import { prefetchTitleDetails } from '@/lib/queries/prefetch'
 import { typography, borderRadius } from '@/theme'
 import { useTheme } from '@/contexts/ThemeContext'
 import type { DiscoverResult } from '@/lib/queries/discover'
 
 const SCREEN_WIDTH = Dimensions.get('window').width
-const CARD_WIDTH = SCREEN_WIDTH * 0.58 // 58% of screen — immersive Stitch scale
+const CARD_WIDTH = SCREEN_WIDTH * 0.42 // 42% of screen — smaller, denser carousel
 const CARD_HEIGHT = CARD_WIDTH * 1.5 // 2:3 aspect ratio
 const SIDE_OFFSET = 20 // matches spacing.marginMobile
 
@@ -44,7 +46,11 @@ const PosterCard = memo(function PosterCard({
   isRemoving,
   isInLibrary,
 }: PosterCardProps) {
-  const posterUrl = getImageUrl(item.poster_path, 'w500')
+  const queryClient = useQueryClient()
+  const posterUrl = getImageUrl(item.poster_path, 'w342')
+  // Low-res thumb shown instantly while the full poster loads (usually cached
+  // from DiscoverCard/list views at w92).
+  const placeholderUrl = getImageUrl(item.poster_path, 'w92')
   const { colors } = useTheme()
   const styles = useMemo(() => StyleSheet.create({
   card: {
@@ -105,12 +111,13 @@ const PosterCard = memo(function PosterCard({
 }), [colors])
 
   const handlePress = useCallback(() => {
+    prefetchTitleDetails(item.mediaType, item.tmdbId, queryClient)
     if (item.mediaType === 'tv') {
       router.push(`/show/${item.libraryId || item.tmdbId}`)
     } else {
       router.push(`/movie/${item.libraryId || item.tmdbId}`)
     }
-  }, [item])
+  }, [item, queryClient])
 
   const isLoading = isAdding || isRemoving
 
@@ -121,6 +128,8 @@ const PosterCard = memo(function PosterCard({
         {posterUrl ? (
           <Image
             source={{ uri: posterUrl }}
+            placeholder={placeholderUrl ? { uri: placeholderUrl } : undefined}
+            recyclingKey={posterUrl ?? undefined}
             style={styles.poster}
             contentFit="cover"
             cachePolicy="memory-disk"

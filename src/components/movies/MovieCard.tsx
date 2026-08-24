@@ -6,8 +6,10 @@ import { Image } from 'expo-image'
 import { Swipeable } from 'react-native-gesture-handler'
 import { Ionicons } from '@expo/vector-icons'
 import { router } from 'expo-router'
+import { useQueryClient } from '@tanstack/react-query'
 import * as Haptics from 'expo-haptics'
 import { getImageUrl } from '@/lib/queries/movies'
+import { prefetchTitleDetails } from '@/lib/queries/prefetch'
 
 import { typography, borderRadius, spacing } from '@/theme'
 import { useTheme } from '@/contexts/ThemeContext'
@@ -25,6 +27,7 @@ interface MovieCardProps {
 const MovieCard = memo(function MovieCard({ movie, onMarkWatched }: MovieCardProps) {
   const swipeableRef = useRef<Swipeable>(null)
   const { colors } = useTheme()
+  const queryClient = useQueryClient()
   const styles = useMemo(() => StyleSheet.create({
   card: {
     width: CARD_WIDTH,
@@ -102,10 +105,12 @@ const MovieCard = memo(function MovieCard({ movie, onMarkWatched }: MovieCardPro
 }), [colors])
 
   const handlePress = useCallback(() => {
+    if (movie.tmdb_id != null) prefetchTitleDetails('movie', movie.tmdb_id, queryClient)
     router.push(`/movie/${movie.id}`)
-  }, [movie.id])
+  }, [movie.id, movie.tmdb_id, queryClient])
 
   const posterUrl = getImageUrl(movie.poster_path, 'w342')
+  const placeholderUrl = getImageUrl(movie.poster_path, 'w92')
   const year = movie.release_date ? movie.release_date.slice(0, 4) : null
 
   const posterContent = (
@@ -113,6 +118,8 @@ const MovieCard = memo(function MovieCard({ movie, onMarkWatched }: MovieCardPro
       {posterUrl ? (
         <Image
           source={{ uri: posterUrl }}
+          placeholder={placeholderUrl ? { uri: placeholderUrl } : undefined}
+          recyclingKey={posterUrl ?? undefined}
           style={styles.poster}
           contentFit="cover"
           cachePolicy="memory-disk"

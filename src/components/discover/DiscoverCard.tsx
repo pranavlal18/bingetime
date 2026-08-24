@@ -5,7 +5,9 @@ import { View, Text, StyleSheet, Pressable, ActivityIndicator } from 'react-nati
 import { Image } from 'expo-image'
 import { Ionicons } from '@expo/vector-icons'
 import { router } from 'expo-router'
+import { useQueryClient } from '@tanstack/react-query'
 import { getImageUrl } from '@/lib/tmdb'
+import { prefetchTitleDetails } from '@/lib/queries/prefetch'
 import { typography, borderRadius, spacing } from '@/theme'
 import { useTheme } from '@/contexts/ThemeContext'
 import type { DiscoverResult } from '@/lib/queries/discover'
@@ -28,16 +30,18 @@ const DiscoverCard = memo(function DiscoverCard({
   isInLibrary,
 }: DiscoverCardProps) {
   const { colors } = useTheme()
+  const queryClient = useQueryClient()
 
   const posterUrl = getImageUrl(item.poster_path, 'w92')
 
   const handlePress = useCallback(() => {
+    prefetchTitleDetails(item.mediaType, item.tmdbId, queryClient)
     if (item.mediaType === 'tv') {
       router.push(`/show/${item.libraryId || item.tmdbId}`)
     } else {
       router.push(`/movie/${item.libraryId || item.tmdbId}`)
     }
-  }, [item])
+  }, [item, queryClient])
 
   const isLoading = isAdding || isRemoving
 
