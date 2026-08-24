@@ -84,6 +84,20 @@ export async function getTrending(mediaType: 'tv' | 'movie' | 'all' = 'tv') {
   return tmdbFetch<TMDbSearchResponse>(`/trending/${mediaType}/week`)
 }
 
+/** Discover titles by genre, popularity-sorted, paged — backs the genre pages */
+export async function discoverByGenre(
+  mediaType: 'tv' | 'movie',
+  genreId: number,
+  page = 1
+) {
+  return tmdbFetch<TMDbSearchResponse>(`/discover/${mediaType}`, {
+    with_genres: String(genreId),
+    sort_by: 'popularity.desc',
+    include_adult: 'false',
+    page: String(page),
+  })
+}
+
 /** Get external IDs (TVDB, IMDb) for a TMDb entity */
 export async function getExternalIds(tmdbId: number, mediaType: 'tv' | 'movie' = 'tv') {
   return tmdbFetch<{ tvdb_id?: number; imdb_id?: string }>(`/${mediaType}/${tmdbId}/external_ids`)
@@ -123,6 +137,7 @@ export interface TMDbCombinedCredit {
   vote_average?: number
   vote_count?: number
   episode_count?: number // tv entries
+  genre_ids?: number[] // tv genre ids (e.g. 10764 Reality, 10767 Talk)
 }
 
 /** Person details with combined credits appended */
