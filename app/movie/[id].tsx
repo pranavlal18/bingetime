@@ -254,6 +254,27 @@ export default function MovieDetailScreen() {
     lineHeight: typography.bodyMd.lineHeight,
     color: colors.onSurface,
   },
+  genreChipsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+  },
+  genreChip: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: borderRadius.full,
+    backgroundColor: colors.secondaryContainer,
+  },
+  genreChipPressed: {
+    opacity: 0.6,
+  },
+  genreChipText: {
+    fontFamily: 'Inter',
+    fontSize: typography.labelSm.fontSize,
+    fontWeight: '600',
+    lineHeight: typography.labelSm.lineHeight,
+    color: colors.onSecondaryContainer,
+  },
 }), [colors])
 
   // Detect if the id param is a TMDb ID (numeric) vs a UUID
@@ -283,9 +304,8 @@ export default function MovieDetailScreen() {
   const year = movie?.release_date?.slice(0, 4) || tmdbDetails?.release_date?.slice(0, 4) || null
   const runtime = movie?.runtime || tmdbDetails?.runtime || null
   const runtimeDisplay = runtime ? `${Math.floor(runtime / 60)}h ${runtime % 60}m` : null
-  const genreList = movie?.genres ?? (tmdbDetails?.genres ? tmdbDetails.genres.map((g: { id: number; name: string }) => g.name) : null)
-  const overview = tmdbDetails?.overview || 'No overview available.'
   const isWatched = movie?.watched ?? false
+  const overview = tmdbDetails?.overview || 'No overview available.'
   const displayTitle = movie?.title || tmdbDetails?.title || 'Unknown'
 
   const handleToggleWatched = useCallback(() => {
@@ -423,14 +443,6 @@ export default function MovieDetailScreen() {
                     <Text style={styles.metaText}>{runtimeDisplay}</Text>
                   </>
                 ) : null}
-                {genreList && genreList.length > 0 ? (
-                  <>
-                    <View style={styles.metaDot} />
-                    <Text style={styles.metaText} numberOfLines={1}>
-                      {genreList.slice(0, 2).join(', ')}
-                    </Text>
-                  </>
-                ) : null}
               </View>
             </View>
           </View>
@@ -463,14 +475,34 @@ export default function MovieDetailScreen() {
           </View>
 
           {/* ── Details grid ── */}
-          {(genreList || runtimeDisplay) && (
+          {(tmdbDetails?.genres?.length || runtimeDisplay) ? (
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>Details</Text>
               <View style={styles.detailsGrid}>
-                {genreList && genreList.length > 0 ? (
-                  <View style={styles.detailItem}>
+                {tmdbDetails?.genres && tmdbDetails.genres.length > 0 ? (
+                  <View style={[styles.detailItem, { flex: 1, minWidth: '100%' }]}>
                     <Text style={styles.detailLabel}>Genres</Text>
-                    <Text style={styles.detailValue}>{genreList.join(', ')}</Text>
+                    <View style={styles.genreChipsRow}>
+                      {tmdbDetails.genres.map((g) => (
+                        <Pressable
+                          key={g.id}
+                          style={({ pressed }) => [
+                            styles.genreChip,
+                            pressed && styles.genreChipPressed,
+                          ]}
+                          onPress={() => {
+                            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
+                            router.push(
+                              `/discover/genre?id=${g.id}&name=${encodeURIComponent(g.name)}&type=movie`
+                            )
+                          }}
+                          accessibilityRole="button"
+                          accessibilityLabel={`Browse ${g.name} movies`}
+                        >
+                          <Text style={styles.genreChipText}>{g.name}</Text>
+                        </Pressable>
+                      ))}
+                    </View>
                   </View>
                 ) : null}
                 {runtimeDisplay ? (
@@ -481,7 +513,7 @@ export default function MovieDetailScreen() {
                 ) : null}
               </View>
             </View>
-          )}
+          ) : null}
 
           {/* ── Cast ── */}
           <CastRow cast={credits?.cast} isLoading={castLoading} />

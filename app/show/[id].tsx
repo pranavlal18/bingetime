@@ -350,6 +350,27 @@ export default function ShowDetailScreen() {
           lineHeight: typography.labelSm.lineHeight,
           color: colors.onSurfaceVariant,
         },
+        genreChipsRow: {
+          flexDirection: 'row',
+          flexWrap: 'wrap',
+          gap: 6,
+        },
+        genreChip: {
+          paddingHorizontal: 10,
+          paddingVertical: 4,
+          borderRadius: borderRadius.full,
+          backgroundColor: colors.secondaryContainer,
+        },
+        genreChipPressed: {
+          opacity: 0.6,
+        },
+        genreChipText: {
+          fontFamily: 'Inter',
+          fontSize: typography.labelSm.fontSize,
+          fontWeight: '600',
+          lineHeight: typography.labelSm.lineHeight,
+          color: colors.onSecondaryContainer,
+        },
 
         // Season selector
         seasonSelector: {
@@ -953,9 +974,27 @@ export default function ShowDetailScreen() {
                     {tmdbDetails?.genres && tmdbDetails.genres.length > 0 && (
                       <View style={styles.detailItem}>
                         <Text style={styles.detailLabel}>Genres</Text>
-                        <Text style={styles.detailValue}>
-                          {tmdbDetails.genres.map((g) => g.name).join(', ')}
-                        </Text>
+                        <View style={styles.genreChipsRow}>
+                          {tmdbDetails.genres.map((g) => (
+                            <Pressable
+                              key={g.id}
+                              style={({ pressed }) => [
+                                styles.genreChip,
+                                pressed && styles.genreChipPressed,
+                              ]}
+                              onPress={() => {
+                                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
+                                router.push(
+                                  `/discover/genre?id=${g.id}&name=${encodeURIComponent(g.name)}&type=tv`
+                                )
+                              }}
+                              accessibilityRole="button"
+                              accessibilityLabel={`Browse ${g.name} shows`}
+                            >
+                              <Text style={styles.genreChipText}>{g.name}</Text>
+                            </Pressable>
+                          ))}
+                        </View>
                       </View>
                     )}
                     {averageRuntime && (
