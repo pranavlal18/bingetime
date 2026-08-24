@@ -52,6 +52,8 @@ export default function CreditCard({
       StyleSheet.create({
         card: {
           gap: 4,
+          overflow: 'hidden',
+          flexShrink: 0,
         },
         cardFlex: {
           flex: 1,
@@ -61,9 +63,10 @@ export default function CreditCard({
         },
         poster: {
           width: '100%',
-          aspectRatio: 2 / 3,
-          borderRadius: borderRadius.lg,
+          aspectRatio: 2 / 2.85,
+          borderRadius: borderRadius.md,
           backgroundColor: colors.surfaceContainerHighest,
+          overflow: 'hidden',
         },
         posterFallback: {
           justifyContent: 'center',
@@ -129,13 +132,21 @@ export default function CreditCard({
       <Text numberOfLines={2} ellipsizeMode="tail" style={compact ? styles.titleCompact : styles.titleNormal}>
         {title}
       </Text>
-      {/* Always rendered so cards in a grid row share one baseline */}
-      <Text numberOfLines={1} style={styles.meta}>
-        {year ?? ''}
-      </Text>
+      {/* Credits-grid mode (roleLabel passed): always render both meta lines so
+          grid rows share one baseline. Scroller mode: render the year only
+          when present, so callers can omit it without an empty gap. */}
       {roleLabel !== undefined ? (
+        <>
+          <Text numberOfLines={1} style={styles.meta}>
+            {year ?? ''}
+          </Text>
+          <Text numberOfLines={1} style={styles.meta}>
+            {roleLabel ?? ''}
+          </Text>
+        </>
+      ) : year ? (
         <Text numberOfLines={1} style={styles.meta}>
-          {roleLabel ?? ''}
+          {year}
         </Text>
       ) : null}
     </Pressable>
