@@ -1,9 +1,9 @@
-// ─── DetailTabs — segmented control pinned below the detail-page hero ───
+// ─── DetailTabs — minimal text tabs pinned below the detail-page hero ───
 
 import { useMemo } from 'react'
 import { Pressable, Text, View, StyleSheet } from 'react-native'
 import * as Haptics from 'expo-haptics'
-import { typography, spacing, borderRadius } from '@/theme'
+import { spacing } from '@/theme'
 import { useTheme } from '@/contexts/ThemeContext'
 
 export type DetailTabKey = 'details' | 'episodes'
@@ -27,36 +27,31 @@ export default function DetailTabs({ tabs, active, onChange }: DetailTabsProps) 
       StyleSheet.create({
       track: {
       flexDirection: 'row',
-      backgroundColor: colors.surfaceContainerHighest,
-      borderRadius: borderRadius.full,
-      padding: 3,
+      gap: 26,
       marginHorizontal: spacing.marginMobile,
       marginVertical: spacing.stackSm,
     },
     segment: {
-      flex: 1,
-      paddingVertical: 8,
-      borderRadius: borderRadius.full,
       alignItems: 'center',
+      paddingVertical: 12,
+      paddingHorizontal: 2,
     },
-    segmentActive: {
+    underline: {
+      width: 36,
+      height: 2,
+      borderRadius: 1,
       backgroundColor: colors.primary,
-      shadowColor: colors.primary,
-      shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: 0.25,
-      shadowRadius: 4,
-      elevation: 3,
+      marginTop: 8,
     },
     segmentText: {
       fontFamily: 'Inter',
-      fontSize: typography.labelMd.fontSize,
+      fontSize: 16,
       fontWeight: '600',
-      lineHeight: typography.labelMd.lineHeight,
-      letterSpacing: typography.labelMd.letterSpacing,
+      lineHeight: 24,
       color: colors.onSurfaceVariant,
     },
     segmentTextActive: {
-      color: colors.onPrimary,
+      color: colors.primary,
     },
     }),
     [colors],
@@ -69,7 +64,7 @@ export default function DetailTabs({ tabs, active, onChange }: DetailTabsProps) 
         return (
           <Pressable
             key={tab.key}
-            style={[styles.segment, isActive && styles.segmentActive]}
+            style={styles.segment}
             onPress={() => {
               if (!isActive) {
                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
@@ -82,6 +77,7 @@ export default function DetailTabs({ tabs, active, onChange }: DetailTabsProps) 
             <Text style={[styles.segmentText, isActive && styles.segmentTextActive]}>
               {tab.label}
             </Text>
+            {isActive && <View style={styles.underline} />}
           </Pressable>
         )
       })}
