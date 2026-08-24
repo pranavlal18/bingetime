@@ -1,6 +1,6 @@
 // ─── Discover Tab — TMDb search + trending + add-to-library ───
 
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useQuery, useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
 import * as tmdb from '@/lib/tmdb'
@@ -118,6 +118,40 @@ export function useTrending(filter: MediaFilter) {
     queryFn: () => fetchTrending(filter, user?.id ?? ''),
     staleTime: 1000 * 60 * 10, // 10 min — trending changes slowly
     enabled: !!user,
+  })
+}
+
+// ── Genre pages — public TMDb data, popularity-sorted, paged ──
+
+export interface GenreTitle {
+  tmdbId: number
+  mediaType: 'tv' | 'movie'
+  title: string
+  poster_path: string | null
+  year: string | null
+}
+
+const GENRE_TITLES_STALE_TIME = 1000 * 60 * 10 // 10 min
+
+export function useGenreTitles(mediaType: 'tv' | 'movie', genreId: number | null) {
+  return useInfiniteQuery({
+    queryKey: ['tmdb', 'genre', mediaType, genreId],
+    queryFn: async ({ pageParam }) => {
+      const res = await tmdb.discoverByGenre(mediaType, genreId as number, pageParam)
+      const items: GenreTitle[] = res.results.map((r) => ({
+        tmdbId: r.id,
+        mediaType,
+        title: (mediaType === 'movie' ? r.title : r.name) ?? 'Unknown',
+        poster_path: r.poster_path ?? null,
+        year: ((mediaType === 'movie' ? r.release_date : r.first_air_date) ?? '').slice(0, 4) || null,
+      }))
+      return { items, nextPage: res.results.length > 0 ? pageParam + 1 : undefined }
+    },
+    initialPageParam: 1,
+    getNextPageParam: (lastPage) => lastPage.nextPage,
+    enabled: !!genreId,
+    staleTime: GENRE_TITLES_STALE_TIME,
+    gcTime: 1000 * 60 * 30,
   })
 }
 
