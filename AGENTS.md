@@ -15,7 +15,7 @@ npm run ios        # dev on iOS
 npm run web        # dev in browser
 ```
 
-No lint, typecheck, or test scripts are configured.
+No lint or test scripts are configured. `npm run typecheck` runs `tsc --noEmit` — run it after every change.
 
 ## Environment (`.env`, gitignored)
 
@@ -40,7 +40,7 @@ All vars use `EXPO_PUBLIC_*` prefix (Expo convention for client-side env vars).
 | `src/types/` | All TS interfaces |
 | `src/components/` | ShowCard, MovieCard, ShowListItem, etc. |
 | `src/utils/` | formatRuntime, formatDate, calcProgress, getYear |
-| `supabase/migrations/` | 2 SQL migrations (7 tables) |
+| `supabase/migrations/` | SQL migrations, numbered — apply in order (latest: `00013`) |
 | `assets/csv/` | Bundled TV Time GDPR export CSVs |
 
 ## Gotchas
@@ -48,10 +48,10 @@ All vars use `EXPO_PUBLIC_*` prefix (Expo convention for client-side env vars).
 - **Metro**: `metro.config.js` pushes `'csv'` to `assetExts` — required for bundled CSV imports.
 - **Babel**: `react-native-reanimated/plugin` must be **last** in `plugins` array.
 - **Movie data only in v1 CSV**: `tracking-prod-records.csv` (v1) is the sole source of movie watch data. Do not treat it as superseded — `tracking-prod-records-v2.csv` has zero movie rows.
-- **Supabase join pattern**: All queries use `'*, user_shows(*)'` (or `user_movies(*)`).
+- **Supabase join pattern**: list queries project explicit columns with `!inner` user joins + DB-side filters (e.g. `.eq('user_shows.user_id', id).eq('user_shows.is_watchlist', true)`); avoid `select('*')`. Query keys live in `src/lib/queries/keys.ts`.
 - **React Query caching**: default `staleTime` 5m / `gcTime` 24h / `retry` 2. Overrides: 2m shows, 5m movies, 10m trending + genre titles, 1h TMDb details (prefetch matches), 24h people/credits/upcoming with `gcTime` 14d. Persisted cache `maxAge` 7d (`app/_layout.tsx`).
 - **Zustand selectors** are used inside list items (not React Context) for granular re-renders.
-- **Single-user**: No auth implemented. One device/user.
+- **Auth**: Supabase email/password via `src/contexts/AuthContext.tsx`; single account on one device. Auth redirects are declarative (`app/index.tsx` + `_layout.tsx` guards).
 - **Dark-first palette**: `surface (#1a1a2e)`, `accent (#e94560)`, `muted (#6b7280)` in `tailwind.config.js`.
 
 ## Skills
