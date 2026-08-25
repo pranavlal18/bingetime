@@ -23,6 +23,7 @@ import {
   useDiscoverTitles,
   useAddToLibrary,
   useRemoveFromLibrary,
+  useGenres,
   BROWSE_SORT_OPTIONS,
   type DiscoverTitle,
 } from '@/lib/queries/discover'
@@ -48,6 +49,40 @@ const CONTENT_PAD = SIDE_OFFSET - COL_GAP / 2
 
 // Soft off-white backdrop used behind dark brand logos (see utils/logoLuminance)
 const LIGHT_LOGO_TILE = '#ECE9F1'
+
+// ── Genre media-type counterpart resolution ──
+// TMDb genre IDs differ between tv and movie (movie "Action" = 28, tv
+// "Action & Adventure" = 10759), so flipping a genre page's media type means
+// re-resolving the id by name. A small alias table covers the renamed pairs;
+// genres with no counterpart (Reality, Talk, Soap...) disable the other side.
+const GENRE_ALIASES: Record<string, string> = {
+  'action & adventure': 'action',
+  action: 'action & adventure',
+  'sci-fi & fantasy': 'science fiction',
+  'science fiction': 'sci-fi & fantasy',
+  'war & politics': 'war',
+  war: 'war & politics',
+}
+
+function normalizeGenreName(name: string): string {
+  return name.trim().toLowerCase().replace(/\s+/g, ' ')
+}
+
+function resolveCounterpartId(
+  sourceName: string,
+  targetGenres: { id: number; name: string }[] | undefined
+): number | null {
+  if (!targetGenres || targetGenres.length === 0) return null
+  const norm = normalizeGenreName(sourceName)
+  const exact = targetGenres.find((g) => normalizeGenreName(g.name) === norm)
+  if (exact) return exact.id
+  const alias = GENRE_ALIASES[norm]
+  if (alias) {
+    const hit = targetGenres.find((g) => normalizeGenreName(g.name) === alias)
+    if (hit) return hit.id
+  }
+  return null
+}
 
 function TitleCard({
   item,
@@ -202,9 +237,28 @@ export default function CollectionBrowser({
 
   const [sortBy, setSortBy] = useState<GenreSortBy>('popularity.desc')
   const [sheetVisible, setSheetVisible] = useState(false)
+
+  // ── Shows/Movies toggle (genre + company pages; networks are TV-only in TMDb) ──
+  const toggleable = kind !== 'network'
+  const [activeType, setActiveType] = useState<'tv' | 'movie'>(mediaType)
+
+  // Per-type discover ids. Company ids are valid on both /discover endpoints;
+  // genres need a per-side id — the origin side starts with the route id and
+  // the other resolves lazily from TMDb's genre lists.
+  const [idsByType, setIdsByType] = useState<{ tv: number | null; movie: number | null }>(() =>
+    kind === 'company'
+      ? { tv: id, movie: id }
+      : { tv: mediaType === 'tv' ? id : null, movie: mediaType === 'movie' ? id : null }
+  )
+  const activeId = idsByType[activeType]
+
+  const needsGenreLists = toggleable && kind === 'genre'
+  const tvGenresQuery = useGenres('tv', { enabled: needsGenreLists })
+  const movieGenresQuery = useGenres('movie', { enabled: needsGenreLists })
+
   const sortLabel = useMemo(
-    () => BROWSE_SORT_OPTIONS[mediaType].find((o) => o.value === sortBy)?.label ?? 'Popular',
-    [mediaType, sortBy]
+    () => BROWSE_SORT_OPTIONS[activeType].find((o) => o.value === sortBy)?.label ?? 'Popular',
+    [activeType, sortBy]
   )
 
   // Header logo: RN images need explicit dimensions — measure the real aspect
@@ -244,7 +298,7 @@ export default function CollectionBrowser({
     fetchNextPage,
     hasNextPage,
     isFetchingNextPage,
-  } = useDiscoverTitles(mediaType, kind, id, sortBy)
+  } = useDiscoverTitles(activeType, kind, activeId, sortBy)
 
   const titles = useMemo(
     () => (data ? data.pages.flatMap((p) => p.items) : []),
@@ -259,6 +313,65 @@ export default function CollectionBrowser({
   const [, forceRender] = useState(0)
   const localLibraryRef = useRef<Map<number, 'added' | 'removed'>>(new Map())
   const statusMapRef = useRef<Map<number, 'in' | 'out'>>(new Map())
+
+  // tmdb ids collide across media types — reset local badge state on flip so
+  // stale entries from the previous type can't bleed into the new grid
+  useEffect(() => {
+    statusMapRef.current.clear()
+    localLibraryRef.current.clear()
+    addingIds.current.clear()
+    removingIds.current.clear()
+  }, [activeType])
+
+  // Eagerly resolve both genre-side ids as soon as the (cached) genre lists
+  // land — makes flipping instant instead of waiting per side.
+  useEffect(() => {
+    if (!needsGenreLists) return
+    const tvList = tvGenresQuery.data?.genres
+    const movieList = movieGenresQuery.data?.genres
+    if (!tvList && !movieList) return
+    setIdsByType((prev) => {
+      let changed = false
+      const next = { ...prev }
+      if (next.tv == null && tvList) {
+        const r = resolveCounterpartId(name, tvList)
+        if (r != null) {
+          next.tv = r
+          changed = true
+        }
+      }
+      if (next.movie == null && movieList) {
+        const r = resolveCounterpartId(name, movieList)
+        if (r != null) {
+          next.movie = r
+          changed = true
+        }
+      }
+      return changed ? next : prev
+    })
+  }, [needsGenreLists, name, tvGenresQuery.data, movieGenresQuery.data])
+
+  // Can the non-active segment be used? 'unknown' while genre lists load —
+  // keep it enabled and show a brief grid loading state if tapped early.
+  const counterpartAvailable: boolean | 'unknown' = useMemo(() => {
+    if (kind !== 'genre') return true // company ids work on both endpoints
+    const list =
+      activeType === 'tv' ? movieGenresQuery.data?.genres : tvGenresQuery.data?.genres
+    if (!list) return 'unknown'
+    return resolveCounterpartId(name, list) != null
+  }, [kind, activeType, name, tvGenresQuery.data, movieGenresQuery.data])
+
+  const handleSwitchType = useCallback(
+    (t: 'tv' | 'movie') => {
+      if (t === activeType) return
+      hapticLight()
+      setActiveType(t)
+      // Sort values differ per media type (first_air_date vs primary_release_date)
+      // — reset to the shared default so the sheet never shows a mismatched label
+      setSortBy('popularity.desc')
+    },
+    [activeType]
+  )
 
   // Batched watchlist lookup for every loaded page of titles
   useEffect(() => {
@@ -391,9 +504,47 @@ export default function CollectionBrowser({
         footerLoader: {
           paddingVertical: 24,
         },
+        // Shows/Movies segmented control (sticky bar top row)
+        typeRow: {
+          flexDirection: 'row',
+          marginBottom: 10,
+        },
+        segTrack: {
+          flexDirection: 'row',
+          backgroundColor: colors.surfaceContainer,
+          borderRadius: borderRadius.full,
+          borderWidth: 1,
+          borderColor: colors.outlineVariant,
+          padding: 2,
+        },
+        segBtn: {
+          paddingHorizontal: 14,
+          paddingVertical: 6,
+          borderRadius: borderRadius.full,
+        },
+        segBtnActive: {
+          backgroundColor: colors.primary,
+        },
+        segBtnDisabled: {
+          opacity: 0.35,
+        },
+        segText: {
+          fontFamily: 'Inter',
+          fontSize: 12,
+          fontWeight: '600',
+          color: colors.onSurfaceVariant,
+        },
+        segTextActive: {
+          color: colors.onPrimary,
+        },
       }),
     [colors]
   )
+
+  // Type-aware empty copy when the browser has a Shows/Movies toggle
+  const emptyCopy = toggleable
+    ? `No ${activeType === 'tv' ? 'shows' : 'movies'} found in ${name}`
+    : emptyMessage ?? `No titles found in ${name}`
 
   const renderItem = useCallback(
     ({ item }: { item: DiscoverTitle }) => (
@@ -439,7 +590,10 @@ export default function CollectionBrowser({
   }
 
   // ── Loading ──
-  if (isLoading) {
+  // Also covers the beat after flipping media type on a genre page while the
+  // counterpart id resolves (disabled queries report isLoading=false)
+  const awaitingCounterpart = needsGenreLists && activeId == null && counterpartAvailable !== false
+  if (isLoading || awaitingCounterpart) {
     return (
       <View style={[styles.container, styles.centered, { paddingTop: insets.top }]}>
         <Stack.Screen options={{ headerShown: false }} />
@@ -524,7 +678,8 @@ export default function CollectionBrowser({
         // Horizontal padding lives ONLY in contentContainerStyle — per-item
         // half-gutter wrappers create the center gutter. Keeps cards flush at
         // 20dp from each screen edge with an 8dp center gutter.
-        contentContainerStyle={[styles.gridContent, { paddingHorizontal: CONTENT_PAD, paddingBottom: 80 + insets.bottom }]}
+        // Extra bottom padding when the type-toggle row makes the sticky bar taller
+        contentContainerStyle={[styles.gridContent, { paddingHorizontal: CONTENT_PAD, paddingBottom: (toggleable ? 132 : 80) + insets.bottom }]}
         showsVerticalScrollIndicator={false}
         onEndReached={handleEndReached}
         onEndReachedThreshold={0.5}
@@ -536,7 +691,7 @@ export default function CollectionBrowser({
         ListEmptyComponent={
           <View style={styles.emptyState}>
             <Ionicons name="film-outline" size={48} color={colors.outlineVariant} />
-            <Text style={styles.emptyText}>{emptyMessage ?? `No titles found in ${name}`}</Text>
+            <Text style={styles.emptyText}>{emptyCopy}</Text>
           </View>
         }
       />
@@ -548,9 +703,6 @@ export default function CollectionBrowser({
           bottom: 0,
           left: 0,
           right: 0,
-          flexDirection: 'row',
-          alignItems: 'center',
-          justifyContent: 'space-between',
           paddingHorizontal: spacing.marginMobile,
           paddingVertical: 12,
           paddingBottom: 12 + insets.bottom,
@@ -561,6 +713,39 @@ export default function CollectionBrowser({
           elevation: 8,
         }}
       >
+        {toggleable && (
+          <View style={styles.typeRow}>
+            <View style={styles.segTrack}>
+              {(['tv', 'movie'] as const).map((t) => {
+                const selected = activeType === t
+                const disabled = !selected && counterpartAvailable === false
+                return (
+                  <Pressable
+                    key={t}
+                    onPress={() => handleSwitchType(t)}
+                    disabled={disabled}
+                    style={[
+                      styles.segBtn,
+                      selected && styles.segBtnActive,
+                      disabled && styles.segBtnDisabled,
+                    ]}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected, disabled }}
+                    accessibilityLabel={t === 'tv' ? `Shows in ${name}` : `Movies in ${name}`}
+                  >
+                    <Text
+                      style={[styles.segText, selected && styles.segTextActive]}
+                      numberOfLines={1}
+                    >
+                      {t === 'tv' ? 'Shows' : 'Movies'}
+                    </Text>
+                  </Pressable>
+                )
+              })}
+            </View>
+          </View>
+        )}
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
         <Pressable
           style={{
             flexDirection: 'row',
@@ -589,6 +774,7 @@ export default function CollectionBrowser({
         <Text style={{ fontFamily: 'Inter', fontSize: 12, color: colors.onSurfaceVariant }}>
           {titles.length} titles
         </Text>
+        </View>
       </View>
 
       <BrowseSortSheet
@@ -596,7 +782,7 @@ export default function CollectionBrowser({
         onClose={() => setSheetVisible(false)}
         value={sortBy}
         onChange={setSortBy}
-        options={BROWSE_SORT_OPTIONS[mediaType]}
+        options={BROWSE_SORT_OPTIONS[activeType]}
       />
     </View>
   )

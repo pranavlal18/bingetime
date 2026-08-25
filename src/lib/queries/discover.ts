@@ -161,12 +161,13 @@ export const BROWSE_SORT_OPTIONS: Record<'tv' | 'movie', BrowseSortOption[]> = {
   ],
 }
 
-export function useGenres(mediaType: 'tv' | 'movie') {
+export function useGenres(mediaType: 'tv' | 'movie', options?: { enabled?: boolean }) {
   return useQuery({
     queryKey: ['tmdb', 'genres', mediaType],
     queryFn: () => tmdb.getGenres(mediaType),
     staleTime: 1000 * 60 * 60 * 24,
     gcTime: 1000 * 60 * 60 * 24 * 7,
+    enabled: options?.enabled,
   })
 }
 
