@@ -1,9 +1,16 @@
 // ─── GenreSortSheet — Spotify-style bottom sheet for genre sorting ───
 
-import { useMemo } from 'react'
+import { useEffect, useMemo } from 'react'
 import { View, Text, Pressable, StyleSheet, Modal } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import * as Haptics from 'expo-haptics'
+import { Gesture, GestureDetector } from 'react-native-gesture-handler'
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withSpring,
+  runOnJS,
+} from 'react-native-reanimated'
 import { useTheme } from '@/contexts/ThemeContext'
 import { spacing, borderRadius } from '@/theme'
 import type { GenreSortBy } from '@/lib/tmdb'
@@ -19,6 +26,33 @@ interface GenreSortSheetProps {
 
 export default function GenreSortSheet({ visible, onClose, mediaType, value, onChange }: GenreSortSheetProps) {
   const { colors } = useTheme()
+  const translateY = useSharedValue(0)
+  const contextY = useSharedValue(0)
+
+  useEffect(() => {
+    if (visible) translateY.value = 0
+  }, [visible, translateY])
+
+  const pan = Gesture.Pan()
+    .onStart(() => {
+      contextY.value = translateY.value
+    })
+    .onUpdate((e) => {
+      const next = e.translationY + contextY.value
+      translateY.value = next > 0 ? next : 0
+    })
+    .onEnd((e) => {
+      const shouldClose = translateY.value > 80 || e.velocityY > 600
+      if (shouldClose) {
+        runOnJS(onClose)()
+      } else {
+        translateY.value = withSpring(0, { damping: 20, stiffness: 300 })
+      }
+    })
+
+  const sheetAnimatedStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: translateY.value }],
+  }))
 
   const options = GENRE_SORT_OPTIONS[mediaType]
 
@@ -81,27 +115,31 @@ export default function GenreSortSheet({ visible, onClose, mediaType, value, onC
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <Pressable style={styles.overlay} onPress={onClose}>
-        <Pressable style={styles.sheet} onPress={(e) => e.stopPropagation()}>
-          <View style={styles.handle} />
-          <Text style={styles.title}>Sort by</Text>
-          {options.map((opt) => {
-            const active = opt.value === value
-            return (
-              <Pressable
-                key={opt.value}
-                style={[styles.option, active && styles.optionActive]}
-                onPress={() => {
-                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
-                  onChange(opt.value)
-                  onClose()
-                }}
-              >
-                <Text style={[styles.optionLabel, active && styles.optionLabelActive]}>{opt.label}</Text>
-                {active && <Ionicons name="checkmark" size={20} color={colors.primary} />}
-              </Pressable>
-            )
-          })}
-        </Pressable>
+        <GestureDetector gesture={pan}>
+          <Animated.View style={[styles.sheet, sheetAnimatedStyle]}>
+            <Pressable onPress={(e) => e.stopPropagation()} style={{ flex: 1 }}>
+              <View style={styles.handle} />
+              <Text style={styles.title}>Sort by</Text>
+              {options.map((opt) => {
+                const active = opt.value === value
+                return (
+                  <Pressable
+                    key={opt.value}
+                    style={[styles.option, active && styles.optionActive]}
+                    onPress={() => {
+                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
+                      onChange(opt.value)
+                      onClose()
+                    }}
+                  >
+                    <Text style={[styles.optionLabel, active && styles.optionLabelActive]}>{opt.label}</Text>
+                    {active && <Ionicons name="checkmark" size={20} color={colors.primary} />}
+                  </Pressable>
+                )
+              })}
+            </Pressable>
+          </Animated.View>
+        </GestureDetector>
       </Pressable>
     </Modal>
   )
