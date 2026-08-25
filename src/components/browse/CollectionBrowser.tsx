@@ -41,9 +41,6 @@ import BrowseSortSheet from '@/components/discover/BrowseSortSheet'
 const SIDE_OFFSET = 20
 const COL_GAP = 8
 const TITLE_LINE = 18
-const TITLE_LINES = 2
-// Reserved title block: fixed height so long titles never push the next row down
-const TITLE_BLOCK_HEIGHT = TITLE_LINES * TITLE_LINE
 // FlashList v2 has no columnWrapperStyle — gutter comes from per-item
 // horizontal padding, so container padding shrinks by half a gutter to keep
 // outer edges at exactly SIDE_OFFSET and center gutter at COL_GAP.
@@ -107,10 +104,6 @@ function TitleCard({
           color: colors.onSurface,
           marginTop: 10,
           lineHeight: TITLE_LINE,
-          // Fixed reserve so every card occupies the same height regardless
-          // of whether the title wraps to 2 lines
-          height: TITLE_BLOCK_HEIGHT,
-          overflow: 'hidden',
         },
         year: {
           fontFamily: 'Inter',
@@ -168,10 +161,13 @@ function TitleCard({
       <Text numberOfLines={2} ellipsizeMode="tail" style={styles.title}>
         {item.title}
       </Text>
-      {/* Always rendered so years align across cards */}
-      <Text numberOfLines={1} ellipsizeMode="tail" style={styles.year}>
-        {item.year ?? ''}
-      </Text>
+      {/* Year follows the title's natural height — tight for 1-line names,
+          unchanged for wrapped ones. Leftover space lands below the card. */}
+      {item.year ? (
+        <Text numberOfLines={1} ellipsizeMode="tail" style={styles.year}>
+          {item.year}
+        </Text>
+      ) : null}
     </Pressable>
   )
 }

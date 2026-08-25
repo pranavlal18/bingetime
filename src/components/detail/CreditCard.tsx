@@ -1,9 +1,9 @@
 // ─── CreditCard — poster card used by Known For row and All Credits grid ───
 //
-// Card width == poster width (poster fills the card at 2:3 aspect ratio), so
-// all text is constrained to the poster's exact bounds and can never overflow.
-// Every text line has a reserved fixed height — content length can never change
-// card dimensions — and cards in the same grid row align on one baseline.
+// Card width == poster width (poster fills the card at ~2:3 aspect ratio), so
+// all text is constrained to the poster's exact bounds. Title wraps to max 2
+// lines; year/role follow at natural height so short names never show a gap
+// between title and meta — leftover space lands below the card instead.
 
 import { useMemo, type ReactNode } from 'react'
 import { Text, View, StyleSheet, Pressable } from 'react-native'
@@ -15,8 +15,8 @@ import { getImageUrl } from '@/lib/tmdb'
 import { useTheme } from '@/contexts/ThemeContext'
 
 /** Locked size modes — see Artist Page design contract. */
-const TITLE_LINE_NORMAL = 18 // 13px / 500, two reserved lines = h36
-const TITLE_LINE_COMPACT = 16 // 12px / 500, two reserved lines = h32
+const TITLE_LINE_NORMAL = 18 // 13px / 500
+const TITLE_LINE_COMPACT = 16 // 12px / 500
 const META_LINE = 16 // 12px / 400
 
 interface CreditCardProps {
@@ -80,7 +80,6 @@ export default function CreditCard({
           fontSize: 13,
           fontWeight: '500',
           lineHeight: TITLE_LINE_NORMAL,
-          height: 2 * TITLE_LINE_NORMAL,
           color: colors.onSurface,
         },
         titleCompact: {
@@ -88,7 +87,6 @@ export default function CreditCard({
           fontSize: 12,
           fontWeight: '500',
           lineHeight: TITLE_LINE_COMPACT,
-          height: 2 * TITLE_LINE_COMPACT,
           color: colors.onSurface,
         },
         meta: {
@@ -96,7 +94,6 @@ export default function CreditCard({
           fontSize: 12,
           fontWeight: '400',
           lineHeight: META_LINE,
-          height: META_LINE,
           color: colors.onSurfaceVariant,
         },
       }),
@@ -139,21 +136,16 @@ export default function CreditCard({
       <Text numberOfLines={2} ellipsizeMode="tail" style={compact ? styles.titleCompact : styles.titleNormal}>
         {title}
       </Text>
-      {/* Credits-grid mode (roleLabel passed): always render both meta lines so
-          grid rows share one baseline. Scroller mode: render the year only
-          when present, so callers can omit it without an empty gap. */}
-      {roleLabel !== undefined ? (
-        <>
-          <Text numberOfLines={1} style={styles.meta}>
-            {year ?? ''}
-          </Text>
-          <Text numberOfLines={1} style={styles.meta}>
-            {roleLabel ?? ''}
-          </Text>
-        </>
-      ) : year ? (
-        <Text numberOfLines={1} style={styles.meta}>
+      {/* Meta follows the title's natural height — year tight under 1-line
+          names, unchanged for wrapped ones. Role renders only when present. */}
+      {year ? (
+        <Text numberOfLines={1} ellipsizeMode="tail" style={styles.meta}>
           {year}
+        </Text>
+      ) : null}
+      {roleLabel ? (
+        <Text numberOfLines={1} ellipsizeMode="tail" style={styles.meta}>
+          {roleLabel}
         </Text>
       ) : null}
     </Pressable>
