@@ -97,6 +97,7 @@ const MovieListItem = memo(function MovieListItem({
 }), [colors])
 
   const handlePress = useCallback(() => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
     router.push(`/movie/${movie.id}`)
   }, [movie.id])
 
@@ -109,7 +110,6 @@ const MovieListItem = memo(function MovieListItem({
       <Pressable
         style={styles.swipeAction}
         onPress={() => {
-          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
           onMarkWatched(movie.id)
           swipeableRef.current?.close()
         }}

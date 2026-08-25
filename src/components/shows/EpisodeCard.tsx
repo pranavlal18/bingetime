@@ -48,6 +48,7 @@ export default function EpisodeCard({ data, sectionKind, onMarkWatched }: Episod
   const glow = useSharedValue(0)
 
   const handlePress = useCallback(() => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
     router.push(`/show/${data.showId}`)
   }, [data.showId])
 
@@ -57,7 +58,6 @@ export default function EpisodeCard({ data, sectionKind, onMarkWatched }: Episod
       withTiming(1, { duration: 200 }),
       withTiming(0, { duration: 300 })
     )
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
     onMarkWatched?.(data.showId, data.seasonNumber, data.episodeNumber)
     swipeableRef.current?.close()
   }, [data.showId, data.seasonNumber, data.episodeNumber, onMarkWatched, glow])

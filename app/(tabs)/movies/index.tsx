@@ -66,7 +66,6 @@ function MoviesScreenContent() {
   }, [isGrid, setViewMode])
 
   const handleToggleWatched = useCallback((movieId: string) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
     toggleWatched.mutate(movieId)
   }, [toggleWatched])
 

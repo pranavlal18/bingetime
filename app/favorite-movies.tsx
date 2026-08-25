@@ -16,6 +16,7 @@ import { Image } from 'expo-image'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { router, Stack } from 'expo-router'
+import * as Haptics from 'expo-haptics'
 import { useFavoriteMovies } from '@/lib/queries/movies'
 import { getImageUrl } from '@/lib/tmdb'
 import { typography, spacing, borderRadius } from '@/theme'
@@ -155,7 +156,13 @@ const GridItem = memo(function GridItem({ title, posterPath, favoritedAt, onPres
     },
   }), [colors])
   return (
-    <Pressable style={gridStyles.item} onPress={onPress}>
+    <Pressable
+      style={gridStyles.item}
+      onPress={() => {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
+        onPress()
+      }}
+    >
       <View style={gridStyles.posterContainer}>
         {posterUrl ? (
           <Image
@@ -256,7 +263,13 @@ const ListItem = memo(function ListItem({
   }), [colors])
 
   return (
-    <Pressable style={listItemStyles.item} onPress={onPress}>
+    <Pressable
+      style={listItemStyles.item}
+      onPress={() => {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
+        onPress()
+      }}
+    >
       <View style={listItemStyles.posterContainer}>
         {posterUrl ? (
           <Image

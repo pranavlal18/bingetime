@@ -153,7 +153,6 @@ const MovieCard = memo(function MovieCard({ movie, onMarkWatched }: MovieCardPro
       <Pressable
         style={styles.swipeAction}
         onPress={() => {
-          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
           onMarkWatched(movie.id)
           swipeableRef.current?.close()
         }}

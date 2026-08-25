@@ -311,9 +311,7 @@ export default function MovieDetailScreen() {
 
   const handleToggleWatched = useCallback(() => {
     if (movie) {
-      toggleWatchedMutation.mutate(movie.id, {
-        onSuccess: () => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light),
-      })
+      toggleWatchedMutation.mutate(movie.id)
     }
   }, [movie, toggleWatchedMutation])
 

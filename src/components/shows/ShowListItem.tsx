@@ -29,6 +29,7 @@ export default function ShowListItem({ show, onMarkWatched, isNewSeason = false 
   const swipeableRef = useRef<Swipeable>(null)
 
   const handlePress = useCallback(() => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
     router.push(`/show/${show.id}`)
   }, [show.id])
 
@@ -154,7 +155,6 @@ export default function ShowListItem({ show, onMarkWatched, isNewSeason = false 
       <Pressable
         style={styles.swipeAction}
         onPress={() => {
-          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
           onMarkWatched(show.id)
           swipeableRef.current?.close()
         }}

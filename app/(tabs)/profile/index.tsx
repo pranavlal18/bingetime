@@ -17,6 +17,7 @@ import { requestNotificationPermissions, cancelAllReminders, getPermissionStatus
 import { Image } from 'expo-image'
 import { Ionicons } from '@expo/vector-icons'
 import { router } from 'expo-router'
+import * as Haptics from 'expo-haptics'
 import Constants from 'expo-constants'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useAppStore } from '@/stores/appStore'
@@ -175,7 +176,13 @@ const PosterItem = memo(function PosterItem({
   const posterUrl = getImageUrl(posterPath, 'w185')
 
   return (
-    <Pressable style={{ width: POSTER_W }} onPress={onPress}>
+    <Pressable
+      style={{ width: POSTER_W }}
+      onPress={() => {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
+        onPress()
+      }}
+    >
       <View
         style={{
           width: POSTER_W,

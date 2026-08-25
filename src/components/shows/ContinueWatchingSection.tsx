@@ -6,6 +6,7 @@ import { Image } from 'expo-image'
 import { FlashList } from '@shopify/flash-list'
 import { Ionicons } from '@expo/vector-icons'
 import { router } from 'expo-router'
+import * as Haptics from 'expo-haptics'
 import { getImageUrl } from '@/lib/queries/shows'
 import ProgressBar from './ProgressBar'
 import { typography, spacing, borderRadius } from '@/theme'
@@ -123,7 +124,13 @@ export default function ContinueWatchingSection({
         item.next_air_episode.episode_number === 1
 
       return (
-        <Pressable style={styles.card} onPress={() => router.push(`/show/${item.id}`)}>
+        <Pressable
+          style={styles.card}
+          onPress={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
+            router.push(`/show/${item.id}`)
+          }}
+        >
           {/* Poster */}
           <View style={styles.posterContainer}>
             {posterUrl ? (

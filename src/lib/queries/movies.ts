@@ -1,6 +1,7 @@
 // ─── Movies Tab — React Query hooks ───
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import * as Haptics from 'expo-haptics'
 import { supabase } from '@/lib/supabase'
 import { getImageUrl, getMovieDetails, searchMovie } from '@/lib/tmdb'
 import { useAuth } from '@/contexts/AuthContext'
@@ -211,6 +212,7 @@ export function useToggleMovieWatched() {
     },
 
     onMutate: async (movieId: string) => {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
       if (!user) return
 
       // Cancel in-flight refetches so optimistic write isn't clobbered
