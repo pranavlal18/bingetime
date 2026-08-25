@@ -14,6 +14,7 @@ import {
 } from '@expo-google-fonts/inter'
 import { useAuth, AuthProvider } from '@/contexts/AuthContext'
 import { ThemeProvider, useTheme } from '@/contexts/ThemeContext'
+import * as SystemUI from 'expo-system-ui'
 import { useSegments, useRouter } from 'expo-router'
 import { useNotificationScheduler } from '@/hooks/useNotificationScheduler'
 import { OfflineBanner } from '@/components/ui/OfflineBanner'
@@ -38,8 +39,14 @@ function InnerLayout() {
   const { user, loading, session } = useAuth()
   const segments = useSegments()
   const router = useRouter()
-  const { themeKey } = useTheme()
+  const { themeKey, colors } = useTheme()
   const isLightTheme = themeKey === 'luminescent'
+
+  // Paint the native window background with the theme color so OS-level surfaces
+  // never flash white during screen transitions (especially Android back-nav).
+  useEffect(() => {
+    SystemUI.setBackgroundColorAsync(colors.background)
+  }, [colors.background])
 
   // Handle auth redirects after initial session loads
   useEffect(() => {
@@ -149,7 +156,13 @@ function InnerLayout() {
       >
         <StatusBar style={isLightTheme ? 'dark' : 'light'} />
         {supportsPushNotifications && <NotificationScheduler />}
-        <Stack screenOptions={{ headerShown: false }}>
+        <Stack
+          screenOptions={{
+            headerShown: false,
+            // Theme-colored scene container — prevents white flash during slide transitions
+            contentStyle: { backgroundColor: colors.background },
+          }}
+        >
           <Stack.Screen name="(auth)" />
           <Stack.Screen name="(tabs)" />
           <Stack.Screen
