@@ -17,7 +17,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Image } from 'expo-image'
 import { Ionicons } from '@expo/vector-icons'
 import { LinearGradient } from 'expo-linear-gradient'
-import * as Haptics from 'expo-haptics'
+import { hapticLight } from '@/utils/haptics'
 import { useMovie, useToggleMovieWatched, useToggleMovieFavorite } from '@/lib/queries/movies'
 import { getMovieDetails, getImageUrl } from '@/lib/tmdb'
 import { useQuery } from '@tanstack/react-query'
@@ -317,7 +317,7 @@ export default function MovieDetailScreen() {
   }, [movie, toggleWatchedMutation])
 
   const handleBack = useCallback(() => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
+    hapticLight()
     router.back()
   }, [])
 
@@ -488,7 +488,7 @@ export default function MovieDetailScreen() {
                             pressed && styles.genreChipPressed,
                           ]}
                           onPress={() => {
-                            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
+                            hapticLight()
                             router.push(
                               `/discover/genre?id=${g.id}&name=${encodeURIComponent(g.name)}&type=movie`
                             )

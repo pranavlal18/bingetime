@@ -6,7 +6,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { View, Text, Pressable, StyleSheet } from 'react-native'
 import { Image } from 'expo-image'
-import * as Haptics from 'expo-haptics'
+import { hapticLight } from '@/utils/haptics'
 import { getImageUrl } from '@/lib/tmdb'
 import { getLogoIsDark } from '@/utils/logoLuminance'
 import { borderRadius } from '@/theme'
@@ -106,7 +106,7 @@ function Pill({
   )
 
   const handlePress = useCallback(() => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
+    hapticLight()
     onPress(item)
   }, [item, onPress])
 

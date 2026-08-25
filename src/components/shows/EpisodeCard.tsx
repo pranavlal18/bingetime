@@ -14,7 +14,7 @@ import { Image } from 'expo-image'
 import { Swipeable } from 'react-native-gesture-handler'
 import { Ionicons } from '@expo/vector-icons'
 import { router } from 'expo-router'
-import * as Haptics from 'expo-haptics'
+import { hapticLight } from '@/utils/haptics'
 import { getImageUrl } from '@/lib/tmdb'
 import { typography, spacing, borderRadius } from '@/theme'
 import { useTheme } from '@/contexts/ThemeContext'
@@ -48,7 +48,7 @@ export default function EpisodeCard({ data, sectionKind, onMarkWatched }: Episod
   const glow = useSharedValue(0)
 
   const handlePress = useCallback(() => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
+    hapticLight()
     router.push(`/show/${data.showId}`)
   }, [data.showId])
 
@@ -363,7 +363,7 @@ export default function EpisodeCard({ data, sectionKind, onMarkWatched }: Episod
                   onPress={
                     data.networkId
                       ? () => {
-                          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
+                          hapticLight()
                           router.push(
                             `/discover/network?id=${data.networkId}&name=${encodeURIComponent(data.network ?? '')}&type=tv`
                           )

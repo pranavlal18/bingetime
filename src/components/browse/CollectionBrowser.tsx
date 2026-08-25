@@ -17,7 +17,7 @@ import { router, Stack } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Image } from 'expo-image'
 import { Ionicons } from '@expo/vector-icons'
-import * as Haptics from 'expo-haptics'
+import { hapticLight } from '@/utils/haptics'
 import { useQueryClient } from '@tanstack/react-query'
 import {
   useDiscoverTitles,
@@ -117,7 +117,7 @@ function TitleCard({
   )
 
   const handlePress = useCallback(() => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
+    hapticLight()
     prefetchTitleDetails(item.mediaType, item.tmdbId, queryClient)
     router.push(
       item.mediaType === 'tv' ? `/show/${item.tmdbId}` : `/movie/${item.tmdbId}`
@@ -420,7 +420,7 @@ export default function CollectionBrowser({
   }, [hasNextPage, isFetchingNextPage, fetchNextPage])
 
   const handleBack = useCallback(() => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
+    hapticLight()
     router.back()
   }, [])
 
@@ -574,7 +574,7 @@ export default function CollectionBrowser({
             borderColor: colors.outlineVariant,
           }}
           onPress={() => {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
+            hapticLight()
             setSheetVisible(true)
           }}
           accessibilityRole="button"
