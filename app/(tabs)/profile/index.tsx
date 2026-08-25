@@ -1,6 +1,6 @@
 // ─── Profile Tab — TV Time style: user + horizontal carousels ───
 
-import { memo, useState, useMemo, useCallback, useEffect } from 'react'
+import { memo, useState, useMemo, useCallback } from 'react'
 import {
   View,
   Text,
@@ -8,17 +8,13 @@ import {
   Pressable,
   StyleSheet,
   ActivityIndicator,
-  Switch,
   Dimensions,
-  Alert,
   Linking,
 } from 'react-native'
-import { requestNotificationPermissions, cancelAllReminders, getPermissionStatus } from '@/utils/notifications'
 import { Image } from 'expo-image'
 import { Ionicons } from '@expo/vector-icons'
 import { router } from 'expo-router'
-import * as Haptics from 'expo-haptics'
-import Constants from 'expo-constants'
+import { hapticLight } from '@/utils/haptics'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useAppStore } from '@/stores/appStore'
 import { useAuth } from '@/contexts/AuthContext'
@@ -48,10 +44,12 @@ function formatNumber(n: number): string {
   return n.toLocaleString('en-US')
 }
 
-function getInitials(email: string): string {
-  return email
-    .split('@')[0]
-    .split('.')
+function getInitials(source: string): string {
+  // Splits on spaces and email-style separators so both email prefixes
+  // ("prana.lal") and custom display names ("Pranav Lal") yield two initials
+  return source
+    .split(/[\s._@-]+/)
+    .filter(Boolean)
     .map((part) => part[0]?.toUpperCase())
     .slice(0, 2)
     .join('')
@@ -179,7 +177,7 @@ const PosterItem = memo(function PosterItem({
     <Pressable
       style={{ width: POSTER_W }}
       onPress={() => {
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
+        hapticLight()
         onPress()
       }}
     >
@@ -532,179 +530,15 @@ const StatsPreviewCards = memo(function StatsPreviewCards({
   )
 })
 
-const SettingsRow = memo(function SettingsRow({
-  icon,
-  label,
-  rightLabel,
-  showChevron = true,
-  onPress,
-}: {
-  icon: keyof typeof Ionicons.glyphMap
-  label: string
-  rightLabel?: string
-  showChevron?: boolean
-  onPress?: () => void
-}) {
-  const { colors } = useTheme()
-  const [pressed, setPressed] = useState(false)
-
-  return (
-    <Pressable
-      style={[
-        {
-          flexDirection: 'row',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          paddingHorizontal: 20,
-          paddingVertical: 16,
-          borderBottomWidth: 1,
-          borderBottomColor: 'rgba(255,255,255,0.05)',
-        },
-        pressed && { backgroundColor: 'rgba(255,255,255,0.05)' },
-      ]}
-      onPress={onPress}
-      onPressIn={() => setPressed(true)}
-      onPressOut={() => setPressed(false)}
-    >
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 16 }}>
-        <Ionicons name={icon} size={20} color={colors.secondary} />
-        <Text
-          style={{
-            fontFamily: 'Inter',
-            fontSize: 16,
-            fontWeight: '400',
-            color: colors.onSurface,
-          }}
-        >
-          {label}
-        </Text>
-      </View>
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-        {rightLabel ? (
-          <Text
-            style={{
-              fontFamily: 'Inter',
-              fontSize: 14,
-              fontWeight: '600',
-              letterSpacing: 0.01,
-              color: colors.onSurfaceVariant,
-            }}
-          >
-            {rightLabel}
-          </Text>
-        ) : null}
-        {showChevron && (
-          <Ionicons name="chevron-forward" size={16} color={colors.outlineVariant} />
-        )}
-      </View>
-    </Pressable>
-  )
-})
-
-const SettingsToggle = memo(function SettingsToggle({
-  icon,
-  label,
-  value,
-  onValueChange,
-  infoText,
-}: {
-  icon: keyof typeof Ionicons.glyphMap
-  label: string
-  value: boolean
-  onValueChange: (value: boolean) => void
-  infoText?: string
-}) {
-  const { colors } = useTheme()
-  return (
-    <View
-      style={{
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        paddingHorizontal: 20,
-        paddingVertical: 16,
-        borderBottomWidth: 1,
-        borderBottomColor: 'rgba(255,255,255,0.05)',
-      }}
-    >
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-        <Ionicons name={icon} size={20} color={colors.secondary} />
-        <Text
-          style={{
-            fontFamily: 'Inter',
-            fontSize: 16,
-            fontWeight: '400',
-            color: colors.onSurface,
-          }}
-        >
-          {label}
-        </Text>
-        {infoText && (
-          <Pressable
-            hitSlop={8}
-            onPress={() => Alert.alert(label, infoText)}
-          >
-            <Ionicons name="information-circle-outline" size={18} color={colors.onSurfaceVariant} />
-          </Pressable>
-        )}
-      </View>
-      <Switch
-        value={value}
-        onValueChange={onValueChange}
-        trackColor={{ false: colors.surfaceContainerHighest, true: colors.primary }}
-        thumbColor="#FFF"
-      />
-    </View>
-  )
-})
-
-const ThemeSwatchPreview = memo(function ThemeSwatchPreview({
-  swatches,
-  size = 'default',
-}: {
-  swatches: readonly [string, string, string] | string[]
-  size?: 'default' | 'small'
-}) {
-  const circleSize = size === 'small' ? 16 : 24
-  const borderW = size === 'small' ? 1 : 2
-  return (
-    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-      {swatches.slice(0, 3).map((color, i) => (
-        <View
-          key={i}
-          style={{
-            width: circleSize,
-            height: circleSize,
-            borderRadius: circleSize / 2,
-            backgroundColor: color,
-            borderWidth: borderW,
-            borderColor: 'rgba(255,255,255,0.15)',
-          }}
-        />
-      ))}
-    </View>
-  )
-})
-
 // ── Main Screen ──
 
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets()
-  const notificationsEnabled = useAppStore((s) => s.notificationsEnabled)
-  const setNotificationsEnabled = useAppStore((s) => s.setNotificationsEnabled)
+  const displayName = useAppStore((s) => s.displayName)
 
-  const { colors, themeKey, setTheme, availableThemes } = useTheme()
-  const [showThemePicker, setShowThemePicker] = useState(false)
+  const { colors } = useTheme()
 
-  useEffect(() => {
-    async function checkPermission() {
-      const { status } = await getPermissionStatus()
-      setNotificationsEnabled(status === 'granted')
-    }
-    checkPermission()
-  }, [setNotificationsEnabled])
-
-  const { user, signOut, loading: authLoading } = useAuth()
+  const { user, loading: authLoading } = useAuth()
 
   const { data: stats, isLoading: statsLoading } = useProfileStats()
   const { data: watchTime, isLoading: watchTimeLoading } = useWatchTimeBreakdown()
@@ -729,9 +563,6 @@ export default function ProfileScreen() {
 
   const { data: credits } = useTitleCredits(sourceTmdbId, sourceMediaType)
   const { data: favoriteMovies } = useFavoriteMovies()
-
-  // Theme label
-  const currentThemeMeta = availableThemes.find((t) => t.key === themeKey)
 
   // Derived sections — all shows in library and watched movies
   const libraryShows = useMemo(() => {
@@ -760,13 +591,6 @@ export default function ProfileScreen() {
 
   const isLoading_ = statsLoading || showsLoading || moviesLoading || authLoading
 
-  const handleSignOut = useCallback(async () => {
-    Alert.alert('Sign out', 'Are you sure you want to sign out?', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Sign out', style: 'destructive', onPress: () => signOut() },
-    ])
-  }, [signOut])
-
   // Dynamic styles that depend on theme
   const styles = useMemo(
     () =>
@@ -787,6 +611,16 @@ export default function ProfileScreen() {
           alignItems: 'center',
           paddingVertical: 32,
           paddingHorizontal: 20,
+        },
+        settingsGear: {
+          position: 'absolute',
+          top: 32,
+          right: 20,
+          width: 40,
+          height: 40,
+          borderRadius: 20,
+          justifyContent: 'center',
+          alignItems: 'center',
         },
         avatarRing: {
           width: 112,
@@ -851,53 +685,6 @@ export default function ProfileScreen() {
           paddingRight: 8,
           gap: 12,
         },
-        // Settings List
-        settingsContainer: {
-          marginHorizontal: 20,
-          marginTop: 8,
-          backgroundColor: colors.surfaceContainer,
-          borderRadius: 16,
-          borderWidth: 1,
-          borderColor: 'rgba(255,255,255,0.05)',
-          overflow: 'hidden',
-        },
-        // Theme Picker
-        themePickerContainer: {
-          paddingHorizontal: 20,
-          paddingBottom: 8,
-          gap: 4,
-        },
-        themeOption: {
-          flexDirection: 'row',
-          alignItems: 'center',
-          gap: 12,
-          paddingVertical: 12,
-          paddingHorizontal: 12,
-          borderRadius: 12,
-        },
-        themeOptionActive: {
-          backgroundColor: 'rgba(255,255,255,0.06)',
-        },
-        themeOptionInfo: {
-          flex: 1,
-        },
-        themeOptionName: {
-          fontFamily: 'Inter',
-          fontSize: 16,
-          fontWeight: '500',
-          color: colors.onSurface,
-        },
-        themeOptionNameActive: {
-          color: colors.primary,
-          fontWeight: '600',
-        },
-        themeOptionDesc: {
-          fontFamily: 'Inter',
-          fontSize: 12,
-          fontWeight: '400',
-          color: colors.onSurfaceVariant,
-          marginTop: 2,
-        },
         // Empty State
         emptyState: {
           marginHorizontal: 20,
@@ -931,29 +718,6 @@ export default function ProfileScreen() {
         },
         emptyActionSecondary: {
           flex: 1,
-        },
-
-        // ── App Footer ──
-        footer: {
-          alignItems: 'center',
-          paddingVertical: 24,
-          paddingBottom: 32,
-        },
-        footerText: {
-          fontFamily: 'Inter',
-          fontSize: 13,
-          fontWeight: '600',
-          color: colors.onSurfaceVariant,
-          letterSpacing: 0.3,
-          opacity: 0.5,
-        },
-        footerVersion: {
-          fontFamily: 'Inter',
-          fontSize: 11,
-          fontWeight: '500',
-          color: colors.onSurfaceVariant,
-          marginTop: 2,
-          opacity: 0.4,
         },
       }),
     [colors]
@@ -1020,36 +784,6 @@ export default function ProfileScreen() {
             ))}
           </View>
 
-          {/* Settings skeleton */}
-          <View
-            style={{
-              marginHorizontal: 20,
-              marginTop: 8,
-              backgroundColor: colors.surfaceContainer,
-              borderRadius: 16,
-              borderWidth: 1,
-              borderColor: 'rgba(255,255,255,0.05)',
-              overflow: 'hidden',
-            }}
-          >
-            {[1, 2, 3].map((i) => (
-              <View
-                key={i}
-                style={{
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  paddingHorizontal: 20,
-                  paddingVertical: 16,
-                  borderBottomWidth: i < 3 ? 1 : 0,
-                  borderBottomColor: 'rgba(255,255,255,0.05)',
-                  gap: 16,
-                }}
-              >
-                <SkeletonBlock width={20} height={20} borderRadius={10} />
-                <SkeletonBlock width="50%" height={16} borderRadius={4} />
-              </View>
-            ))}
-          </View>
         </ScrollView>
       </View>
     )
@@ -1063,6 +797,18 @@ export default function ProfileScreen() {
       >
         {/* ── User Header ── */}
         <View style={styles.userHeader}>
+          <Pressable
+            style={styles.settingsGear}
+            onPress={() => {
+              hapticLight()
+              router.push('/profile/settings')
+            }}
+            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel="Settings"
+          >
+            <Ionicons name="settings-outline" size={24} color={colors.onSurface} />
+          </Pressable>
           <View style={styles.avatarRing}>
             <View style={styles.avatarContainer}>
               {pfpCast.length > 0 ? (
@@ -1085,13 +831,13 @@ export default function ProfileScreen() {
                 </View>
               ) : (
                 <Text style={styles.avatarInitials}>
-                  {user ? getInitials(user.email || '') : 'AT'}
+                  {user ? getInitials(displayName || user.email || '') : 'AT'}
                 </Text>
               )}
             </View>
           </View>
           <Text style={styles.userName}>
-            {user?.email?.split('@')[0] || 'Alex Thorne'}
+            {displayName || user?.email?.split('@')[0] || 'Alex Thorne'}
           </Text>
           <Text style={styles.userBadge}>{user?.email || 'Premium Member'}</Text>
         </View>
@@ -1245,106 +991,6 @@ export default function ProfileScreen() {
             </ScrollView>
           </View>
         )}
-
-        {/* ── Settings List ── */}
-        <View style={styles.settingsContainer}>
-          {/* ── Theme picker (expandable) ── */}
-          <Pressable
-            style={{
-              flexDirection: 'row',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              paddingHorizontal: 20,
-              paddingVertical: 16,
-              borderBottomWidth: 1,
-              borderBottomColor: 'rgba(255,255,255,0.05)',
-            }}
-            onPress={() => setShowThemePicker(!showThemePicker)}
-          >
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 16 }}>
-              <Ionicons name="color-palette-outline" size={20} color={colors.secondary} />
-              <Text
-                style={{
-                  fontFamily: 'Inter',
-                  fontSize: 16,
-                  fontWeight: '400',
-                  color: colors.onSurface,
-                }}
-              >
-                Theme
-              </Text>
-            </View>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-              <ThemeSwatchPreview
-                swatches={currentThemeMeta?.swatches ?? ['#d0bcff', '#8b5cf6', '#15121b']}
-              />
-              <Ionicons
-                name={showThemePicker ? 'chevron-up' : 'chevron-forward'}
-                size={16}
-                color={colors.outlineVariant}
-              />
-            </View>
-          </Pressable>
-
-          {/* ── Theme options (collapsible) ── */}
-          {showThemePicker && (
-            <View style={styles.themePickerContainer}>
-              {availableThemes.map((t) => {
-                const isActive = t.key === themeKey
-                return (
-                  <Pressable
-                    key={t.key}
-                    style={[styles.themeOption, isActive && styles.themeOptionActive]}
-                    onPress={() => {
-                      setTheme(t.key as ThemeKey)
-                      setShowThemePicker(false)
-                    }}
-                  >
-                    <ThemeSwatchPreview swatches={t.swatches} size="small" />
-                    <View style={styles.themeOptionInfo}>
-                      <Text style={[styles.themeOptionName, isActive && styles.themeOptionNameActive]}>
-                        {t.name}
-                      </Text>
-                      <Text style={styles.themeOptionDesc}>{t.description}</Text>
-                    </View>
-                    {isActive && (
-                      <Ionicons name="checkmark-circle" size={20} color={colors.primary} />
-                    )}
-                  </Pressable>
-                )
-              })}
-            </View>
-          )}
-
-          <SettingsToggle
-            icon="notifications-outline"
-            label="Notifications"
-            value={notificationsEnabled}
-            infoText="Get notified when new episodes of your watchlisted shows are airing. Notifications are scheduled for each upcoming episode."
-            onValueChange={async (value) => {
-              if (value) {
-                const granted = await requestNotificationPermissions()
-                setNotificationsEnabled(granted)
-              } else {
-                setNotificationsEnabled(false)
-                await cancelAllReminders()
-              }
-            }}
-          />
-          <SettingsRow
-            icon="log-out-outline"
-            label="Sign Out"
-            rightLabel=""
-            showChevron={false}
-            onPress={handleSignOut}
-          />
-        </View>
-
-        {/* App footer */}
-        <View style={styles.footer}>
-          <Text style={styles.footerText}>BingeTime</Text>
-          <Text style={styles.footerVersion}>v{Constants.expoConfig?.version ?? '1.0.0'}</Text>
-        </View>
       </ScrollView>
     </View>
   )

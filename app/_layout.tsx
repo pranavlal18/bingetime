@@ -196,6 +196,10 @@ function InnerLayout() {
             name="person/[id]/credits"
             options={{ animation: 'slide_from_right' }}
           />
+          <Stack.Screen
+            name="profile/settings"
+            options={{ animation: 'slide_from_right' }}
+          />
         </Stack>
         <Toast />
       </PersistQueryClientProvider>
