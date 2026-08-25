@@ -218,6 +218,10 @@ export default function EpisodeCard({ data, sectionKind, onMarkWatched }: Episod
     color: colors.onSurfaceVariant,
     marginTop: spacing.unit,
   },
+  networkTappable: {
+    color: colors.primary,
+    fontWeight: '600',
+  },
   checkmarkContainer: {
     justifyContent: 'center',
     alignItems: 'center',
@@ -355,9 +359,31 @@ export default function EpisodeCard({ data, sectionKind, onMarkWatched }: Episod
             <>
               {data.airTime && <Text style={styles.airTime}>{formatAirTime(data.airTime)}</Text>}
               {data.network && (
-                <Text style={styles.network} numberOfLines={1}>
-                  {data.network}
-                </Text>
+                <Pressable
+                  onPress={
+                    data.networkId
+                      ? () => {
+                          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
+                          router.push(
+                            `/discover/network?id=${data.networkId}&name=${encodeURIComponent(data.network ?? '')}&type=tv`
+                          )
+                        }
+                      : undefined
+                  }
+                  hitSlop={6}
+                  disabled={!data.networkId}
+                  accessibilityRole={data.networkId ? 'button' : 'text'}
+                  accessibilityLabel={data.networkId ? `Browse shows on ${data.network}` : data.network}
+                >
+                  {({ pressed }) => (
+                    <Text
+                      style={[styles.network, data.networkId ? styles.networkTappable : null, pressed && { opacity: 0.6 }]}
+                      numberOfLines={1}
+                    >
+                      {data.network}
+                    </Text>
+                  )}
+                </Pressable>
               )}
             </>
           ) : (

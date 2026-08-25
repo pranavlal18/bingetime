@@ -55,6 +55,7 @@ interface ShowWithNextAir {
   episodeName: string | null
   airDate: string
   networkName: string | null
+  networkId: number | null
   isPremiere: boolean
 }
 
@@ -77,6 +78,7 @@ async function fetchNextAirForShow(tmdbId: number): Promise<Omit<ShowWithNextAir
       episodeName: nextEp.name || null,
       airDate: nextEp.air_date,
       networkName: details.networks?.[0]?.name ?? null,
+      networkId: details.networks?.[0]?.id ?? null,
       isPremiere: nextEp.episode_number === 1,
     }
   } catch {
@@ -153,6 +155,7 @@ async function fetchUpcomingEpisodes(userId: string): Promise<EpisodeSection[]> 
           isWatched: false,
           airTime: airDate.toISOString(), // Include time for notification scheduling
           network: r.networkName,
+          networkId: r.networkId,
           isPremiere: r.isPremiere,
           isFinale: false,
           showStatus: null,

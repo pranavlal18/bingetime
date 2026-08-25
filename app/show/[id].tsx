@@ -28,6 +28,7 @@ import { useTheme } from '@/contexts/ThemeContext'
 import EpisodeDetailModal from '@/components/episodes/EpisodeDetailModal'
 import DetailTabs, { type DetailTabKey } from '@/components/detail/DetailTabs'
 import CastRow from '@/components/detail/CastRow'
+import TappableLogoPills from '@/components/detail/TappableLogoPills'
 import { useTitleCredits } from '@/lib/queries/credits'
 
 import { isAired, getDaysUntilAiring, isNew, formatRuntime } from '@/utils'
@@ -964,9 +965,15 @@ export default function ShowDetailScreen() {
                     {tmdbDetails?.networks && tmdbDetails.networks.length > 0 && (
                       <View style={styles.detailItem}>
                         <Text style={styles.detailLabel}>Network</Text>
-                        <Text style={styles.detailValue}>
-                          {tmdbDetails.networks.map((n) => n.name).join(', ')}
-                        </Text>
+                        <TappableLogoPills
+                          items={tmdbDetails.networks.slice(0, 2)}
+                          onPress={(n) =>
+                            router.push(
+                              `/discover/network?id=${n.id}&name=${encodeURIComponent(n.name)}&logo=${encodeURIComponent(n.logo_path ?? '')}&type=tv`
+                            )
+                          }
+                          accessibilityLabelFor={(n) => `Browse shows on ${n.name}`}
+                        />
                       </View>
                     )}
                     {tmdbDetails?.genres && tmdbDetails.genres.length > 0 && (

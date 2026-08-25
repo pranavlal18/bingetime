@@ -25,6 +25,7 @@ import LibraryToggle from '@/components/ui/LibraryToggle'
 import FavoriteToggle from '@/components/ui/FavoriteToggle'
 import ErrorState from '@/components/ui/ErrorState'
 import CastRow from '@/components/detail/CastRow'
+import TappableLogoPills from '@/components/detail/TappableLogoPills'
 import { useTitleCredits } from '@/lib/queries/credits'
 import { typography, spacing, borderRadius } from '@/theme'
 import { useTheme } from '@/contexts/ThemeContext'
@@ -471,7 +472,7 @@ export default function MovieDetailScreen() {
           </View>
 
           {/* ── Details grid ── */}
-          {(tmdbDetails?.genres?.length || runtimeDisplay) ? (
+          {(tmdbDetails?.genres?.length || runtimeDisplay || tmdbDetails?.production_companies?.length) ? (
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>Details</Text>
               <View style={styles.detailsGrid}>
@@ -499,6 +500,20 @@ export default function MovieDetailScreen() {
                         </Pressable>
                       ))}
                     </View>
+                  </View>
+                ) : null}
+                {tmdbDetails?.production_companies && tmdbDetails.production_companies.length > 0 ? (
+                  <View style={[styles.detailItem, { flex: 1, minWidth: '100%' }]}>
+                    <Text style={styles.detailLabel}>Studios</Text>
+                    <TappableLogoPills
+                      items={tmdbDetails.production_companies.slice(0, 2)}
+                      onPress={(c) =>
+                        router.push(
+                          `/discover/company?id=${c.id}&name=${encodeURIComponent(c.name)}&logo=${encodeURIComponent(c.logo_path ?? '')}&type=movie`
+                        )
+                      }
+                      accessibilityLabelFor={(c) => `Browse movies by ${c.name}`}
+                    />
                   </View>
                 ) : null}
                 {runtimeDisplay ? (
