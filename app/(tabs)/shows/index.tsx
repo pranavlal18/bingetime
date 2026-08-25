@@ -504,7 +504,8 @@ export default function ShowsScreen() {
           paddingTop: spacing.unit,
         },
         listContentEmpty: {
-          flex: 1,
+          // flexGrow (not flex) — lets empty content stretch to center
+          flexGrow: 1,
           justifyContent: 'center',
         },
 

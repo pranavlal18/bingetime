@@ -22,6 +22,7 @@ import { getImageUrl } from '@/lib/tmdb'
 import { useQueryClient } from '@tanstack/react-query'
 import { borderRadius, spacing } from '@/theme'
 import { useTheme } from '@/contexts/ThemeContext'
+import ErrorState from '@/components/ui/ErrorState'
 
 // Grid geometry: 20dp side padding, 8dp column gap → 171dp cards @ 390dp screen
 const SIDE_OFFSET = 20
@@ -159,6 +160,7 @@ export default function GenrePage() {
     data,
     isLoading,
     error,
+    refetch,
     fetchNextPage,
     hasNextPage,
     isFetchingNextPage,
@@ -274,13 +276,9 @@ export default function GenrePage() {
   // ── Error ──
   if (error) {
     return (
-      <View style={[styles.container, styles.centered, { paddingTop: insets.top }]}>
+      <View style={[styles.container, { paddingTop: insets.top }]}>
         <Stack.Screen options={{ headerShown: false }} />
-        <Ionicons name="cloud-offline-outline" size={48} color={colors.onSurfaceVariant} />
-        <Text style={styles.emptyText}>Failed to load {genreName}</Text>
-        <Pressable onPress={() => router.back()}>
-          <Text style={[styles.emptyText, { color: colors.primary }]}>Go back</Text>
-        </Pressable>
+        <ErrorState title={`Failed to load ${genreName}`} onRetry={refetch} onGoBack={() => router.back()} />
       </View>
     )
   }

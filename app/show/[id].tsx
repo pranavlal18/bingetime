@@ -22,6 +22,7 @@ import { getShowDetails, getImageUrl } from '@/lib/tmdb'
 import { useQuery } from '@tanstack/react-query'
 import LibraryToggle from '@/components/ui/LibraryToggle'
 import FavoriteToggle from '@/components/ui/FavoriteToggle'
+import ErrorState from '@/components/ui/ErrorState'
 import { typography, spacing, borderRadius } from '@/theme'
 import { useTheme } from '@/contexts/ThemeContext'
 import EpisodeDetailModal from '@/components/episodes/EpisodeDetailModal'
@@ -579,7 +580,7 @@ export default function ShowDetailScreen() {
   const isTmdbIdParam = /^\d+$/.test(id)
 
   // ── Data ──
-  const { data: show, isLoading, error } = useShow(id)
+  const { data: show, isLoading, error, refetch } = useShow(id)
   const markWatchedMutation = useMarkWatched()
   const toggleFavoriteMutation = useToggleFavorite()
   const updateShowRuntimeMutation = useUpdateShowRuntime()
@@ -792,12 +793,8 @@ export default function ShowDetailScreen() {
   const isFallbackError = !show && !tmdbDetails && isTmdbIdParam && !tmdbLoading
   if (isRealDbError || isFallbackError) {
     return (
-      <View style={[styles.container, styles.centered, { paddingTop: insets.top }]}>
-        <Ionicons name="alert-circle-outline" size={48} color={colors.outline} />
-        <Text style={styles.errorText}>Could not load show details</Text>
-        <Pressable onPress={handleBack} style={styles.errorBackBtn}>
-          <Text style={styles.errorBackBtnText}>Go back</Text>
-        </Pressable>
+      <View style={[styles.container, { paddingTop: insets.top }]}>
+        <ErrorState title="Could not load show details" onRetry={refetch} onGoBack={handleBack} />
       </View>
     )
   }

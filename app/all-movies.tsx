@@ -185,7 +185,7 @@ export default function AllMoviesScreen() {
       paddingTop: spacing.stackSm,
     },
     listContentEmpty: {
-      flex: 1,
+      flexGrow: 1,
       justifyContent: 'center',
     },
     emptyState: {

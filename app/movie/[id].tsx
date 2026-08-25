@@ -23,6 +23,7 @@ import { getMovieDetails, getImageUrl } from '@/lib/tmdb'
 import { useQuery } from '@tanstack/react-query'
 import LibraryToggle from '@/components/ui/LibraryToggle'
 import FavoriteToggle from '@/components/ui/FavoriteToggle'
+import ErrorState from '@/components/ui/ErrorState'
 import CastRow from '@/components/detail/CastRow'
 import { useTitleCredits } from '@/lib/queries/credits'
 import { typography, spacing, borderRadius } from '@/theme'
@@ -280,7 +281,7 @@ export default function MovieDetailScreen() {
   // Detect if the id param is a TMDb ID (numeric) vs a UUID
   const isTmdbIdParam = /^\d+$/.test(id)
 
-  const { data: movie, isLoading, error } = useMovie(id)
+  const { data: movie, isLoading, error, refetch } = useMovie(id)
   const toggleWatchedMutation = useToggleMovieWatched()
   const toggleFavoriteMutation = useToggleMovieFavorite()
 
@@ -336,12 +337,8 @@ export default function MovieDetailScreen() {
   const isFallbackError = !movie && !tmdbDetails && isTmdbIdParam && !tmdbLoading
   if (isRealDbError || isFallbackError) {
     return (
-      <View style={[styles.container, styles.centered, { paddingTop: insets.top }]}>
-        <Ionicons name="alert-circle-outline" size={48} color={colors.onSurfaceVariant} />
-        <Text style={styles.errorText}>Could not load movie details</Text>
-        <Pressable onPress={handleBack} style={styles.goBackButton}>
-          <Text style={styles.goBackText}>Go back</Text>
-        </Pressable>
+      <View style={[styles.container, { paddingTop: insets.top }]}>
+        <ErrorState title="Could not load movie details" onRetry={refetch} onGoBack={handleBack} />
       </View>
     )
   }

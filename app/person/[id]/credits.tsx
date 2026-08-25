@@ -10,6 +10,7 @@ import * as Haptics from 'expo-haptics'
 import { usePerson, dedupeCredits, isScriptedCredit } from '@/lib/queries/people'
 import type { TMDbCombinedCredit } from '@/lib/tmdb'
 import CreditCard from '@/components/detail/CreditCard'
+import ErrorState from '@/components/ui/ErrorState'
 import { typography, spacing, borderRadius } from '@/theme'
 import { useTheme } from '@/contexts/ThemeContext'
 
@@ -63,7 +64,7 @@ export default function PersonCreditsScreen() {
   }, [id])
   const isValidId = personId != null
 
-  const { data: person, isLoading } = usePerson(isValidId ? personId : undefined)
+  const { data: person, isLoading, error, refetch } = usePerson(isValidId ? personId : undefined)
 
   const styles = useMemo(
     () =>
@@ -269,6 +270,19 @@ export default function PersonCreditsScreen() {
         <Pressable onPress={handleBack} style={styles.goBackButton}>
           <Text style={styles.goBackText}>Go back</Text>
         </Pressable>
+      </View>
+    )
+  }
+
+  if (error || (!person && !isLoading)) {
+    return (
+      <View style={[styles.container, styles.centered, { paddingTop: insets.top }]}>
+        <Stack.Screen options={{ headerShown: false }} />
+        <ErrorState
+          title="Could not load credits"
+          onRetry={refetch}
+          onGoBack={handleBack}
+        />
       </View>
     )
   }

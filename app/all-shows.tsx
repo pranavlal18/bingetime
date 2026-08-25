@@ -172,7 +172,7 @@ export default function AllShowsScreen() {
       paddingTop: spacing.stackSm,
     },
     listContentEmpty: {
-      flex: 1,
+      flexGrow: 1,
       justifyContent: 'center',
     },
 

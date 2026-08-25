@@ -10,6 +10,7 @@ import { usePerson, topKnownFor } from '@/lib/queries/people'
 import { getImageUrl } from '@/lib/tmdb'
 import type { TMDbCombinedCredit } from '@/lib/tmdb'
 import CreditCard from '@/components/detail/CreditCard'
+import ErrorState from '@/components/ui/ErrorState'
 import { typography, spacing, borderRadius } from '@/theme'
 import { useTheme } from '@/contexts/ThemeContext'
 
@@ -41,7 +42,7 @@ export default function PersonDetailScreen() {
     return /^\d+$/.test(raw) ? parseInt(raw, 10) : null
   }, [id])
 
-  const { data: person, isLoading, error } = usePerson(personId)
+  const { data: person, isLoading, error, refetch } = usePerson(personId)
   const knownFor = useMemo(() => topKnownFor(person, 8), [person])
 
   const styles = useMemo(
@@ -242,13 +243,13 @@ export default function PersonDetailScreen() {
 
   if (error || (!person && !isLoading)) {
     return (
-      <View style={[styles.container, styles.centered, { paddingTop: insets.top }]}>
+      <View style={[styles.container, { paddingTop: insets.top }]}>
         <Stack.Screen options={{ headerShown: false }} />
-        <Ionicons name="alert-circle-outline" size={48} color={colors.onSurfaceVariant} />
-        <Text style={styles.errorText}>Could not load person details</Text>
-        <Pressable onPress={() => router.back()} style={styles.goBackButton}>
-          <Text style={styles.goBackText}>Go back</Text>
-        </Pressable>
+        <ErrorState
+          title="Could not load person details"
+          onRetry={refetch}
+          onGoBack={() => router.back()}
+        />
       </View>
     )
   }

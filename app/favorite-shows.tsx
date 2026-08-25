@@ -379,7 +379,7 @@ export default function FavoriteShowsScreen() {
           paddingTop: spacing.stackSm,
         },
         listContentEmpty: {
-          flex: 1,
+          flexGrow: 1,
           justifyContent: 'center',
         },
 
