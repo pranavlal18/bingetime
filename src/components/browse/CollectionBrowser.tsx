@@ -391,9 +391,11 @@ export default function CollectionBrowser({
           paddingHorizontal: spacing.marginMobile,
           paddingVertical: 12,
           paddingBottom: 12 + insets.bottom,
-          backgroundColor: colors.surfaceContainer,
+          backgroundColor: colors.surfaceContainerHigh,
           borderTopWidth: 1,
           borderTopColor: colors.outlineVariant,
+          zIndex: 10,
+          elevation: 8,
         }}
       >
         <Pressable
