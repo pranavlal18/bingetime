@@ -127,9 +127,9 @@ export function useTrending(filter: MediaFilter) {
   })
 }
 
-// ── Genre pages — public TMDb data, popularity-sorted, paged ──
+// ── Browse pages (genre / network / company) — public TMDb data, paged ──
 
-export interface GenreTitle {
+export interface DiscoverTitle {
   tmdbId: number
   mediaType: 'tv' | 'movie'
   title: string
@@ -137,14 +137,14 @@ export interface GenreTitle {
   year: string | null
 }
 
-const GENRE_TITLES_STALE_TIME = 1000 * 60 * 10 // 10 min
+const DISCOVER_TITLES_STALE_TIME = 1000 * 60 * 10 // 10 min
 
-export type GenreSortOption = {
+export type BrowseSortOption = {
   label: string
   value: tmdb.GenreSortBy
 }
 
-export const GENRE_SORT_OPTIONS: Record<'tv' | 'movie', GenreSortOption[]> = {
+export const BROWSE_SORT_OPTIONS: Record<'tv' | 'movie', BrowseSortOption[]> = {
   tv: [
     { label: 'Popular', value: 'popularity.desc' },
     { label: 'Top Rated', value: 'vote_average.desc' },
@@ -170,16 +170,17 @@ export function useGenres(mediaType: 'tv' | 'movie') {
   })
 }
 
-export function useGenreTitles(
+export function useDiscoverTitles(
   mediaType: 'tv' | 'movie',
-  genreId: number | null,
+  kind: tmdb.DiscoverFilterKind,
+  id: number | null,
   sortBy: tmdb.GenreSortBy = 'popularity.desc'
 ) {
   return useInfiniteQuery({
-    queryKey: ['tmdb', 'genre', mediaType, genreId, sortBy],
+    queryKey: ['tmdb', 'discover', mediaType, kind, id, sortBy],
     queryFn: async ({ pageParam }) => {
-      const res = await tmdb.discoverByGenre(mediaType, genreId as number, pageParam, sortBy)
-      const items: GenreTitle[] = res.results.map((r) => ({
+      const res = await tmdb.discoverTitles(mediaType, kind, id as number, pageParam, sortBy)
+      const items: DiscoverTitle[] = res.results.map((r) => ({
         tmdbId: r.id,
         mediaType,
         title: (mediaType === 'movie' ? r.title : r.name) ?? 'Unknown',
@@ -190,8 +191,8 @@ export function useGenreTitles(
     },
     initialPageParam: 1,
     getNextPageParam: (lastPage) => lastPage.nextPage,
-    enabled: !!genreId,
-    staleTime: GENRE_TITLES_STALE_TIME,
+    enabled: !!id,
+    staleTime: DISCOVER_TITLES_STALE_TIME,
     gcTime: 1000 * 60 * 30,
   })
 }

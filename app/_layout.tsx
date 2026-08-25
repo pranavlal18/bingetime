@@ -165,6 +165,14 @@ function InnerLayout() {
             options={{ animation: 'slide_from_right' }}
           />
           <Stack.Screen
+            name="discover/network"
+            options={{ animation: 'slide_from_right' }}
+          />
+          <Stack.Screen
+            name="discover/company"
+            options={{ animation: 'slide_from_right' }}
+          />
+          <Stack.Screen
             name="all-shows"
             options={{ animation: 'slide_from_right' }}
           />

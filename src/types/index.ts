@@ -148,6 +148,11 @@ export interface TMDbMovieDetails {
   release_date: string | null
   runtime: number | null
   genres?: Array<{ id: number; name: string }>
+  production_companies?: Array<{
+    id: number
+    name: string
+    logo_path: string | null
+  }>
 }
 
 export interface TMDbSeasonDetails {
@@ -261,6 +266,7 @@ export interface EpisodeCardData {
   // Upcoming-only fields
   airTime?: string | null
   network?: string | null
+  networkId?: number | null
   // Tracking
   showStatus?: string | null
 }

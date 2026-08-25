@@ -1,4 +1,5 @@
-// ─── GenreSortSheet — Spotify-style bottom sheet for genre sorting ───
+// ─── BrowseSortSheet — Spotify-style bottom sheet for browse-page sorting ───
+// Shared by genre / network / company pages; options passed in by caller.
 
 import { useEffect, useMemo } from 'react'
 import { View, Text, Pressable, StyleSheet, Modal } from 'react-native'
@@ -14,17 +15,17 @@ import Animated, {
 import { useTheme } from '@/contexts/ThemeContext'
 import { spacing, borderRadius } from '@/theme'
 import type { GenreSortBy } from '@/lib/tmdb'
-import { GENRE_SORT_OPTIONS } from '@/lib/queries/discover'
+import type { BrowseSortOption } from '@/lib/queries/discover'
 
-interface GenreSortSheetProps {
+interface BrowseSortSheetProps {
   visible: boolean
   onClose: () => void
-  mediaType: 'tv' | 'movie'
   value: GenreSortBy
   onChange: (v: GenreSortBy) => void
+  options: BrowseSortOption[]
 }
 
-export default function GenreSortSheet({ visible, onClose, mediaType, value, onChange }: GenreSortSheetProps) {
+export default function BrowseSortSheet({ visible, onClose, value, onChange, options }: BrowseSortSheetProps) {
   const { colors } = useTheme()
   const translateY = useSharedValue(0)
   const contextY = useSharedValue(0)
@@ -53,8 +54,6 @@ export default function GenreSortSheet({ visible, onClose, mediaType, value, onC
   const sheetAnimatedStyle = useAnimatedStyle(() => ({
     transform: [{ translateY: translateY.value }],
   }))
-
-  const options = GENRE_SORT_OPTIONS[mediaType]
 
   const styles = useMemo(
     () =>

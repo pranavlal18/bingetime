@@ -94,20 +94,44 @@ export type GenreSortBy =
   | 'original_title.asc'
   | 'vote_count.desc'
 
-/** Discover titles by genre, paged — backs the genre pages */
-export async function discoverByGenre(
+/** What a browse page filters TMDb discover by */
+export type DiscoverFilterKind = 'genre' | 'network' | 'company'
+
+/** Discover titles by genre / network / company, paged — backs all browse pages */
+export async function discoverTitles(
+  mediaType: 'tv' | 'movie',
+  kind: DiscoverFilterKind,
+  id: number,
+  page = 1,
+  sortBy: GenreSortBy = 'popularity.desc'
+) {
+  const filterParam =
+    kind === 'genre' ? 'with_genres' : kind === 'network' ? 'with_networks' : 'with_companies'
+  const params: Record<string, string> = {
+    [filterParam]: String(id),
+    sort_by: sortBy,
+    include_adult: 'false',
+    page: String(page),
+  }
+  // "Newest" should show already-released titles, not far-future (e.g. 2030) placeholders
+  if (sortBy === 'primary_release_date.desc' || sortBy === 'first_air_date.desc') {
+    const today = new Date().toISOString().slice(0, 10)
+    if (mediaType === 'movie') {
+      params['primary_release_date.lte'] = today
+    } else {
+      params['first_air_date.lte'] = today
+    }
+  }
+  return tmdbFetch<TMDbSearchResponse>(`/discover/${mediaType}`, params)
+}
+
+// Back-compat alias — existing call sites use discoverByGenre
+export const discoverByGenre = (
   mediaType: 'tv' | 'movie',
   genreId: number,
   page = 1,
   sortBy: GenreSortBy = 'popularity.desc'
-) {
-  return tmdbFetch<TMDbSearchResponse>(`/discover/${mediaType}`, {
-    with_genres: String(genreId),
-    sort_by: sortBy,
-    include_adult: 'false',
-    page: String(page),
-  })
-}
+) => discoverTitles(mediaType, 'genre', genreId, page, sortBy)
 
 export interface TMDbGenre {
   id: number
