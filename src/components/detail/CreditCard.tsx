@@ -5,7 +5,7 @@
 // Every text line has a reserved fixed height — content length can never change
 // card dimensions — and cards in the same grid row align on one baseline.
 
-import { useMemo } from 'react'
+import { useMemo, type ReactNode } from 'react'
 import { Text, View, StyleSheet, Pressable } from 'react-native'
 import { Image } from 'expo-image'
 import { Ionicons } from '@expo/vector-icons'
@@ -33,6 +33,8 @@ interface CreditCardProps {
   width?: number
   /** true → credits-grid sizing (12px title / h32 reserve). */
   compact?: boolean
+  /** Optional overlay (e.g. LibraryBadge) positioned top-right of the poster. */
+  badge?: ReactNode
   onPress: () => void
 }
 
@@ -43,6 +45,7 @@ export default function CreditCard({
   roleLabel,
   width,
   compact = false,
+  badge,
   onPress,
 }: CreditCardProps) {
   const { colors } = useTheme()
@@ -116,20 +119,23 @@ export default function CreditCard({
       accessibilityRole="button"
       accessibilityLabel={`${title}${year ? ` (${year})` : ''}`}
     >
-      {posterUrl ? (
-        <Image
-          source={{ uri: posterUrl }}
-          style={styles.poster}
-          contentFit="cover"
-          cachePolicy="memory-disk"
-          recyclingKey={posterUrl}
-          transition={150}
-        />
-      ) : (
-        <View style={[styles.poster, styles.posterFallback]}>
-          <Ionicons name="film-outline" size={24} color={colors.outlineVariant} />
-        </View>
-      )}
+      <View>
+        {posterUrl ? (
+          <Image
+            source={{ uri: posterUrl }}
+            style={styles.poster}
+            contentFit="cover"
+            cachePolicy="memory-disk"
+            recyclingKey={posterUrl}
+            transition={150}
+          />
+        ) : (
+          <View style={[styles.poster, styles.posterFallback]}>
+            <Ionicons name="film-outline" size={24} color={colors.outlineVariant} />
+          </View>
+        )}
+        {badge}
+      </View>
       <Text numberOfLines={2} ellipsizeMode="tail" style={compact ? styles.titleCompact : styles.titleNormal}>
         {title}
       </Text>

@@ -2,7 +2,7 @@
 // Header (back + brand logo or title), sort bottom sheet, sticky count bar,
 // and a 2-column poster grid with infinite scroll over TMDb discover.
 
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   View,
   Text,
@@ -10,6 +10,7 @@ import {
   StyleSheet,
   useWindowDimensions,
   ActivityIndicator,
+  Alert,
 } from 'react-native'
 import { FlashList } from '@shopify/flash-list'
 import { router, Stack } from 'expo-router'
@@ -20,13 +21,19 @@ import * as Haptics from 'expo-haptics'
 import { useQueryClient } from '@tanstack/react-query'
 import {
   useDiscoverTitles,
+  useAddToLibrary,
+  useRemoveFromLibrary,
   BROWSE_SORT_OPTIONS,
   type DiscoverTitle,
 } from '@/lib/queries/discover'
+import { fetchLibraryStatus } from '@/lib/queries/libraryStatus'
+import LibraryBadge from '@/components/ui/LibraryBadge'
 import { prefetchTitleDetails } from '@/lib/queries/prefetch'
 import { getImageUrl, type DiscoverFilterKind, type GenreSortBy } from '@/lib/tmdb'
+import { getLogoIsDark } from '@/utils/logoLuminance'
 import { borderRadius, spacing } from '@/theme'
 import { useTheme } from '@/contexts/ThemeContext'
+import { useAuth } from '@/contexts/AuthContext'
 import ErrorState from '@/components/ui/ErrorState'
 import BrowseSortSheet from '@/components/discover/BrowseSortSheet'
 
@@ -42,7 +49,20 @@ const TITLE_BLOCK_HEIGHT = TITLE_LINES * TITLE_LINE
 // outer edges at exactly SIDE_OFFSET and center gutter at COL_GAP.
 const CONTENT_PAD = SIDE_OFFSET - COL_GAP / 2
 
-function TitleCard({ item }: { item: DiscoverTitle }) {
+// Soft off-white backdrop used behind dark brand logos (see utils/logoLuminance)
+const LIGHT_LOGO_TILE = '#ECE9F1'
+
+function TitleCard({
+  item,
+  isInLibrary,
+  isPending,
+  onToggleLibrary,
+}: {
+  item: DiscoverTitle
+  isInLibrary: boolean
+  isPending: boolean
+  onToggleLibrary: () => void
+}) {
   const queryClient = useQueryClient()
   const { colors } = useTheme()
   const { width: winW } = useWindowDimensions()
@@ -69,6 +89,7 @@ function TitleCard({ item }: { item: DiscoverTitle }) {
           backgroundColor: colors.surfaceDim,
           borderWidth: 1,
           borderColor: colors.outlineVariant,
+          position: 'relative',
         },
         poster: {
           width: '100%',
@@ -99,7 +120,7 @@ function TitleCard({ item }: { item: DiscoverTitle }) {
           marginTop: 3,
         },
       }),
-    [colors]
+    [colors, posterH]
   )
 
   const handlePress = useCallback(() => {
@@ -137,6 +158,12 @@ function TitleCard({ item }: { item: DiscoverTitle }) {
             />
           </View>
         )}
+        <LibraryBadge
+          size={26}
+          isInLibrary={isInLibrary}
+          isPending={isPending}
+          onToggle={onToggleLibrary}
+        />
       </View>
       <Text numberOfLines={2} ellipsizeMode="tail" style={styles.title}>
         {item.title}
@@ -175,6 +202,7 @@ export default function CollectionBrowser({
 }: CollectionBrowserProps) {
   const insets = useSafeAreaInsets()
   const { colors } = useTheme()
+  const { user } = useAuth()
 
   const [sortBy, setSortBy] = useState<GenreSortBy>('popularity.desc')
   const [sheetVisible, setSheetVisible] = useState(false)
@@ -183,7 +211,34 @@ export default function CollectionBrowser({
     [mediaType, sortBy]
   )
 
-  const headerLogoUrl = getImageUrl(logoPath ?? null, 'w154')
+  // Header logo: RN images need explicit dimensions — measure the real aspect
+  // ratio on load and derive width from the fixed height. Until then assume a
+  // typical wordmark ratio (~2). On failure fall back to the text title.
+  const HEADER_LOGO_HEIGHT = 26
+  const [headerLogoRatio, setHeaderLogoRatio] = useState(2)
+  const [headerLogoFailed, setHeaderLogoFailed] = useState(false)
+
+  // expo-image can't reliably render SVGs — treat them as unavailable up front
+  const headerLogoUrl = useMemo(() => {
+    const url = getImageUrl(logoPath ?? null, 'w154')
+    return url && !url.endsWith('.svg') ? url : null
+  }, [logoPath])
+  const showHeaderLogo = !!headerLogoUrl && !headerLogoFailed
+
+  // Dark logos (black wordmarks) vanish on the dark background — detect them
+  // once per URL and give those a light tile behind the mark
+  const [headerLogoIsDark, setHeaderLogoIsDark] = useState(false)
+  useEffect(() => {
+    let cancelled = false
+    setHeaderLogoIsDark(false)
+    if (!headerLogoUrl) return
+    getLogoIsDark(headerLogoUrl).then((dark) => {
+      if (!cancelled && dark === true) setHeaderLogoIsDark(true)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [headerLogoUrl])
 
   const {
     data,
@@ -198,6 +253,76 @@ export default function CollectionBrowser({
   const titles = useMemo(
     () => (data ? data.pages.flatMap((p) => p.items) : []),
     [data]
+  )
+
+  // ── Watchlist state (Discover pattern: batch enrich + optimistic session map) ──
+  const addMutation = useAddToLibrary()
+  const removeMutation = useRemoveFromLibrary()
+  const addingIds = useRef(new Set<number>())
+  const removingIds = useRef(new Set<number>())
+  const [, forceRender] = useState(0)
+  const localLibraryRef = useRef<Map<number, 'added' | 'removed'>>(new Map())
+  const statusMapRef = useRef<Map<number, 'in' | 'out'>>(new Map())
+
+  // Batched watchlist lookup for every loaded page of titles
+  useEffect(() => {
+    if (!user || titles.length === 0) return
+    let cancelled = false
+    fetchLibraryStatus(titles, user.id)
+      .then((map) => {
+        if (cancelled) return
+        for (const t of titles) {
+          statusMapRef.current.set(t.tmdbId, map.has(t.tmdbId) ? 'in' : 'out')
+        }
+        forceRender((n) => n + 1)
+      })
+      .catch(() => {
+        // Silent — badges stay '+' and remain functional via local toggles
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [titles, user])
+
+  const isInLibrary = useCallback((tmdbId: number) => {
+    const localStatus = localLibraryRef.current.get(tmdbId)
+    if (localStatus === 'added') return true
+    if (localStatus === 'removed') return false
+    return statusMapRef.current.get(tmdbId) === 'in'
+  }, [])
+
+  const handleToggleLibrary = useCallback(
+    (item: DiscoverTitle) => {
+      const wasIn = isInLibrary(item.tmdbId)
+      // Optimistic flip
+      localLibraryRef.current.set(item.tmdbId, wasIn ? 'removed' : 'added')
+      const pending = wasIn ? removingIds.current : addingIds.current
+      pending.add(item.tmdbId)
+      forceRender((n) => n + 1)
+
+      const discoverItem = {
+        tmdbId: item.tmdbId,
+        mediaType: item.mediaType,
+        title: item.title,
+        poster_path: item.poster_path,
+        year: item.year,
+        releaseDate: null,
+        overview: null,
+        inLibrary: wasIn,
+      }
+      const mutation = wasIn ? removeMutation : addMutation
+      mutation.mutate(discoverItem as any, {
+        onError: (err: Error) => {
+          Alert.alert(wasIn ? 'Failed to remove' : 'Failed to add', err.message)
+          localLibraryRef.current.delete(item.tmdbId)
+        },
+        onSettled: () => {
+          pending.delete(item.tmdbId)
+          forceRender((n) => n + 1)
+        },
+      })
+    },
+    [isInLibrary, addMutation, removeMutation]
   )
 
   const styles = useMemo(
@@ -229,9 +354,17 @@ export default function CollectionBrowser({
           marginLeft: -8,
         },
         headerLogo: {
-          height: 26,
-          maxWidth: '70%',
+          height: HEADER_LOGO_HEIGHT,
           marginLeft: 6,
+        },
+        // Light backdrop for dark logos (black wordmarks) so they read on the
+        // dark background — see utils/logoLuminance
+        headerLogoTile: {
+          backgroundColor: LIGHT_LOGO_TILE,
+          borderRadius: borderRadius.md,
+          paddingHorizontal: 10,
+          paddingVertical: 8,
+          marginLeft: 2,
         },
         headerTitle: {
           fontFamily: 'Inter',
@@ -270,10 +403,15 @@ export default function CollectionBrowser({
     ({ item }: { item: DiscoverTitle }) => (
       // Half-gutter padding on every cell = COL_GAP center gutter (v2 grid)
       <View style={{ flex: 1, paddingHorizontal: COL_GAP / 2 }}>
-        <TitleCard item={item} />
+        <TitleCard
+          item={item}
+          isInLibrary={isInLibrary(item.tmdbId)}
+          isPending={addingIds.current.has(item.tmdbId) || removingIds.current.has(item.tmdbId)}
+          onToggleLibrary={() => handleToggleLibrary(item)}
+        />
       </View>
     ),
-    []
+    [isInLibrary, handleToggleLibrary]
   )
 
   const keyExtractor = useCallback(
@@ -335,16 +473,40 @@ export default function CollectionBrowser({
         >
           <Ionicons name="chevron-back" size={24} color={colors.primary} />
         </Pressable>
-        {headerLogoUrl ? (
-          <Image
-            source={{ uri: headerLogoUrl }}
-            recyclingKey={headerLogoUrl}
-            style={styles.headerLogo}
-            contentFit="contain"
-            cachePolicy="memory-disk"
-            transition={150}
-            accessibilityLabel={name}
-          />
+        {showHeaderLogo ? (
+          headerLogoIsDark ? (
+            <View style={styles.headerLogoTile}>
+              <Image
+                source={{ uri: headerLogoUrl ?? undefined }}
+                recyclingKey={headerLogoUrl ?? undefined}
+                style={[styles.headerLogo, { marginLeft: 0, width: Math.min(Math.max(HEADER_LOGO_HEIGHT * headerLogoRatio, 40), 220) }]}
+                contentFit="contain"
+                cachePolicy="memory-disk"
+                transition={150}
+                onLoad={(e) => {
+                  const src = e.source
+                  if (src?.width && src?.height) setHeaderLogoRatio(src.width / src.height)
+                }}
+                onError={() => setHeaderLogoFailed(true)}
+                accessibilityLabel={name}
+              />
+            </View>
+          ) : (
+            <Image
+              source={{ uri: headerLogoUrl ?? undefined }}
+              recyclingKey={headerLogoUrl ?? undefined}
+              style={[styles.headerLogo, { width: Math.min(Math.max(HEADER_LOGO_HEIGHT * headerLogoRatio, 40), 220) }]}
+              contentFit="contain"
+              cachePolicy="memory-disk"
+              transition={150}
+              onLoad={(e) => {
+                const src = e.source
+                if (src?.width && src?.height) setHeaderLogoRatio(src.width / src.height)
+              }}
+              onError={() => setHeaderLogoFailed(true)}
+              accessibilityLabel={name}
+            />
+          )
         ) : (
           <Text style={styles.headerTitle} numberOfLines={1}>
             {name}
