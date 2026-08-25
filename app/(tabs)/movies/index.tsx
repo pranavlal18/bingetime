@@ -169,7 +169,8 @@ function MoviesScreenContent() {
           accessibilityRole="button"
           accessibilityLabel={`${movie.title}, ${year || 'unknown year'}`}
         >
-          {/* Poster — same size as ShowCard */}
+          {/* Poster — same size as ShowCard (no shadow; per-view elevation on
+              Android costs an offscreen bitmap ×40 cards in this grid) */}
           <View
             style={{
               width: CARD_WIDTH,
@@ -180,11 +181,6 @@ function MoviesScreenContent() {
               position: 'relative',
               borderWidth: 1,
               borderColor: colors.outlineVariant,
-              shadowColor: '#000',
-              shadowOffset: { width: 0, height: 8 },
-              shadowOpacity: 0.4,
-              shadowRadius: 12,
-              elevation: 8,
             }}
           >
             <AnimatedPoster

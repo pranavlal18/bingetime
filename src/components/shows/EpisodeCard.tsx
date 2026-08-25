@@ -303,7 +303,7 @@ export default function EpisodeCard({ data, sectionKind, onMarkWatched }: Episod
               style={styles.poster}
               contentFit="cover"
               cachePolicy="memory-disk"
-              transition={200}
+              transition={150}
             />
           ) : (
             <View style={styles.posterPlaceholder}>

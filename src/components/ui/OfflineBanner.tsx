@@ -1,8 +1,12 @@
 import { View, Text, StyleSheet } from 'react-native'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useNetInfo } from '@react-native-community/netinfo'
+import { useTheme } from '@/contexts/ThemeContext'
 
 export function OfflineBanner() {
   const netInfo = useNetInfo()
+  const { colors } = useTheme()
+  const insets = useSafeAreaInsets()
 
   // Only show when specifically offline
   if (netInfo.isConnected === null || netInfo.isConnected === true) {
@@ -10,17 +14,15 @@ export function OfflineBanner() {
   }
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.text}>You are currently offline.</Text>
+    <View style={[styles.container, { backgroundColor: colors.errorContainer, paddingTop: insets.top + 8 }]}>
+      <Text style={[styles.text, { color: colors.onError }]}>You are currently offline.</Text>
     </View>
   )
 }
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: '#e94560',
     padding: 8,
-    paddingTop: 12, // Account for status bar
     position: 'absolute',
     top: 0,
     left: 0,
@@ -28,7 +30,6 @@ const styles = StyleSheet.create({
     zIndex: 1000,
   },
   text: {
-    color: 'white',
     textAlign: 'center',
     fontWeight: 'bold',
     fontSize: 12,

@@ -249,12 +249,13 @@ export default function RootLayout() {
 
   return (
     <GestureHandlerRootView style={styles.root}>
-      <OfflineBanner />
       <EnvGuard>
         {fontsLoaded ? (
           <AuthProvider>
             <ThemeProvider>
               <ErrorBoundary>
+                {/* Inside ThemeProvider so the banner can use theme tokens */}
+                <OfflineBanner />
                 <InnerLayout />
               </ErrorBoundary>
             </ThemeProvider>

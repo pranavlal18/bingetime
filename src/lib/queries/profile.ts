@@ -39,21 +39,27 @@ export interface WatchlistMovie extends Movie {
 // ── Fetch stats ──
 
 async function fetchStats(userId: string): Promise<ProfileStats> {
-  // Fetch user_shows with show details including average_runtime
-  const { data: userShows, error: showsError } = await supabase
-    .from('user_shows')
-    .select(`
-      episodes_seen,
-      is_favorited,
-      is_watchlist,
-      shows!inner(average_runtime)
-    `)
-    .eq('user_id', userId)
+  // Parallel — both lookups are independent; sequential awaited cost a round-trip each
+  const [showsResult, moviesResult] = await Promise.all([
+    supabase
+      .from('user_shows')
+      .select(
+        `
+        episodes_seen,
+        is_favorited,
+        is_watchlist,
+        shows!inner(average_runtime)
+      `
+      )
+      .eq('user_id', userId),
+    supabase
+      .from('user_movies')
+      .select('watched, is_watchlist, movies!inner(runtime)')
+      .eq('user_id', userId),
+  ])
 
-  const { data: userMovies, error: moviesError } = await supabase
-    .from('user_movies')
-    .select('watched, is_watchlist, movies!inner(runtime)')
-    .eq('user_id', userId)
+  const { data: userShows, error: showsError } = showsResult
+  const { data: userMovies, error: moviesError } = moviesResult
 
   if (showsError) throw new Error(showsError.message)
   if (moviesError) throw new Error(moviesError.message)
