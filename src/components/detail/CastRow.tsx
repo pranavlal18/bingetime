@@ -3,7 +3,7 @@
 import { useMemo } from 'react'
 import { Text, View, ScrollView, StyleSheet, Pressable } from 'react-native'
 import { router } from 'expo-router'
-import * as Haptics from 'expo-haptics'
+import { hapticLight } from '@/utils/haptics'
 import { Image } from 'expo-image'
 import type { TMDbCastMember } from '@/lib/tmdb'
 import { getImageUrl } from '@/lib/tmdb'
@@ -155,7 +155,7 @@ export default function CastRow({ cast, isLoading }: CastRowProps) {
               key={member.id}
               style={({ pressed }) => [styles.member, pressed && styles.memberPressed]}
               onPress={() => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
+                hapticLight()
                 router.push(`/person/${member.id}`)
               }}
               accessibilityRole="button"

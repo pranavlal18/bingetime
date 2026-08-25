@@ -16,7 +16,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Image } from 'expo-image'
 import { Ionicons } from '@expo/vector-icons'
 import { router } from 'expo-router'
-import * as Haptics from 'expo-haptics'
+import { hapticLight } from '@/utils/haptics'
 import {
   useTrending,
   useAddToLibrary,
@@ -363,7 +363,7 @@ export default function TrendingScreen() {
       <View style={styles.header}>
         <Pressable
           onPress={() => {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
+            hapticLight()
             router.back()
           }}
           style={styles.backButton}

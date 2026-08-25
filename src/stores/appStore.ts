@@ -10,6 +10,10 @@ interface AppState extends AppSettings {
   setTheme: (theme: ThemeKey) => void
   notificationsEnabled: boolean
   setNotificationsEnabled: (enabled: boolean) => void
+  hapticsEnabled: boolean
+  setHapticsEnabled: (enabled: boolean) => void
+  displayName: string | null
+  setDisplayName: (name: string | null) => void
   statsPeriod: 'week' | 'month'
   setStatsPeriod: (period: 'week' | 'month') => void
   hasRunReleaseDateSync: boolean
@@ -24,6 +28,8 @@ export const useAppStore = create<AppState>()(
       moviesViewMode: 'poster-grid',
       theme: 'cinematic-dark',
       notificationsEnabled: false,
+      hapticsEnabled: true,
+      displayName: null,
       statsPeriod: 'week',
       hasRunReleaseDateSync: false,
 
@@ -31,6 +37,8 @@ export const useAppStore = create<AppState>()(
       setMoviesViewMode: (mode) => set({ moviesViewMode: mode }),
       setTheme: (theme) => set({ theme }),
       setNotificationsEnabled: (enabled) => set({ notificationsEnabled: enabled }),
+      setHapticsEnabled: (enabled) => set({ hapticsEnabled: enabled }),
+      setDisplayName: (name) => set({ displayName: name }),
       setStatsPeriod: (period) => set({ statsPeriod: period }),
       setHasRunReleaseDateSync: (done) => set({ hasRunReleaseDateSync: done }),
     }),

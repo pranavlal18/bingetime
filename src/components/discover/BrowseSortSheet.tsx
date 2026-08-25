@@ -4,7 +4,7 @@
 import { useEffect, useMemo } from 'react'
 import { View, Text, Pressable, StyleSheet, Modal } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
-import * as Haptics from 'expo-haptics'
+import { hapticLight } from '@/utils/haptics'
 import { Gesture, GestureDetector } from 'react-native-gesture-handler'
 import Animated, {
   useSharedValue,
@@ -130,7 +130,7 @@ export default function BrowseSortSheet<T extends string>({
                     key={opt.value}
                     style={[styles.option, active && styles.optionActive]}
                     onPress={() => {
-                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
+                      hapticLight()
                       onChange(opt.value)
                       onClose()
                     }}

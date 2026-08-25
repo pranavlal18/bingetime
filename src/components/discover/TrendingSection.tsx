@@ -6,7 +6,7 @@ import { FlashList } from '@shopify/flash-list'
 import { Image } from 'expo-image'
 import { Ionicons } from '@expo/vector-icons'
 import { router } from 'expo-router'
-import * as Haptics from 'expo-haptics'
+import { hapticLight } from '@/utils/haptics'
 import { useQueryClient } from '@tanstack/react-query'
 import { getImageUrl } from '@/lib/tmdb'
 import { prefetchTitleDetails } from '@/lib/queries/prefetch'
@@ -112,7 +112,7 @@ const PosterCard = memo(function PosterCard({
 }), [colors])
 
   const handlePress = useCallback(() => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
+    hapticLight()
     prefetchTitleDetails(item.mediaType, item.tmdbId, queryClient)
     if (item.mediaType === 'tv') {
       router.push(`/show/${item.libraryId || item.tmdbId}`)

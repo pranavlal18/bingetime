@@ -15,7 +15,7 @@ import {
 } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import { router } from 'expo-router'
-import * as Haptics from 'expo-haptics'
+import { hapticLight } from '@/utils/haptics'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useTheme } from '@/contexts/ThemeContext'
 import { searchMulti, searchMovieAgnostic, searchTv, getMovieDetails, getShowDetails, getImageUrl } from '@/lib/tmdb'
@@ -207,7 +207,7 @@ export default function AddContentScreen() {
       <View style={styles.header}>
         <Pressable
           onPress={() => {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
+            hapticLight()
             router.back()
           }}
           hitSlop={16}

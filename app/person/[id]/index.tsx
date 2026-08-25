@@ -6,7 +6,7 @@ import { useLocalSearchParams, router, Stack } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Image } from 'expo-image'
 import { Ionicons } from '@expo/vector-icons'
-import * as Haptics from 'expo-haptics'
+import { hapticLight } from '@/utils/haptics'
 import { usePerson, topKnownFor } from '@/lib/queries/people'
 import { fetchLibraryStatus } from '@/lib/queries/libraryStatus'
 import { useAddToLibrary, useRemoveFromLibrary } from '@/lib/queries/discover'
@@ -329,7 +329,7 @@ export default function PersonDetailScreen() {
           title="Could not load person details"
           onRetry={refetch}
           onGoBack={() => {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
+            hapticLight()
             router.back()
           }}
         />
@@ -358,7 +358,7 @@ export default function PersonDetailScreen() {
       >
           <Pressable
             onPress={() => {
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
+              hapticLight()
               router.back()
             }}
             style={styles.backButton}

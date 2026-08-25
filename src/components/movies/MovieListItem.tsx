@@ -6,7 +6,7 @@ import { Image } from 'expo-image'
 import { Swipeable } from 'react-native-gesture-handler'
 import { Ionicons } from '@expo/vector-icons'
 import { router } from 'expo-router'
-import * as Haptics from 'expo-haptics'
+import { hapticLight } from '@/utils/haptics'
 import { getImageUrl } from '@/lib/queries/movies'
 import { typography, borderRadius, spacing } from '@/theme'
 import { useTheme } from '@/contexts/ThemeContext'
@@ -97,7 +97,7 @@ const MovieListItem = memo(function MovieListItem({
 }), [colors])
 
   const handlePress = useCallback(() => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
+    hapticLight()
     router.push(`/movie/${movie.id}`)
   }, [movie.id])
 

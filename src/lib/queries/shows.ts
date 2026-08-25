@@ -1,7 +1,7 @@
 // ─── Shows Tab — React Query hooks ───
 
 import { useQuery, useMutation, useQueryClient, QueryClient } from '@tanstack/react-query'
-import * as Haptics from 'expo-haptics'
+import { hapticLight } from '@/utils/haptics'
 import { supabase } from '@/lib/supabase'
 import { getImageUrl, getShowBasicDetails } from '@/lib/tmdb'
 import { useAuth } from '@/contexts/AuthContext'
@@ -500,7 +500,7 @@ export function useMarkWatched() {
     }) => markEpisodeWatched(showId, user?.id ?? '', seasonNumber, episodeNumber),
 
     onMutate: async ({ showId, seasonNumber, episodeNumber }) => {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
+      hapticLight()
       if (!user) return
 
       // Cancel in-flight refetches so they don't clobber our optimistic write

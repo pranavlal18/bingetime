@@ -6,7 +6,7 @@ import { Image } from 'expo-image'
 import { FlashList } from '@shopify/flash-list'
 import { Ionicons } from '@expo/vector-icons'
 import { router } from 'expo-router'
-import * as Haptics from 'expo-haptics'
+import { hapticLight } from '@/utils/haptics'
 import { getImageUrl } from '@/lib/queries/shows'
 import ProgressBar from './ProgressBar'
 import { typography, spacing, borderRadius } from '@/theme'
@@ -127,7 +127,7 @@ export default function ContinueWatchingSection({
         <Pressable
           style={styles.card}
           onPress={() => {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
+            hapticLight()
             router.push(`/show/${item.id}`)
           }}
         >

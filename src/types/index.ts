@@ -240,6 +240,8 @@ export interface AppSettings {
   moviesViewMode: ViewMode
   theme: ThemeKey
   notificationsEnabled: boolean
+  hapticsEnabled: boolean
+  displayName: string | null
 }
 
 // Query key factories moved to src/lib/queries/keys.ts (single source of truth)

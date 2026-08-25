@@ -9,7 +9,7 @@ import { useMemo, type ReactNode } from 'react'
 import { Text, View, StyleSheet, Pressable } from 'react-native'
 import { Image } from 'expo-image'
 import { Ionicons } from '@expo/vector-icons'
-import * as Haptics from 'expo-haptics'
+import { hapticLight } from '@/utils/haptics'
 import { borderRadius } from '@/theme'
 import { getImageUrl } from '@/lib/tmdb'
 import { useTheme } from '@/contexts/ThemeContext'
@@ -110,7 +110,7 @@ export default function CreditCard({
         pressed && styles.pressed,
       ]}
       onPress={() => {
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
+        hapticLight()
         onPress()
       }}
       accessibilityRole="button"

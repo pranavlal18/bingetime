@@ -11,7 +11,7 @@ import {
 import { Image } from 'expo-image'
 import { Ionicons } from '@expo/vector-icons'
 import { router } from 'expo-router'
-import * as Haptics from 'expo-haptics'
+import { hapticLight } from '@/utils/haptics'
 import { useQueryClient } from '@tanstack/react-query'
 import { getImageUrl, isHaventWatched } from '@/lib/queries/shows'
 import { prefetchTitleDetails } from '@/lib/queries/prefetch'
@@ -35,7 +35,7 @@ export default function ShowCard({ show, isNewSeason = false }: ShowCardProps) {
   const queryClient = useQueryClient()
 
   const handlePress = useCallback(() => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
+    hapticLight()
     if (show.tmdb_id != null) prefetchTitleDetails('tv', show.tmdb_id, queryClient)
     router.push(`/show/${show.id}`)
   }, [show.id, show.tmdb_id, queryClient])

@@ -36,7 +36,7 @@ import { useTheme } from '@/contexts/ThemeContext'
 import { spacing, borderRadius } from '@/theme'
 import type { DiscoverResult, MediaFilter } from '@/lib/queries/discover'
 import { router } from 'expo-router'
-import * as Haptics from 'expo-haptics'
+import { hapticLight } from '@/utils/haptics'
 
 const SCREEN_WIDTH = Dimensions.get('window').width
 
@@ -223,7 +223,7 @@ export default function DiscoverScreen() {
             <Pressable
               key={g.id}
               onPress={() => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
+                hapticLight()
                 router.push(`/discover/genre?id=${g.id}&name=${encodeURIComponent(g.name)}&type=movie`)
               }}
               style={{

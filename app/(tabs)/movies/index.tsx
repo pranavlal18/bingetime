@@ -17,7 +17,7 @@ import { FlashList } from '@shopify/flash-list'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { router } from 'expo-router'
-import * as Haptics from 'expo-haptics'
+import { hapticLight } from '@/utils/haptics'
 import { useMovies, useToggleMovieWatched, useRefreshMovieReleaseDates } from '@/lib/queries/movies'
 import { useAppStore } from '@/stores/appStore'
 import { useEffect } from 'react'
@@ -165,7 +165,7 @@ function MoviesScreenContent() {
             pressed && { opacity: 0.85, transform: [{ scale: 0.97 }] },
           ]}
           onPress={() => {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
+            hapticLight()
             router.push(`/movie/${movie.id}`)
           }}
           accessibilityRole="button"

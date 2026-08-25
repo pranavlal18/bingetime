@@ -8,7 +8,7 @@ import Animated, {
   useAnimatedStyle,
   withTiming,
 } from 'react-native-reanimated'
-import * as Haptics from 'expo-haptics'
+import { hapticLight } from '@/utils/haptics'
 import { spacing } from '@/theme'
 import { useTheme } from '@/contexts/ThemeContext'
 
@@ -97,7 +97,7 @@ export default function DetailTabs({ tabs, active, onChange }: DetailTabsProps) 
             style={styles.segment}
             onPress={() => {
               if (!isActive) {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
+                hapticLight()
                 onChange(tab.key)
               }
             }}

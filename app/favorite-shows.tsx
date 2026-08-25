@@ -16,7 +16,7 @@ import { Image } from 'expo-image'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { router, Stack } from 'expo-router'
-import * as Haptics from 'expo-haptics'
+import { hapticLight } from '@/utils/haptics'
 import { useFavorites } from '@/lib/queries/profile'
 import { getImageUrl } from '@/lib/tmdb'
 import { typography, spacing, borderRadius } from '@/theme'
@@ -171,7 +171,7 @@ const GridItem = memo(function GridItem({ name, posterPath, favoritedAt, onPress
     <Pressable
       style={gridStyles.gridItem}
       onPress={() => {
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
+        hapticLight()
         onPress()
       }}
     >
@@ -287,7 +287,7 @@ const ListItem = memo(function ListItem({
     <Pressable
       style={listStyles.listItem}
       onPress={() => {
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
+        hapticLight()
         onPress()
       }}
     >
@@ -497,7 +497,7 @@ export default function FavoriteShowsScreen() {
       <View style={styles.appBar}>
         <Pressable
           onPress={() => {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
+            hapticLight()
             router.back()
           }}
           style={styles.backBtn}

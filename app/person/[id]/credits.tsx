@@ -6,7 +6,7 @@ import { FlashList } from '@shopify/flash-list'
 import { useLocalSearchParams, router, Stack } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
-import * as Haptics from 'expo-haptics'
+import { hapticLight } from '@/utils/haptics'
 import { usePerson, dedupeCredits, isScriptedCredit } from '@/lib/queries/people'
 import { fetchLibraryStatus } from '@/lib/queries/libraryStatus'
 import { useAddToLibrary, useRemoveFromLibrary } from '@/lib/queries/discover'
@@ -295,7 +295,7 @@ export default function PersonCreditsScreen() {
   )
 
   const handleBack = useCallback(() => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
+    hapticLight()
     router.back()
   }, [])
 
@@ -390,7 +390,7 @@ export default function PersonCreditsScreen() {
               style={[styles.segment, active && styles.segmentActive]}
               onPress={() => {
                 if (!active) {
-                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
+                  hapticLight()
                   setFilter(f.key)
                 }
               }}
@@ -455,7 +455,7 @@ export default function PersonCreditsScreen() {
             borderColor: colors.outlineVariant,
           }}
           onPress={() => {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
+            hapticLight()
             setSheetVisible(true)
           }}
           accessibilityRole="button"

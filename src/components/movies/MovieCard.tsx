@@ -7,7 +7,7 @@ import { Swipeable } from 'react-native-gesture-handler'
 import { Ionicons } from '@expo/vector-icons'
 import { router } from 'expo-router'
 import { useQueryClient } from '@tanstack/react-query'
-import * as Haptics from 'expo-haptics'
+import { hapticLight } from '@/utils/haptics'
 import { getImageUrl } from '@/lib/queries/movies'
 import { prefetchTitleDetails } from '@/lib/queries/prefetch'
 
@@ -105,7 +105,7 @@ const MovieCard = memo(function MovieCard({ movie, onMarkWatched }: MovieCardPro
 }), [colors])
 
   const handlePress = useCallback(() => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
+    hapticLight()
     if (movie.tmdb_id != null) prefetchTitleDetails('movie', movie.tmdb_id, queryClient)
     router.push(`/movie/${movie.id}`)
   }, [movie.id, movie.tmdb_id, queryClient])

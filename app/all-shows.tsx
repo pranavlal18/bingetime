@@ -14,7 +14,7 @@ import { FlashList } from '@shopify/flash-list'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { router, Stack } from 'expo-router'
-import * as Haptics from 'expo-haptics'
+import { hapticLight } from '@/utils/haptics'
 import { useShows } from '@/lib/queries/shows'
 import { useAppStore } from '@/stores/appStore'
 import { typography, spacing, borderRadius } from '@/theme'
@@ -331,7 +331,7 @@ export default function AllShowsScreen() {
       <View style={styles.appBar}>
         <Pressable
           onPress={() => {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
+            hapticLight()
             router.back()
           }}
           style={styles.backBtn}

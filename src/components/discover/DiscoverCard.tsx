@@ -5,7 +5,7 @@ import { View, Text, StyleSheet, Pressable, ActivityIndicator } from 'react-nati
 import { Image } from 'expo-image'
 import { Ionicons } from '@expo/vector-icons'
 import { router } from 'expo-router'
-import * as Haptics from 'expo-haptics'
+import { hapticLight } from '@/utils/haptics'
 import { useQueryClient } from '@tanstack/react-query'
 import { getImageUrl } from '@/lib/tmdb'
 import { prefetchTitleDetails } from '@/lib/queries/prefetch'
@@ -36,7 +36,7 @@ const DiscoverCard = memo(function DiscoverCard({
   const posterUrl = getImageUrl(item.poster_path, 'w92')
 
   const handlePress = useCallback(() => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
+    hapticLight()
     prefetchTitleDetails(item.mediaType, item.tmdbId, queryClient)
     if (item.mediaType === 'tv') {
       router.push(`/show/${item.libraryId || item.tmdbId}`)
