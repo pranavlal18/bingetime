@@ -1,15 +1,8 @@
 // ─── StatSkeleton — skeleton that mirrors the stats page layout ───
 
-import { memo, useEffect, useMemo } from 'react'
+import { memo, useMemo } from 'react'
 import { View, StyleSheet } from 'react-native'
-import Animated, {
-  useSharedValue,
-  withRepeat,
-  withTiming,
-  useAnimatedStyle,
-  cancelAnimation,
-  Easing,
-} from 'react-native-reanimated'
+import ShimmerSkeleton from '@/components/ui/ShimmerSkeleton'
 import { useTheme } from '@/contexts/ThemeContext'
 
 // ── Shared pulsing block ──
@@ -26,34 +19,14 @@ const SkeletonPulse = memo(function SkeletonPulse({
   style?: any
 }) {
   const { colors } = useTheme()
-  const opacity = useSharedValue(1)
-
-  useEffect(() => {
-    opacity.value = withRepeat(
-      withTiming(0.3, { duration: 1000, easing: Easing.ease }),
-      -1,
-      true
-    )
-    // Stop the UI-thread repeat on unmount — otherwise it runs forever
-    return () => cancelAnimation(opacity)
-  }, [opacity])
-
-  const animatedStyle = useAnimatedStyle(() => ({
-    opacity: opacity.value,
-  }))
-
+  // Wrapper kept for the ~25 call sites in this file — now backed by the
+  // shared ShimmerSkeleton system instead of its own pulse loop.
   return (
-    <Animated.View
-      style={[
-        {
-          width: width as any,
-          height,
-          borderRadius,
-          backgroundColor: colors.surfaceContainerHighest,
-        },
-        animatedStyle,
-        style,
-      ]}
+    <ShimmerSkeleton
+      width={width}
+      height={height}
+      borderRadius={borderRadius}
+      style={[{ backgroundColor: colors.surfaceContainerHighest }, style]}
     />
   )
 })
