@@ -11,8 +11,45 @@ try {
   _mmkv = null
 }
 
+// Dedicated instance for small persistent UI state (Zustand stores) —
+// isolated from the query-cache instance so heavy persister writes never
+// contend with settings reads.
+let _local: MMKV | null = null
+try {
+  if (Platform.OS !== 'web') {
+    _local = new MMKV({ id: 'bingetime-local' })
+  }
+} catch {
+  _local = null
+}
+const localInstance = _local
+
+// One-time migration: Zustand stores previously lived on the shared
+// 'bingetime-cache' instance. Copy them over if they haven't moved yet.
+if (localInstance && _mmkv) {
+  for (const key of ['bingetime-settings', 'bingetime-recent-searches']) {
+    if (!localInstance.contains(key)) {
+      const legacy = _mmkv.getString(key)
+      if (legacy != null) localInstance.set(key, legacy)
+    }
+  }
+}
+
 export const mmkv = _mmkv as unknown as MMKV
 const mmkvInstance = _mmkv
+
+/** Sync storage for Zustand on native — no hydration flicker */
+export const mmkvLocalSync = {
+  setItem: (key: string, value: string) => {
+    if (localInstance) localInstance.set(key, value)
+  },
+  getItem: (key: string): string | null => {
+    return localInstance?.getString(key) ?? null
+  },
+  removeItem: (key: string) => {
+    localInstance?.delete(key)
+  },
+}
 
 export const mmkvStorage = {
   setItem: (key: string, value: string) => {

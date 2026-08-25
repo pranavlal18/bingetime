@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
-import { mmkvAsyncStorage } from '@/lib/mmkv'
+import { Platform } from 'react-native'
+import { mmkvAsyncStorage, mmkvLocalSync } from '@/lib/mmkv'
 import type { AppSettings, ViewMode, ThemeKey } from '@/types'
 
 interface AppState extends AppSettings {
@@ -35,9 +36,12 @@ export const useAppStore = create<AppState>()(
     }),
     {
       name: 'bingetime-settings',
-      // MMKV-backed (sync reads, ~30x faster than AsyncStorage). The async
-      // adapter also lazy-migrates legacy AsyncStorage values on first read.
-      storage: createJSONStorage(() => mmkvAsyncStorage),
+      version: 1,
+      // Sync MMKV on native (no async hydration flicker); async adapter on web
+      storage: createJSONStorage(() =>
+        Platform.OS === 'web' ? mmkvAsyncStorage : mmkvLocalSync
+      ),
+      migrate: (persisted, version) => persisted as AppState,
     }
   )
 )

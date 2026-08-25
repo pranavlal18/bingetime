@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
-import { mmkvAsyncStorage } from '@/lib/mmkv'
+import { Platform } from 'react-native'
+import { mmkvAsyncStorage, mmkvLocalSync } from '@/lib/mmkv'
 
 const MAX_RECENTS = 8
 
@@ -32,7 +33,12 @@ export const useSearchStore = create<SearchState>()(
     }),
     {
       name: 'bingetime-recent-searches',
-      storage: createJSONStorage(() => mmkvAsyncStorage),
+      version: 1,
+      // Sync MMKV on native (no async hydration flicker); async adapter on web
+      storage: createJSONStorage(() =>
+        Platform.OS === 'web' ? mmkvAsyncStorage : mmkvLocalSync
+      ),
+      migrate: (persisted, version) => persisted as SearchState,
     }
   )
 )
