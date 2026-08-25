@@ -116,7 +116,7 @@ export default function BrowseSortSheet({ visible, onClose, value, onChange, opt
       <Pressable style={styles.overlay} onPress={onClose}>
         <GestureDetector gesture={pan}>
           <Animated.View style={[styles.sheet, sheetAnimatedStyle]}>
-            <Pressable onPress={(e) => e.stopPropagation()} style={{ flex: 1 }}>
+            <Pressable onPress={(e) => e.stopPropagation()}>
               <View style={styles.handle} />
               <Text style={styles.title}>Sort by</Text>
               {options.map((opt) => {
