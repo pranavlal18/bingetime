@@ -139,11 +139,46 @@ export interface GenreTitle {
 
 const GENRE_TITLES_STALE_TIME = 1000 * 60 * 10 // 10 min
 
-export function useGenreTitles(mediaType: 'tv' | 'movie', genreId: number | null) {
+export type GenreSortOption = {
+  label: string
+  value: tmdb.GenreSortBy
+}
+
+export const GENRE_SORT_OPTIONS: Record<'tv' | 'movie', GenreSortOption[]> = {
+  tv: [
+    { label: 'Popular', value: 'popularity.desc' },
+    { label: 'Top Rated', value: 'vote_average.desc' },
+    { label: 'Newest', value: 'first_air_date.desc' },
+    { label: 'A–Z', value: 'original_title.asc' },
+    { label: 'Most Votes', value: 'vote_count.desc' },
+  ],
+  movie: [
+    { label: 'Popular', value: 'popularity.desc' },
+    { label: 'Top Rated', value: 'vote_average.desc' },
+    { label: 'Newest', value: 'primary_release_date.desc' },
+    { label: 'A–Z', value: 'original_title.asc' },
+    { label: 'Most Votes', value: 'vote_count.desc' },
+  ],
+}
+
+export function useGenres(mediaType: 'tv' | 'movie') {
+  return useQuery({
+    queryKey: ['tmdb', 'genres', mediaType],
+    queryFn: () => tmdb.getGenres(mediaType),
+    staleTime: 1000 * 60 * 60 * 24,
+    gcTime: 1000 * 60 * 60 * 24 * 7,
+  })
+}
+
+export function useGenreTitles(
+  mediaType: 'tv' | 'movie',
+  genreId: number | null,
+  sortBy: tmdb.GenreSortBy = 'popularity.desc'
+) {
   return useInfiniteQuery({
-    queryKey: ['tmdb', 'genre', mediaType, genreId],
+    queryKey: ['tmdb', 'genre', mediaType, genreId, sortBy],
     queryFn: async ({ pageParam }) => {
-      const res = await tmdb.discoverByGenre(mediaType, genreId as number, pageParam)
+      const res = await tmdb.discoverByGenre(mediaType, genreId as number, pageParam, sortBy)
       const items: GenreTitle[] = res.results.map((r) => ({
         tmdbId: r.id,
         mediaType,

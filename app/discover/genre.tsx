@@ -1,7 +1,7 @@
 // ─── Genre Page — all titles in a single TMDb genre, popularity-sorted ───
 // Reached from tappable genre chips on show/movie detail pages.
 
-import { useCallback, useMemo } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import {
   View,
   Text,
@@ -16,13 +16,15 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Image } from 'expo-image'
 import { Ionicons } from '@expo/vector-icons'
 import * as Haptics from 'expo-haptics'
-import { useGenreTitles, type GenreTitle } from '@/lib/queries/discover'
+import { useGenreTitles, type GenreTitle, GENRE_SORT_OPTIONS } from '@/lib/queries/discover'
 import { prefetchTitleDetails } from '@/lib/queries/prefetch'
 import { getImageUrl } from '@/lib/tmdb'
+import type { GenreSortBy } from '@/lib/tmdb'
 import { useQueryClient } from '@tanstack/react-query'
 import { borderRadius, spacing } from '@/theme'
 import { useTheme } from '@/contexts/ThemeContext'
 import ErrorState from '@/components/ui/ErrorState'
+import GenreSortSheet from '@/components/discover/GenreSortSheet'
 
 // Grid geometry: 20dp side padding, 8dp column gap → 171dp cards @ 390dp screen
 const SIDE_OFFSET = 20
@@ -156,6 +158,13 @@ export default function GenrePage() {
   const mediaType: 'tv' | 'movie' = type === 'movie' ? 'movie' : 'tv'
   const genreName = name ? String(name) : mediaType === 'tv' ? 'TV Shows' : 'Movies'
 
+  const [sortBy, setSortBy] = useState<GenreSortBy>('popularity.desc')
+  const [sheetVisible, setSheetVisible] = useState(false)
+  const sortLabel = useMemo(
+    () => GENRE_SORT_OPTIONS[mediaType].find((o) => o.value === sortBy)?.label ?? 'Popular',
+    [mediaType, sortBy]
+  )
+
   const {
     data,
     isLoading,
@@ -164,7 +173,7 @@ export default function GenrePage() {
     fetchNextPage,
     hasNextPage,
     isFetchingNextPage,
-  } = useGenreTitles(mediaType, genreId)
+  } = useGenreTitles(mediaType, genreId, sortBy)
 
   const titles = useMemo(
     () => (data ? data.pages.flatMap((p) => p.items) : []),
@@ -312,7 +321,7 @@ export default function GenrePage() {
         // Horizontal padding lives ONLY in contentContainerStyle — per-item
         // half-gutter wrappers create the center gutter. Keeps cards flush at
         // 20dp from each screen edge with an 8dp center gutter.
-        contentContainerStyle={[styles.gridContent, { paddingHorizontal: CONTENT_PAD, paddingBottom: insets.bottom + 32 }]}
+        contentContainerStyle={[styles.gridContent, { paddingHorizontal: CONTENT_PAD, paddingBottom: 80 + insets.bottom }]}
         showsVerticalScrollIndicator={false}
         onEndReached={handleEndReached}
         onEndReachedThreshold={0.5}
@@ -327,6 +336,60 @@ export default function GenrePage() {
             <Text style={styles.emptyText}>No titles found in this genre</Text>
           </View>
         }
+      />
+
+      {/* Sticky bottom bar — Spotify-style */}
+      <View
+        style={{
+          position: 'absolute',
+          bottom: 0,
+          left: 0,
+          right: 0,
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          paddingHorizontal: spacing.marginMobile,
+          paddingVertical: 12,
+          paddingBottom: 12 + insets.bottom,
+          backgroundColor: colors.surfaceContainer,
+          borderTopWidth: 1,
+          borderTopColor: colors.outlineVariant,
+        }}
+      >
+        <Pressable
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 6,
+            backgroundColor: colors.surfaceContainerHigh,
+            paddingHorizontal: 14,
+            paddingVertical: 8,
+            borderRadius: borderRadius.full,
+            borderWidth: 1,
+            borderColor: colors.outlineVariant,
+          }}
+          onPress={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
+            setSheetVisible(true)
+          }}
+        >
+          <Ionicons name="swap-vertical" size={16} color={colors.onSurface} />
+          <Text style={{ fontFamily: 'Inter', fontSize: 13, fontWeight: '600', color: colors.onSurface }}>
+            {sortLabel}
+          </Text>
+          <Ionicons name="chevron-down" size={14} color={colors.onSurfaceVariant} />
+        </Pressable>
+        <Text style={{ fontFamily: 'Inter', fontSize: 12, color: colors.onSurfaceVariant }}>
+          {titles.length} titles
+        </Text>
+      </View>
+
+      <GenreSortSheet
+        visible={sheetVisible}
+        onClose={() => setSheetVisible(false)}
+        mediaType={mediaType}
+        value={sortBy}
+        onChange={setSortBy}
       />
     </View>
   )

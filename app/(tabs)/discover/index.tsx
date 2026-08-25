@@ -20,6 +20,7 @@ import { useFocusEffect } from 'expo-router'
 import {
   useTrending,
   useSearch,
+  useGenres,
   useAddToLibrary,
   useRemoveFromLibrary,
 } from '@/lib/queries/discover'
@@ -34,6 +35,8 @@ import { useSearchStore } from '@/stores/searchStore'
 import { useTheme } from '@/contexts/ThemeContext'
 import { spacing, borderRadius } from '@/theme'
 import type { DiscoverResult, MediaFilter } from '@/lib/queries/discover'
+import { router } from 'expo-router'
+import * as Haptics from 'expo-haptics'
 
 const SCREEN_WIDTH = Dimensions.get('window').width
 
@@ -83,6 +86,7 @@ export default function DiscoverScreen() {
     isSearching ? debouncedQuery : '',
     filter
   )
+  const { data: genreData } = useGenres('movie')
   const addMutation = useAddToLibrary()
   const removeMutation = useRemoveFromLibrary()
 
@@ -192,23 +196,74 @@ export default function DiscoverScreen() {
 
   const searchKeyExtractor = useCallback((item: DiscoverResult) => item.tmdbId.toString(), [])
 
-  // ── Footer/header for list: recents + trending/recommended when not searching, chips when searching ──
+  const genreChips = useMemo(() => {
+    if (isSearching) return null
+    const genres = genreData?.genres ?? []
+    if (genres.length === 0) return null
+    return (
+      <View style={{ marginBottom: 16 }}>
+        <Text
+          style={{
+            fontFamily: 'Inter',
+            fontSize: 14,
+            fontWeight: '700',
+            color: colors.onSurface,
+            paddingHorizontal: spacing.marginMobile,
+            marginBottom: 10,
+          }}
+        >
+          Browse genres
+        </Text>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={{ paddingHorizontal: spacing.marginMobile, gap: 8 }}
+        >
+          {genres.slice(0, 12).map((g) => (
+            <Pressable
+              key={g.id}
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
+                router.push(`/discover/genre?id=${g.id}&name=${encodeURIComponent(g.name)}&type=movie`)
+              }}
+              style={{
+                paddingHorizontal: 16,
+                paddingVertical: 8,
+                borderRadius: borderRadius.full,
+                backgroundColor: colors.surfaceContainer,
+                borderWidth: 1,
+                borderColor: colors.outlineVariant,
+              }}
+            >
+              <Text style={{ fontFamily: 'Inter', fontSize: 13, fontWeight: '600', color: colors.onSurfaceVariant }}>
+                {g.name}
+              </Text>
+            </Pressable>
+          ))}
+        </ScrollView>
+      </View>
+    )
+  }, [isSearching, genreData, colors])
+
   const listHeaderElement = useMemo(() => {
     if (!isSearching && recents.length > 0) {
       return (
-        <RecentSearchesRow
-          recents={recents}
-          onSelect={(q) => setSearchText(q)}
-          onRemove={removeRecent}
-          onClearAll={clearAllRecents}
-        />
+        <>
+          {genreChips}
+          <RecentSearchesRow
+            recents={recents}
+            onSelect={(q) => setSearchText(q)}
+            onRemove={removeRecent}
+            onClearAll={clearAllRecents}
+          />
+        </>
       )
     }
     if (isSearching) {
       return <FilterChips value={filter} onChange={setFilter} />
     }
-    return null
-  }, [isSearching, recents, removeRecent, clearAllRecents, filter])
+    return genreChips
+  }, [isSearching, recents, removeRecent, clearAllRecents, filter, genreChips])
 
   const listFooterElement = useMemo(() => {
     if (isSearching) return null

@@ -85,18 +85,37 @@ export async function getTrending(mediaType: 'tv' | 'movie' | 'all' = 'tv') {
   return tmdbFetch<TMDbSearchResponse>(`/trending/${mediaType}/week`)
 }
 
-/** Discover titles by genre, popularity-sorted, paged — backs the genre pages */
+/** Allowed sort values for genre discovery (subset of TMDb sort_by). */
+export type GenreSortBy =
+  | 'popularity.desc'
+  | 'vote_average.desc'
+  | 'primary_release_date.desc'
+  | 'first_air_date.desc'
+  | 'original_title.asc'
+  | 'vote_count.desc'
+
+/** Discover titles by genre, paged — backs the genre pages */
 export async function discoverByGenre(
   mediaType: 'tv' | 'movie',
   genreId: number,
-  page = 1
+  page = 1,
+  sortBy: GenreSortBy = 'popularity.desc'
 ) {
   return tmdbFetch<TMDbSearchResponse>(`/discover/${mediaType}`, {
     with_genres: String(genreId),
-    sort_by: 'popularity.desc',
+    sort_by: sortBy,
     include_adult: 'false',
     page: String(page),
   })
+}
+
+export interface TMDbGenre {
+  id: number
+  name: string
+}
+
+export async function getGenres(mediaType: 'tv' | 'movie') {
+  return tmdbFetch<{ genres: TMDbGenre[] }>(`/genre/${mediaType}/list`)
 }
 
 /** Get external IDs (TVDB, IMDb) for a TMDb entity */
