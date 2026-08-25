@@ -34,19 +34,15 @@ All vars use `EXPO_PUBLIC_*` prefix (Expo convention for client-side env vars).
 | `app/_layout.tsx` | Root stack + QueryClientProvider + GestureHandlerRootView |
 | `app/(tabs)/` | Tab navigator (Shows, Movies, Discover, Profile) |
 | `src/lib/queries/` | React Query hooks per domain (shows, movies, episodes, profile, discover) |
-| `src/lib/import/` | TV Time CSV → Supabase pipeline (one-time onboarding) |
-| `src/stores/` | Zustand (viewMode, theme, import state) |
+| `src/stores/` | Zustand (viewMode, theme, recent searches) |
 | `src/types/` | All TS interfaces |
 | `src/components/` | ShowCard, MovieCard, ShowListItem, etc. |
 | `src/utils/` | formatRuntime, formatDate, calcProgress, getYear |
-| `supabase/migrations/` | SQL migrations, numbered — apply in order (latest: `00013`) |
-| `assets/csv/` | Bundled TV Time GDPR export CSVs |
+| `supabase/migrations/` | SQL migrations, numbered — apply in order (latest: `00014`) |
 
 ## Gotchas
 
-- **Metro**: `metro.config.js` pushes `'csv'` to `assetExts` — required for bundled CSV imports.
 - **Babel**: `react-native-reanimated/plugin` must be **last** in `plugins` array.
-- **Movie data only in v1 CSV**: `tracking-prod-records.csv` (v1) is the sole source of movie watch data. Do not treat it as superseded — `tracking-prod-records-v2.csv` has zero movie rows.
 - **Supabase join pattern**: list queries project explicit columns with `!inner` user joins + DB-side filters (e.g. `.eq('user_shows.user_id', id).eq('user_shows.is_watchlist', true)`); avoid `select('*')`. Query keys live in `src/lib/queries/keys.ts`.
 - **React Query caching**: default `staleTime` 5m / `gcTime` 24h / `retry` 2. Overrides: 2m shows, 5m movies, 10m trending + genre titles, 1h TMDb details (prefetch matches), 24h people/credits/upcoming with `gcTime` 14d. Persisted cache `maxAge` 7d (`app/_layout.tsx`).
 - **Zustand selectors** are used inside list items (not React Context) for granular re-renders.

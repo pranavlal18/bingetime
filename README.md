@@ -91,7 +91,7 @@ npm run typecheck # tsc --noEmit
 |-------|------------|
 | **Routing** | Expo Router (file-based, `app/`) |
 | **Styling** | Theme tokens + `StyleSheet.create` (dark-first) |
-| **State** | Zustand v5 (persisted to AsyncStorage) |
+| **State** | Zustand v5 (persisted to MMKV) |
 | **Data Fetching** | TanStack React Query v5 (offline-first, persisted) |
 | **Database** | Supabase (PostgreSQL) + TMDb REST API |
 | **Lists** | @shopify/flash-list v2 |
