@@ -135,7 +135,12 @@ const DiscoverCard = memo(function DiscoverCard({
 }), [colors])
 
   return (
-    <Pressable style={styles.card} onPress={handlePress}>
+    <Pressable
+      style={styles.card}
+      onPress={handlePress}
+      accessibilityRole="button"
+      accessibilityLabel={`${item.title}${item.year ? ` (${item.year})` : ''} — ${item.mediaType === 'tv' ? 'TV series' : 'Movie'}${isInLibrary ? ', in library' : ''}`}
+    >
       <View style={styles.posterContainer}>
         {posterUrl ? (
           <Image
@@ -143,6 +148,8 @@ const DiscoverCard = memo(function DiscoverCard({
             style={styles.poster}
             contentFit="cover"
             cachePolicy="memory-disk"
+            recyclingKey={posterUrl ?? undefined}
+            transition={150}
           />
         ) : (
           <View style={styles.posterPlaceholder}>
@@ -174,6 +181,9 @@ const DiscoverCard = memo(function DiscoverCard({
         ]}
         onPress={() => (isInLibrary ? onRemove(item) : onAdd(item))}
         disabled={isLoading}
+        hitSlop={8}
+        accessibilityRole="button"
+        accessibilityLabel={isInLibrary ? `Remove ${item.title} from library` : `Add ${item.title} to library`}
       >
           {isLoading ? (
             <ActivityIndicator size="small" color="#fff" />

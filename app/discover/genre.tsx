@@ -7,10 +7,10 @@ import {
   Text,
   Pressable,
   StyleSheet,
-  FlatList,
-  Dimensions,
+  useWindowDimensions,
   ActivityIndicator,
 } from 'react-native'
+import { FlashList } from '@shopify/flash-list'
 import { useLocalSearchParams, router, Stack } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Image } from 'expo-image'
@@ -23,20 +23,26 @@ import { useQueryClient } from '@tanstack/react-query'
 import { borderRadius, spacing } from '@/theme'
 import { useTheme } from '@/contexts/ThemeContext'
 
-const SCREEN_WIDTH = Dimensions.get('window').width
 // Grid geometry: 20dp side padding, 8dp column gap → 171dp cards @ 390dp screen
 const SIDE_OFFSET = 20
 const COL_GAP = 8
-const CARD_WIDTH = (SCREEN_WIDTH - SIDE_OFFSET * 2 - COL_GAP) / 2
-const POSTER_HEIGHT = CARD_WIDTH * 1.5 // exact 2:3 aspect ratio
 const TITLE_LINE = 18
 const TITLE_LINES = 2
 // Reserved title block: fixed height so long titles never push the next row down
 const TITLE_BLOCK_HEIGHT = TITLE_LINES * TITLE_LINE
+// FlashList v2 has no columnWrapperStyle — gutter comes from per-item
+// horizontal padding, so container padding shrinks by half a gutter to keep
+// outer edges at exactly SIDE_OFFSET and center gutter at COL_GAP.
+const CONTENT_PAD = SIDE_OFFSET - COL_GAP / 2
 
 function GenreCard({ item }: { item: GenreTitle }) {
   const queryClient = useQueryClient()
   const { colors } = useTheme()
+  const { width: winW } = useWindowDimensions()
+
+  // Exact same visual metrics as before: (W - 40 side - 8 gutter) / 2
+  const cardW = (winW - SIDE_OFFSET * 2 - COL_GAP) / 2
+  const posterH = cardW * 1.5
 
   const posterUrl = getImageUrl(item.poster_path, 'w342')
   const placeholderUrl = getImageUrl(item.poster_path, 'w92')
@@ -45,12 +51,12 @@ function GenreCard({ item }: { item: GenreTitle }) {
     () =>
       StyleSheet.create({
         card: {
-          width: CARD_WIDTH,
+          width: '100%',
           marginBottom: 20,
         },
         posterContainer: {
-          width: CARD_WIDTH,
-          height: POSTER_HEIGHT,
+          width: '100%',
+          height: posterH,
           borderRadius: borderRadius.md,
           overflow: 'hidden',
           backgroundColor: colors.surfaceDim,
@@ -225,7 +231,12 @@ export default function GenrePage() {
   )
 
   const renderItem = useCallback(
-    ({ item }: { item: GenreTitle }) => <GenreCard item={item} />,
+    ({ item }: { item: GenreTitle }) => (
+      // Half-gutter padding on every cell = COL_GAP center gutter (v2 grid)
+      <View style={{ flex: 1, paddingHorizontal: COL_GAP / 2 }}>
+        <GenreCard item={item} />
+      </View>
+    ),
     []
   )
 
@@ -295,17 +306,15 @@ export default function GenrePage() {
       </View>
 
       {/* Grid */}
-      <FlatList
+      <FlashList
         data={titles}
         keyExtractor={keyExtractor}
         renderItem={renderItem}
         numColumns={2}
-        // Horizontal padding lives ONLY in contentContainerStyle — the column
-        // wrapper must not add a second inset. Gap-only keeps cards flush at
+        // Horizontal padding lives ONLY in contentContainerStyle — per-item
+        // half-gutter wrappers create the center gutter. Keeps cards flush at
         // 20dp from each screen edge with an 8dp center gutter.
-        columnWrapperStyle={{ gap: COL_GAP }}
-        // insets.bottom + 32: final row never collides with gesture/nav area
-        contentContainerStyle={[styles.gridContent, { paddingBottom: insets.bottom + 32 }]}
+        contentContainerStyle={[styles.gridContent, { paddingHorizontal: CONTENT_PAD, paddingBottom: insets.bottom + 32 }]}
         showsVerticalScrollIndicator={false}
         onEndReached={handleEndReached}
         onEndReachedThreshold={0.5}

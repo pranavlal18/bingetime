@@ -37,9 +37,17 @@ const SearchBar = memo(
           autoCapitalize="none"
           autoCorrect={false}
           returnKeyType="search"
+          accessibilityLabel="Search movies and shows"
+          accessibilityHint="Type a title to search TMDb"
         />
         {value.length > 0 && (
-          <Pressable onPress={onClear} hitSlop={8} style={styles.clearBtn}>
+          <Pressable
+            onPress={onClear}
+            hitSlop={8}
+            style={styles.clearBtn}
+            accessibilityRole="button"
+            accessibilityLabel="Clear search"
+          >
             <Ionicons name="close-circle" size={18} color={colors.onSurfaceVariant} />
           </Pressable>
         )}

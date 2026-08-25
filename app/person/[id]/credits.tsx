@@ -1,7 +1,8 @@
 // ─── All Credits — dense 5-col grid (matches desired screenshot) ───
 
 import { useCallback, useMemo, useState } from 'react'
-import { View, Text, Pressable, StyleSheet, FlatList, ActivityIndicator } from 'react-native'
+import { View, Text, Pressable, StyleSheet, ActivityIndicator } from 'react-native'
+import { FlashList } from '@shopify/flash-list'
 import { useLocalSearchParams, router, Stack } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
@@ -31,6 +32,9 @@ const SORTS: { key: SortKey; label: string }[] = [
 const NUM_COLS = 5
 const COL_GAP = 10
 const ROW_GAP = 12
+// FlashList v2 grid: half-gutter padding per item creates the center gap;
+// container padding shrinks by half a gutter so outer edges stay at 20dp.
+const CONTENT_PAD = spacing.marginMobile - COL_GAP / 2
 
 function getYear(c: TMDbCombinedCredit): string {
   return (c.release_date ?? c.first_air_date ?? '').slice(0, 4)
@@ -45,9 +49,9 @@ export default function PersonCreditsScreen() {
   const cellWidth = useMemo(() => {
     const w = containerW
     if (!w || w < 100) return 64 // Expo Go Android: useWindowDimensions 0 on first frame
-    const horizontal = spacing.marginMobile * 2
-    const gaps = COL_GAP * (NUM_COLS - 1)
-    return (w - horizontal - gaps) / NUM_COLS
+    // Cells are (containerW - 2*CONTENT_PAD)/NUM_COLS wide; the per-item
+    // half-gutter padding leaves this inner width for the card.
+    return (w - CONTENT_PAD * 2) / NUM_COLS - COL_GAP
   }, [containerW])
 
   const [filter, setFilter] = useState<MediaFilter>('all')
@@ -186,12 +190,8 @@ export default function PersonCreditsScreen() {
           flex: 1,
         },
         listContent: {
-          paddingHorizontal: spacing.marginMobile,
+          paddingHorizontal: CONTENT_PAD,
           paddingBottom: 40,
-        },
-        columnWrapper: {
-          justifyContent: 'space-between',
-          marginBottom: ROW_GAP,
         },
         emptyText: {
           fontFamily: 'Inter',
@@ -242,15 +242,19 @@ export default function PersonCreditsScreen() {
       const year = getYear(item)
       const role = item.character?.trim() || item.job?.trim() || ''
       return (
-        <CreditCard
-          posterPath={item.poster_path ?? null}
-          title={title}
-          year={year || null}
-          roleLabel={role}
-          width={cellWidth}
-          compact
-          onPress={() => router.push(item.media_type === 'tv' ? `/show/${item.id}` : `/movie/${item.id}`)}
-        />
+        // Half-gutter padding on every cell = COL_GAP center gutter (v2 grid);
+        // bottom padding preserves the FlatList columnWrapper row gap.
+        <View style={{ flex: 1, paddingHorizontal: COL_GAP / 2, paddingBottom: ROW_GAP }}>
+          <CreditCard
+            posterPath={item.poster_path ?? null}
+            title={title}
+            year={year || null}
+            roleLabel={role}
+            width={cellWidth}
+            compact
+            onPress={() => router.push(item.media_type === 'tv' ? `/show/${item.id}` : `/movie/${item.id}`)}
+          />
+        </View>
       )
     },
     [cellWidth]
@@ -336,17 +340,15 @@ export default function PersonCreditsScreen() {
       </View>
 
       <View style={{ flex: 1 }} onLayout={(e) => setContainerW(e.nativeEvent.layout.width)}>
-        <FlatList
+        <FlashList
           key={`credits-${NUM_COLS}-${Math.round(cellWidth)}`}
           style={styles.list}
           contentContainerStyle={styles.listContent}
-          columnWrapperStyle={credits.length > 1 ? styles.columnWrapper : undefined}
           numColumns={NUM_COLS}
         data={credits}
         keyExtractor={(c) => `${c.media_type}-${c.id}`}
         renderItem={renderItem}
         showsVerticalScrollIndicator={false}
-        initialNumToRender={20}
         ListEmptyComponent={
           <View>
             <Text style={styles.emptyText}>No scripted credits</Text>

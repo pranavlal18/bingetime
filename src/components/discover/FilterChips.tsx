@@ -21,7 +21,7 @@ const FilterChips = memo(function FilterChips({ value, onChange }: FilterChipsPr
   const { colors } = useTheme()
 
   return (
-    <View style={styles.row}>
+    <View style={styles.row} accessibilityRole="tablist">
       {FILTERS.map((f) => {
         const active = value === f.key
         return (
@@ -35,6 +35,9 @@ const FilterChips = memo(function FilterChips({ value, onChange }: FilterChipsPr
                 borderColor: active ? colors.primary : colors.outlineVariant,
               },
             ]}
+            accessibilityRole="tab"
+            accessibilityState={{ selected: active }}
+            accessibilityLabel={`${f.label} filter`}
           >
             <Text
               style={[

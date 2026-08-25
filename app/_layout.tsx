@@ -6,6 +6,14 @@ import { StatusBar } from 'expo-status-bar'
 import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client'
 import { GestureHandlerRootView } from 'react-native-gesture-handler'
 import { StyleSheet, ActivityIndicator, View, Linking, Alert, Text, Platform } from 'react-native'
+import {
+  useFonts,
+  Inter_400Regular,
+  Inter_500Medium,
+  Inter_600SemiBold,
+  Inter_700Bold,
+  Inter_800ExtraBold,
+} from '@expo-google-fonts/inter'
 import { useAuth, AuthProvider } from '@/contexts/AuthContext'
 import { ThemeProvider, useTheme } from '@/contexts/ThemeContext'
 import { useSegments, useRouter } from 'expo-router'
@@ -231,17 +239,32 @@ function EnvGuard({ children }: { children: React.ReactNode }) {
 }
 
 export default function RootLayout() {
+  // Load Inter before rendering any screen — typography tokens reference
+  // fontFamily:'Inter' and system-font fallback causes metric shifts/clipping.
+  const [fontsLoaded] = useFonts({
+    Inter_400Regular,
+    Inter_500Medium,
+    Inter_600SemiBold,
+    Inter_700Bold,
+    Inter_800ExtraBold,
+  })
+
   return (
     <GestureHandlerRootView style={styles.root}>
       <OfflineBanner />
       <EnvGuard>
-        <AuthProvider>
-          <ThemeProvider>
-            <ErrorBoundary>
-              <InnerLayout />
-            </ErrorBoundary>
-          </ThemeProvider>
-        </AuthProvider>
+        {fontsLoaded ? (
+          <AuthProvider>
+            <ThemeProvider>
+              <ErrorBoundary>
+                <InnerLayout />
+              </ErrorBoundary>
+            </ThemeProvider>
+          </AuthProvider>
+        ) : (
+          // Splash-colored blank view — seamless handoff while Inter loads
+          <View style={[styles.root, styles.splashBackground]} />
+        )}
       </EnvGuard>
     </GestureHandlerRootView>
   )
@@ -250,6 +273,9 @@ export default function RootLayout() {
 const styles = StyleSheet.create({
   root: {
     flex: 1,
+  },
+  splashBackground: {
+    backgroundColor: '#15121b', // cinematic-dark surfaceDim — matches native splash
   },
   loadingContainer: {
     flex: 1,

@@ -122,6 +122,7 @@ export default function CreditCard({
           style={styles.poster}
           contentFit="cover"
           cachePolicy="memory-disk"
+          recyclingKey={posterUrl}
           transition={150}
         />
       ) : (

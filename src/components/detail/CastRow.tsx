@@ -167,6 +167,7 @@ export default function CastRow({ cast, isLoading }: CastRowProps) {
                   style={styles.avatar}
                   contentFit="cover"
                   cachePolicy="memory-disk"
+                  recyclingKey={avatarUrl}
                   transition={150}
                 />
               ) : (
