@@ -8,6 +8,7 @@ import Animated, {
   withRepeat,
   withTiming,
   interpolate,
+  cancelAnimation,
 } from 'react-native-reanimated'
 import { LinearGradient } from 'expo-linear-gradient'
 import { borderRadius } from '@/theme'
@@ -50,7 +51,9 @@ export default function ShimmerSkeleton({
       -1,
       false
     )
-  }, [])
+    // Stop the UI-thread repeat on unmount — otherwise it runs forever
+    return () => cancelAnimation(shimmerX)
+  }, [shimmerX])
 
   const animatedStyle = useAnimatedStyle(() => ({
     transform: [

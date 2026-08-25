@@ -49,7 +49,7 @@ All vars use `EXPO_PUBLIC_*` prefix (Expo convention for client-side env vars).
 - **Babel**: `react-native-reanimated/plugin` must be **last** in `plugins` array.
 - **Movie data only in v1 CSV**: `tracking-prod-records.csv` (v1) is the sole source of movie watch data. Do not treat it as superseded — `tracking-prod-records-v2.csv` has zero movie rows.
 - **Supabase join pattern**: All queries use `'*, user_shows(*)'` (or `user_movies(*)`).
-- **React Query `staleTime`**: 2m shows, 5m movies, 10m trending, 1h TMDb details. `gcTime`: 30m. `retry`: 2.
+- **React Query caching**: default `staleTime` 5m / `gcTime` 24h / `retry` 2. Overrides: 2m shows, 5m movies, 10m trending + genre titles, 1h TMDb details (prefetch matches), 24h people/credits/upcoming with `gcTime` 14d. Persisted cache `maxAge` 7d (`app/_layout.tsx`).
 - **Zustand selectors** are used inside list items (not React Context) for granular re-renders.
 - **Single-user**: No auth implemented. One device/user.
 - **Dark-first palette**: `surface (#1a1a2e)`, `accent (#e94560)`, `muted (#6b7280)` in `tailwind.config.js`.

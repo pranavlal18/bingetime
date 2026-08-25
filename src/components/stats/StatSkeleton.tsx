@@ -7,6 +7,7 @@ import Animated, {
   withRepeat,
   withTiming,
   useAnimatedStyle,
+  cancelAnimation,
   Easing,
 } from 'react-native-reanimated'
 import { useTheme } from '@/contexts/ThemeContext'
@@ -33,6 +34,8 @@ const SkeletonPulse = memo(function SkeletonPulse({
       -1,
       true
     )
+    // Stop the UI-thread repeat on unmount — otherwise it runs forever
+    return () => cancelAnimation(opacity)
   }, [opacity])
 
   const animatedStyle = useAnimatedStyle(() => ({

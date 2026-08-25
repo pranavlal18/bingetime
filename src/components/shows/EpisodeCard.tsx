@@ -1,7 +1,15 @@
 // ─── EpisodeCard — TV Time-style episode row ───
 
 import { useCallback, useRef, useMemo } from 'react'
-import { View, Text, Pressable, StyleSheet, Animated } from 'react-native'
+import { View, Text, Pressable, StyleSheet } from 'react-native'
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withSequence,
+  withTiming,
+  interpolate,
+  interpolateColor,
+} from 'react-native-reanimated'
 import { Image } from 'expo-image'
 import { Swipeable } from 'react-native-gesture-handler'
 import { Ionicons } from '@expo/vector-icons'
@@ -35,22 +43,24 @@ interface EpisodeCardProps {
 export default function EpisodeCard({ data, sectionKind, onMarkWatched }: EpisodeCardProps) {
   const { colors } = useTheme()
   const swipeableRef = useRef<Swipeable>(null)
-  const glowAnim = useRef(new Animated.Value(0)).current
+  // Reanimated shared value — runs on UI thread (legacy JS-driver Animated
+  // caused layout jank inside FlashList rows)
+  const glow = useSharedValue(0)
 
   const handlePress = useCallback(() => {
     router.push(`/show/${data.showId}`)
   }, [data.showId])
 
   const handleMark = useCallback(() => {
-    glowAnim.setValue(0)
-    Animated.sequence([
-      Animated.timing(glowAnim, { toValue: 1, duration: 200, useNativeDriver: false }),
-      Animated.timing(glowAnim, { toValue: 0, duration: 300, useNativeDriver: false }),
-    ]).start()
+    glow.value = 0
+    glow.value = withSequence(
+      withTiming(1, { duration: 200 }),
+      withTiming(0, { duration: 300 })
+    )
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
     onMarkWatched?.(data.showId, data.seasonNumber, data.episodeNumber)
     swipeableRef.current?.close()
-  }, [data.showId, data.seasonNumber, data.episodeNumber, onMarkWatched, glowAnim])
+  }, [data.showId, data.seasonNumber, data.episodeNumber, onMarkWatched, glow])
 
   const posterUrl = getImageUrl(data.posterPath, 'w92')
 
@@ -243,23 +253,19 @@ export default function EpisodeCard({ data, sectionKind, onMarkWatched }: Episod
   },
 }), [colors])
 
-  // ── Glow animation interpolations ──
-  const glowBg = glowAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: ['transparent', colors.primary],
-  })
-  const glowIconOpacity = glowAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0, 1],
-  })
-  const swipeFlashOpacity = glowAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0, 0.3],
-  })
-  const swipeScale = glowAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [1, 1.03],
-  })
+  // ── Glow animation (worklet-driven, replaces legacy interpolations) ──
+  const glowBgStyle = useAnimatedStyle(() => ({
+    backgroundColor: interpolateColor(glow.value, [0, 1], ['transparent', colors.primary]),
+  }))
+  const glowIconStyle = useAnimatedStyle(() => ({
+    opacity: glow.value,
+  }))
+  const swipeFlashStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(glow.value, [0, 1], [0, 0.3]),
+  }))
+  const swipeScaleStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: interpolate(glow.value, [0, 1], [1, 1.03]) }],
+  }))
 
   const renderRightActions = () => {
     if (isWatchedHistory || isUpcoming || !onMarkWatched) return null
@@ -269,10 +275,11 @@ export default function EpisodeCard({ data, sectionKind, onMarkWatched }: Episod
         <Animated.View
           style={[
             StyleSheet.absoluteFill,
-            { borderRadius: borderRadius.md, backgroundColor: '#ffffff', opacity: swipeFlashOpacity },
+            { borderRadius: borderRadius.md, backgroundColor: '#ffffff' },
+            swipeFlashStyle,
           ]}
         />
-        <Animated.View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', transform: [{ scale: swipeScale }] }}>
+        <Animated.View style={[{ flex: 1, justifyContent: 'center', alignItems: 'center' }, swipeScaleStyle]}>
           <Ionicons name="checkmark" size={24} color={colors.onPrimary} />
           <Text style={styles.swipeLabel}>Watch</Text>
         </Animated.View>
@@ -359,13 +366,14 @@ export default function EpisodeCard({ data, sectionKind, onMarkWatched }: Episod
                 <Ionicons name="checkmark-circle" size={24} color={colors.success} />
               ) : (
                 <Pressable onPress={handleMark} hitSlop={8}>
-                  <Animated.View style={[styles.checkCircle, { backgroundColor: glowBg }]}>
+                  <Animated.View style={[styles.checkCircle, glowBgStyle]}>
                     <Ionicons name="checkmark" size={18} color={colors.onSurfaceVariant} />
                     {/* White checkmark overlay that fades in during glow */}
                     <Animated.View
                       style={[
                         StyleSheet.absoluteFill,
-                        { borderRadius: 15, justifyContent: 'center', alignItems: 'center', opacity: glowIconOpacity },
+                        { borderRadius: 15, justifyContent: 'center', alignItems: 'center' },
+                        glowIconStyle,
                       ]}
                     >
                       <Ionicons name="checkmark" size={18} color={colors.onPrimary} />
