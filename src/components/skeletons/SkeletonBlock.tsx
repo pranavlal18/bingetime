@@ -22,7 +22,9 @@ export default function SkeletonBlock({
 }: SkeletonBlockProps) {
   return (
     <ShimmerSkeleton
-      width={width}
+      // DimensionValue ⊇ string|number (adds null/'auto'); all call sites
+      // pass concrete widths, so narrowing here is safe.
+      width={width as string | number}
       height={height}
       borderRadius={borderRadius}
       style={style as object}
