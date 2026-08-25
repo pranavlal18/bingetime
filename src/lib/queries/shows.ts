@@ -4,7 +4,7 @@ import { useQuery, useMutation, useQueryClient, QueryClient } from '@tanstack/re
 import { supabase } from '@/lib/supabase'
 import { getImageUrl, getShowBasicDetails } from '@/lib/tmdb'
 import { useAuth } from '@/contexts/AuthContext'
-import { showKeys, episodeKeys, profileKeys } from '@/types'
+import { showKeys, episodeKeys, profileKeys } from './keys'
 import { type ShowWithUserData, type NextAirEpisode } from '@/types'
 import Toast from 'react-native-toast-message'
 
@@ -62,7 +62,8 @@ async function fetchShows(
         poster_path,
         total_episodes,
         last_air_date,
-        average_runtime
+        average_runtime,
+        genres
       )
     `)
     .eq('user_id', userId)
@@ -122,25 +123,22 @@ async function fetchShows(
       counts.set(row.show_id, (counts.get(row.show_id) ?? 0) + 1)
     }
 
-    const updates: Promise<{ error: any }>[] = []
+    // Single batched upsert — one round trip instead of N
+    const drift: Record<string, any>[] = []
     for (const show of result) {
       const actual = counts.get(show.id) ?? 0
       // Only protect if we have no watched data in this app, but had imported count
       const newCount = (actual === 0 && show.episodes_seen > 0) ? show.episodes_seen : actual
       if (newCount !== show.episodes_seen) {
         show.episodes_seen = newCount
-        // Wrap in Promise.resolve to handle PromiseLike from Postgrest
-        updates.push(
-          Promise.resolve(
-            supabase
-              .from('user_shows')
-              .upsert({ show_id: show.id, episodes_seen: newCount, is_following: true, user_id: userId }, { onConflict: 'show_id,user_id' })
-          ).then((r) => ({ error: r.error }))
-        )
+        drift.push({ show_id: show.id, episodes_seen: newCount, is_following: true, user_id: userId })
       }
     }
-    if (updates.length > 0) {
-      await Promise.all(updates)
+    if (drift.length > 0) {
+      const { error: syncError } = await supabase
+        .from('user_shows')
+        .upsert(drift, { onConflict: 'show_id,user_id' })
+      if (syncError && __DEV__) console.warn('[fetchShows] episodes_seen sync failed:', syncError.message)
 
       // Also patch the caches so the UI is consistent
       if (queryClient) {

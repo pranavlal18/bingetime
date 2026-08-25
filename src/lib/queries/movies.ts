@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabase'
 import { getImageUrl, getMovieDetails, searchMovie } from '@/lib/tmdb'
 import { useAuth } from '@/contexts/AuthContext'
 import type { Movie, UserMovie } from '@/types'
+import { movieKeys } from './keys'
 import Toast from 'react-native-toast-message'
 
 // ── Types for joined query result ──
@@ -43,16 +44,6 @@ function mapRow(row: any): MovieWithUserData {
   }
 }
 
-// ── Query keys ──
-
-export const movieKeys = {
-  all: ['movies'] as const,
-  list: (userId: string) => ['movies', 'list', userId] as const,
-  detail: (id: string) => ['movies', 'detail', id] as const,
-  favorites: (userId: string) => ['movies', 'favorites', userId] as const,
-  upcoming: (userId: string) => ['movies', 'upcoming', userId] as const,
-}
-
 // ── Sorting ──
 
 function sortMovies(movies: MovieWithUserData[]): MovieWithUserData[] {
@@ -71,19 +62,26 @@ function sortMovies(movies: MovieWithUserData[]): MovieWithUserData[] {
 async function fetchMovies(userId: string): Promise<MovieWithUserData[]> {
   const { data, error } = await supabase
     .from('movies')
-    .select('*, user_movies!inner(*)')
+    .select(`
+      id,
+      tmdb_id,
+      title,
+      release_date,
+      runtime,
+      poster_path,
+      genres,
+      user_movies!inner(*)
+    `)
     .eq('user_movies.user_id', userId)
+    // Filter at the DB — was client-side .filter(is_watchlist) after fetching
+    .eq('user_movies.is_watchlist', true)
 
   if (__DEV__) console.log('🔍 [fetchMovies] Query result:', { dataLength: data?.length, error: error?.message })
 
   if (error) throw new Error(`Failed to fetch movies: ${error.message}`)
   if (!data) return []
 
-  let result = data.map(mapRow)
-  if (__DEV__) console.log('🔍 [fetchMovies] After mapping:', { count: result.length, watchlist: result.filter(m => m.is_watchlist).length, watched: result.filter(m => m.watched).length })
-  // Filter: only show items that are in the user's library
-  result = result.filter((m) => m.is_watchlist)
-  return sortMovies(result)
+  return sortMovies(data.map(mapRow))
 }
 
 export function useMovies() {

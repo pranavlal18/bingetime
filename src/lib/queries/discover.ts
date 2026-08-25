@@ -53,36 +53,42 @@ async function enrichWithLibraryStatus(
 ): Promise<DiscoverResult[]> {
   if (results.length === 0 || !userId) return []
 
-  const tmdbIds = results.map((r) => r.tmdbId)
+  // Split IDs by media type — tv 123 and movie 123 are different titles, so
+  // each table should only be queried with its own IDs (in parallel).
+  const tvIds = results.filter((r) => r.mediaType === 'tv').map((r) => r.tmdbId)
+  const movieIds = results.filter((r) => r.mediaType === 'movie').map((r) => r.tmdbId)
 
-  // Check shows by tmdb_id — only include items with is_watchlist: true for this user
-  const { data: existingShows } = await supabase
-    .from('shows')
-    .select('id, tmdb_id, user_shows!inner(is_watchlist)')
-    .in('tmdb_id', tmdbIds)
-    .not('tmdb_id', 'is', null)
-    .eq('user_shows.user_id', userId)
-    .eq('user_shows.is_watchlist', true)
-
-  // Check movies by tmdb_id — only include items with is_watchlist: true for this user
-  const { data: existingMovies } = await supabase
-    .from('movies')
-    .select('id, tmdb_id, user_movies!inner(is_watchlist)')
-    .in('tmdb_id', tmdbIds)
-    .not('tmdb_id', 'is', null)
-    .eq('user_movies.user_id', userId)
-    .eq('user_movies.is_watchlist', true)
+  const [existingShows, existingMovies] = await Promise.all([
+    tvIds.length > 0
+      ? supabase
+          .from('shows')
+          .select('id, tmdb_id, user_shows!inner(is_watchlist)')
+          .in('tmdb_id', tvIds)
+          .not('tmdb_id', 'is', null)
+          .eq('user_shows.user_id', userId)
+          .eq('user_shows.is_watchlist', true)
+      : Promise.resolve({ data: [] as any[] }),
+    movieIds.length > 0
+      ? supabase
+          .from('movies')
+          .select('id, tmdb_id, user_movies!inner(is_watchlist)')
+          .in('tmdb_id', movieIds)
+          .not('tmdb_id', 'is', null)
+          .eq('user_movies.user_id', userId)
+          .eq('user_movies.is_watchlist', true)
+      : Promise.resolve({ data: [] as any[] }),
+  ])
 
   // Build lookup maps
   const showMap = new Map<number, string>()
-  if (existingShows) {
-    for (const s of existingShows) {
+  if (existingShows?.data) {
+    for (const s of existingShows.data) {
       if (s.tmdb_id) showMap.set(s.tmdb_id, s.id)
     }
   }
   const movieMap = new Map<number, string>()
-  if (existingMovies) {
-    for (const m of existingMovies) {
+  if (existingMovies?.data) {
+    for (const m of existingMovies.data) {
       if (m.tmdb_id) movieMap.set(m.tmdb_id, m.id)
     }
   }

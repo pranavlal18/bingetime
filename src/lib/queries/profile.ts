@@ -4,7 +4,8 @@ import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
 import { useAppStore } from '@/stores/appStore'
-import type { Show, UserShow, Movie, UserMovie, List } from '@/types'
+import { profileKeys } from './keys'
+import type { Show, UserShow, Movie, UserMovie } from '@/types'
 
 // ── Types ──
 
@@ -16,7 +17,6 @@ export interface ProfileStats {
   favoritedShows: number
   watchlistShows: number
   watchlistMovies: number
-  customLists: number
 }
 
 export interface FavoriteShow extends Show {
@@ -34,15 +34,6 @@ export interface WatchlistShow extends Show {
 
 export interface WatchlistMovie extends Movie {
   watched: boolean
-}
-
-// ── Query keys ──
-
-export const profileKeys = {
-  stats: (userId: string) => ['profile', 'stats', userId] as const,
-  favorites: (userId: string) => ['profile', 'favorites', userId] as const,
-  watchlist: (userId: string) => ['profile', 'watchlist', userId] as const,
-  lists: (userId: string) => ['profile', 'lists', userId] as const,
 }
 
 // ── Fetch stats ──
@@ -64,13 +55,8 @@ async function fetchStats(userId: string): Promise<ProfileStats> {
     .select('watched, is_watchlist, movies!inner(runtime)')
     .eq('user_id', userId)
 
-  const { count: listsCount, error: listsError } = await supabase
-    .from('lists')
-    .select('id', { count: 'exact', head: true })
-
   if (showsError) throw new Error(showsError.message)
   if (moviesError) throw new Error(moviesError.message)
-  if (listsError) throw new Error(listsError.message)
 
   const totalShows = userShows?.length ?? 0
   const favoritedShows = userShows?.filter((s) => s.is_favorited).length ?? 0
@@ -97,7 +83,6 @@ async function fetchStats(userId: string): Promise<ProfileStats> {
   const totalMovies = userMovies?.length ?? 0
   const watchedMovies = userMovies?.filter((m) => m.watched).length ?? 0
   const watchlistMovies = userMovies?.filter((m) => m.is_watchlist).length ?? 0
-  const customLists = listsCount ?? 0
 
   // Calculate total movie watch time using actual runtime from movies table
   // Fall back to 2h estimate if runtime is null
@@ -125,7 +110,6 @@ async function fetchStats(userId: string): Promise<ProfileStats> {
     favoritedShows,
     watchlistShows,
     watchlistMovies,
-    customLists,
   }
 }
 
@@ -251,29 +235,6 @@ export function useWatchlist() {
       ])
       return { shows, movies }
     },
-    staleTime: 1000 * 60 * 5,
-    enabled: !!user,
-  })
-}
-
-// ── Fetch custom lists ──
-
-async function fetchLists(): Promise<List[]> {
-  const { data, error } = await supabase
-    .from('lists')
-    .select('*')
-    .order('name')
-
-  if (error) throw new Error(error.message)
-  return data ?? []
-}
-
-export function useCustomLists() {
-  const { user } = useAuth()
-
-  return useQuery({
-    queryKey: profileKeys.lists(user?.id ?? ''),
-    queryFn: fetchLists,
     staleTime: 1000 * 60 * 5,
     enabled: !!user,
   })

@@ -237,26 +237,7 @@ export interface AppSettings {
   notificationsEnabled: boolean
 }
 
-// ── Query key factories ──
-export const showKeys = {
-  all: ['shows'] as const,
-  list: (userId: string) => ['shows', 'list', userId] as const,
-  continueWatching: (userId: string) => ['shows', 'continue-watching', userId] as const,
-  detail: (id: string) => ['shows', 'detail', id] as const,
-}
-
-export const episodeKeys = {
-  all: ['episodes'] as const,
-  season: (showId: string, tmdbId: number | null, seasonNumber: number, userId: string) =>
-    ['episodes', 'season', showId, tmdbId, seasonNumber, userId] as const,
-}
-
-export const profileKeys = {
-  stats: (userId: string) => ['profile', 'stats', userId] as const,
-  favorites: (userId: string) => ['profile', 'favorites', userId] as const,
-  watchlist: (userId: string) => ['profile', 'watchlist', userId] as const,
-  lists: (userId: string) => ['profile', 'lists', userId] as const,
-}
+// Query key factories moved to src/lib/queries/keys.ts (single source of truth)
 
 export interface EpisodeCardData {
   // Show info

@@ -4,7 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import { getSeasonDetails } from '@/lib/tmdb'
 import { useAuth } from '@/contexts/AuthContext'
-import { episodeKeys, showKeys } from '@/types'
+import { episodeKeys, showKeys } from './keys'
 import type { TMDbSeasonDetails, EpisodeCardData, ShowWithUserData } from '@/types'
 
 // ── Types ──
