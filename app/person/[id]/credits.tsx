@@ -1,6 +1,6 @@
 // ─── All Credits — dense 5-col grid (matches desired screenshot) ───
 
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { View, Text, Pressable, StyleSheet, ActivityIndicator } from 'react-native'
 import { FlashList } from '@shopify/flash-list'
 import { useLocalSearchParams, router, Stack } from 'expo-router'
@@ -8,11 +8,17 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import * as Haptics from 'expo-haptics'
 import { usePerson, dedupeCredits, isScriptedCredit } from '@/lib/queries/people'
+import { fetchLibraryStatus } from '@/lib/queries/libraryStatus'
+import { useAddToLibrary, useRemoveFromLibrary } from '@/lib/queries/discover'
 import type { TMDbCombinedCredit } from '@/lib/tmdb'
 import CreditCard from '@/components/detail/CreditCard'
+import LibraryBadge from '@/components/ui/LibraryBadge'
+import BrowseSortSheet from '@/components/discover/BrowseSortSheet'
 import ErrorState from '@/components/ui/ErrorState'
 import { typography, spacing, borderRadius } from '@/theme'
 import { useTheme } from '@/contexts/ThemeContext'
+import { useAuth } from '@/contexts/AuthContext'
+import { Alert } from 'react-native'
 
 type MediaFilter = 'all' | 'movie' | 'tv'
 type SortKey = 'newest' | 'oldest' | 'popular' | 'az'
@@ -30,7 +36,10 @@ const SORTS: { key: SortKey; label: string }[] = [
   { key: 'az', label: 'A–Z' },
 ]
 
-const NUM_COLS = 5
+// Sheet-shaped view of SORTS for the shared bottom-sheet component
+const SORT_SHEET_OPTIONS = SORTS.map(({ key, label }) => ({ value: key, label }))
+
+const NUM_COLS = 3
 const COL_GAP = 10
 const ROW_GAP = 12
 // FlashList v2 grid: half-gutter padding per item creates the center gap;
@@ -57,6 +66,8 @@ export default function PersonCreditsScreen() {
 
   const [filter, setFilter] = useState<MediaFilter>('all')
   const [sort, setSort] = useState<SortKey>('newest')
+  const [sheetVisible, setSheetVisible] = useState(false)
+  const sortLabel = useMemo(() => SORTS.find((s) => s.key === sort)?.label ?? 'Newest', [sort])
 
   const personId = useMemo(() => {
     const raw = String(id ?? '')
@@ -159,40 +170,13 @@ export default function PersonCreditsScreen() {
         segmentTextActive: {
           color: colors.onPrimary,
         },
-        sortRow: {
-          flexDirection: 'row',
-          gap: 8,
-          marginHorizontal: spacing.marginMobile,
-          marginBottom: 14,
-          flexWrap: 'wrap',
-        },
-        sortChip: {
-          paddingHorizontal: 14,
-          paddingVertical: 6,
-          borderRadius: borderRadius.full,
-          backgroundColor: colors.surfaceContainerHighest,
-          borderWidth: 1,
-          borderColor: colors.outlineVariant,
-        },
-        sortChipActive: {
-          backgroundColor: colors.primary,
-          borderColor: colors.primary,
-        },
-        sortChipText: {
-          fontFamily: 'Inter',
-          fontSize: 12,
-          fontWeight: '600',
-          color: colors.onSurfaceVariant,
-        },
-        sortChipTextActive: {
-          color: colors.onPrimary,
-        },
         list: {
           flex: 1,
         },
         listContent: {
           paddingHorizontal: CONTENT_PAD,
-          paddingBottom: 40,
+          // Clears the floating bottom sort bar
+          paddingBottom: 96,
         },
         emptyText: {
           fontFamily: 'Inter',
@@ -235,6 +219,81 @@ export default function PersonCreditsScreen() {
     })
   }, [person, filter, sort])
 
+  // ── Watchlist state (same batched-enrichment pattern as CollectionBrowser) ──
+  const { user } = useAuth()
+  const addMutation = useAddToLibrary()
+  const removeMutation = useRemoveFromLibrary()
+  const addingIds = useRef(new Set<number>())
+  const removingIds = useRef(new Set<number>())
+  const [, forceRender] = useState(0)
+  const localLibraryRef = useRef<Map<string, 'added' | 'removed'>>(new Map())
+  // Composite key `${mediaType}:${id}` — tv 123 and movie 123 are different titles
+  const statusMapRef = useRef<Map<string, 'in' | 'out'>>(new Map())
+
+  useEffect(() => {
+    if (!user || credits.length === 0) return
+    let cancelled = false
+    fetchLibraryStatus(
+      credits.map((c) => ({ tmdbId: c.id, mediaType: c.media_type })),
+      user.id
+    )
+      .then((map) => {
+        if (cancelled) return
+        for (const c of credits) {
+          statusMapRef.current.set(`${c.media_type}:${c.id}`, map.has(c.id) ? 'in' : 'out')
+        }
+        forceRender((n) => n + 1)
+      })
+      .catch(() => {
+        // Silent — badges stay '+' and remain functional via local toggles
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [credits, user])
+
+  const isInLibrary = useCallback((credit: TMDbCombinedCredit) => {
+    const key = `${credit.media_type}:${credit.id}`
+    const localStatus = localLibraryRef.current.get(key)
+    if (localStatus === 'added') return true
+    if (localStatus === 'removed') return false
+    return statusMapRef.current.get(key) === 'in'
+  }, [])
+
+  const handleToggleLibrary = useCallback(
+    (item: TMDbCombinedCredit) => {
+      const wasIn = isInLibrary(item)
+      const key = `${item.media_type}:${item.id}`
+      localLibraryRef.current.set(key, wasIn ? 'removed' : 'added')
+      const pending = wasIn ? removingIds.current : addingIds.current
+      pending.add(item.id)
+      forceRender((n) => n + 1)
+
+      const discoverItem = {
+        tmdbId: item.id,
+        mediaType: item.media_type,
+        title: (item.title ?? item.name ?? 'Untitled').trim(),
+        poster_path: item.poster_path ?? null,
+        year: getYear(item) || null,
+        releaseDate: null,
+        overview: null,
+        inLibrary: wasIn,
+      }
+      const mutation = wasIn ? removeMutation : addMutation
+      mutation.mutate(discoverItem as any, {
+        onError: (err: Error) => {
+          Alert.alert(wasIn ? 'Failed to remove' : 'Failed to add', err.message)
+          localLibraryRef.current.delete(key)
+        },
+        onSettled: () => {
+          pending.delete(item.id)
+          forceRender((n) => n + 1)
+        },
+      })
+    },
+    [isInLibrary, addMutation, removeMutation]
+  )
+
   const handleBack = useCallback(() => router.back(), [])
 
   const renderItem = useCallback(
@@ -242,6 +301,8 @@ export default function PersonCreditsScreen() {
       const title = (item.title ?? item.name ?? 'Untitled').trim()
       const year = getYear(item)
       const role = item.character?.trim() || item.job?.trim() || ''
+      const inLib = isInLibrary(item)
+      const pending = addingIds.current.has(item.id) || removingIds.current.has(item.id)
       return (
         // Half-gutter padding on every cell = COL_GAP center gutter (v2 grid);
         // bottom padding preserves the FlatList columnWrapper row gap.
@@ -253,12 +314,20 @@ export default function PersonCreditsScreen() {
             roleLabel={role}
             width={cellWidth}
             compact
+            badge={
+              <LibraryBadge
+                size={20}
+                isInLibrary={inLib}
+                isPending={pending}
+                onToggle={() => handleToggleLibrary(item)}
+              />
+            }
             onPress={() => router.push(item.media_type === 'tv' ? `/show/${item.id}` : `/movie/${item.id}`)}
           />
         </View>
       )
     },
-    [cellWidth]
+    [cellWidth, isInLibrary, handleToggleLibrary]
   )
 
   if (!isValidId) {
@@ -331,28 +400,6 @@ export default function PersonCreditsScreen() {
         })}
       </View>
 
-      <View style={styles.sortRow}>
-        {SORTS.map((s) => {
-          const active = s.key === sort
-          return (
-            <Pressable
-              key={s.key}
-              style={[styles.sortChip, active && styles.sortChipActive]}
-              onPress={() => {
-                if (!active) {
-                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
-                  setSort(s.key)
-                }
-              }}
-              accessibilityRole="button"
-              accessibilityState={{ selected: active }}
-            >
-              <Text style={[styles.sortChipText, active && styles.sortChipTextActive]}>{s.label}</Text>
-            </Pressable>
-          )
-        })}
-      </View>
-
       <View style={{ flex: 1 }} onLayout={(e) => setContainerW(e.nativeEvent.layout.width)}>
         <FlashList
           key={`credits-${NUM_COLS}-${Math.round(cellWidth)}`}
@@ -371,6 +418,64 @@ export default function PersonCreditsScreen() {
         }
         />
       </View>
+
+      {/* Sticky bottom bar — sort control, same pattern as browse pages */}
+      <View
+        style={{
+          position: 'absolute',
+          bottom: 0,
+          left: 0,
+          right: 0,
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          paddingHorizontal: spacing.marginMobile,
+          paddingVertical: 12,
+          paddingBottom: 12 + insets.bottom,
+          backgroundColor: colors.surfaceContainerHigh,
+          borderTopWidth: 1,
+          borderTopColor: colors.outlineVariant,
+          zIndex: 10,
+          elevation: 8,
+        }}
+      >
+        <Pressable
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 6,
+            backgroundColor: colors.surfaceContainerHigh,
+            paddingHorizontal: 14,
+            paddingVertical: 8,
+            borderRadius: borderRadius.full,
+            borderWidth: 1,
+            borderColor: colors.outlineVariant,
+          }}
+          onPress={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
+            setSheetVisible(true)
+          }}
+          accessibilityRole="button"
+          accessibilityLabel={`Sort by ${sortLabel}`}
+        >
+          <Ionicons name="swap-vertical" size={16} color={colors.onSurface} />
+          <Text style={{ fontFamily: 'Inter', fontSize: 13, fontWeight: '600', color: colors.onSurface }}>
+            {sortLabel}
+          </Text>
+          <Ionicons name="chevron-down" size={14} color={colors.onSurfaceVariant} />
+        </Pressable>
+        <Text style={{ fontFamily: 'Inter', fontSize: 12, color: colors.onSurfaceVariant }}>
+          {credits.length} titles
+        </Text>
+      </View>
+
+      <BrowseSortSheet
+        visible={sheetVisible}
+        onClose={() => setSheetVisible(false)}
+        value={sort}
+        onChange={setSort}
+        options={SORT_SHEET_OPTIONS}
+      />
     </View>
   )
 }

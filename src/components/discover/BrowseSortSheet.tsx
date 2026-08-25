@@ -14,18 +14,22 @@ import Animated, {
 } from 'react-native-reanimated'
 import { useTheme } from '@/contexts/ThemeContext'
 import { spacing, borderRadius } from '@/theme'
-import type { GenreSortBy } from '@/lib/tmdb'
-import type { BrowseSortOption } from '@/lib/queries/discover'
 
-interface BrowseSortSheetProps {
+interface BrowseSortSheetProps<T extends string> {
   visible: boolean
   onClose: () => void
-  value: GenreSortBy
-  onChange: (v: GenreSortBy) => void
-  options: BrowseSortOption[]
+  value: T
+  onChange: (v: T) => void
+  options: { label: string; value: T }[]
 }
 
-export default function BrowseSortSheet({ visible, onClose, value, onChange, options }: BrowseSortSheetProps) {
+export default function BrowseSortSheet<T extends string>({
+  visible,
+  onClose,
+  value,
+  onChange,
+  options,
+}: BrowseSortSheetProps<T>) {
   const { colors } = useTheme()
   const translateY = useSharedValue(0)
   const contextY = useSharedValue(0)

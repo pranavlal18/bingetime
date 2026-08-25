@@ -1,22 +1,26 @@
 // ─── Artist Page — matches screenshot: plain bio, 5-up Known For, no count pill ───
 
-import { useMemo, useState } from 'react'
-import { View, Text, ScrollView, Pressable, StyleSheet, ActivityIndicator } from 'react-native'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { View, Text, ScrollView, Pressable, StyleSheet, ActivityIndicator, Alert } from 'react-native'
 import { useLocalSearchParams, router, Stack } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Image } from 'expo-image'
 import { Ionicons } from '@expo/vector-icons'
 import { usePerson, topKnownFor } from '@/lib/queries/people'
+import { fetchLibraryStatus } from '@/lib/queries/libraryStatus'
+import { useAddToLibrary, useRemoveFromLibrary } from '@/lib/queries/discover'
 import { getImageUrl } from '@/lib/tmdb'
 import type { TMDbCombinedCredit } from '@/lib/tmdb'
 import CreditCard from '@/components/detail/CreditCard'
+import LibraryBadge from '@/components/ui/LibraryBadge'
 import ErrorState from '@/components/ui/ErrorState'
 import { typography, spacing, borderRadius } from '@/theme'
 import { useTheme } from '@/contexts/ThemeContext'
+import { useAuth } from '@/contexts/AuthContext'
 
 const PORTRAIT_W = 112
 const PORTRAIT_H = 168
-const KNOWN_FOR_W = 68
+const KNOWN_FOR_W = 96
 const KNOWN_FOR_GAP = 10
 
 function formatBorn(dateStr: string | null): string | null {
@@ -44,6 +48,81 @@ export default function PersonDetailScreen() {
 
   const { data: person, isLoading, error, refetch } = usePerson(personId)
   const knownFor = useMemo(() => topKnownFor(person, 8), [person])
+
+  // ── Watchlist state (same batched-enrichment pattern as credits grid) ──
+  const { user } = useAuth()
+  const addMutation = useAddToLibrary()
+  const removeMutation = useRemoveFromLibrary()
+  const addingIds = useRef(new Set<number>())
+  const removingIds = useRef(new Set<number>())
+  const [, forceRender] = useState(0)
+  const localLibraryRef = useRef<Map<string, 'added' | 'removed'>>(new Map())
+  // Composite key `${mediaType}:${id}` — tv 123 and movie 123 are different titles
+  const statusMapRef = useRef<Map<string, 'in' | 'out'>>(new Map())
+
+  useEffect(() => {
+    if (!user || knownFor.length === 0) return
+    let cancelled = false
+    fetchLibraryStatus(
+      knownFor.map((c) => ({ tmdbId: c.id, mediaType: c.media_type })),
+      user.id
+    )
+      .then((map) => {
+        if (cancelled) return
+        for (const c of knownFor) {
+          statusMapRef.current.set(`${c.media_type}:${c.id}`, map.has(c.id) ? 'in' : 'out')
+        }
+        forceRender((n) => n + 1)
+      })
+      .catch(() => {
+        // Silent — badges stay '+' and remain functional via local toggles
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [knownFor, user])
+
+  const isInLibrary = useCallback((credit: TMDbCombinedCredit) => {
+    const key = `${credit.media_type}:${credit.id}`
+    const localStatus = localLibraryRef.current.get(key)
+    if (localStatus === 'added') return true
+    if (localStatus === 'removed') return false
+    return statusMapRef.current.get(key) === 'in'
+  }, [])
+
+  const handleToggleLibrary = useCallback(
+    (item: TMDbCombinedCredit) => {
+      const wasIn = isInLibrary(item)
+      const key = `${item.media_type}:${item.id}`
+      localLibraryRef.current.set(key, wasIn ? 'removed' : 'added')
+      const pending = wasIn ? removingIds.current : addingIds.current
+      pending.add(item.id)
+      forceRender((n) => n + 1)
+
+      const discoverItem = {
+        tmdbId: item.id,
+        mediaType: item.media_type,
+        title: (item.title ?? item.name ?? 'Untitled').trim(),
+        poster_path: item.poster_path ?? null,
+        year: (item.release_date ?? item.first_air_date ?? '').slice(0, 4) || null,
+        releaseDate: null,
+        overview: null,
+        inLibrary: wasIn,
+      }
+      const mutation = wasIn ? removeMutation : addMutation
+      mutation.mutate(discoverItem as any, {
+        onError: (err: Error) => {
+          Alert.alert(wasIn ? 'Failed to remove' : 'Failed to add', err.message)
+          localLibraryRef.current.delete(key)
+        },
+        onSettled: () => {
+          pending.delete(item.id)
+          forceRender((n) => n + 1)
+        },
+      })
+    },
+    [isInLibrary, addMutation, removeMutation]
+  )
 
   const styles = useMemo(
     () =>
@@ -337,6 +416,14 @@ export default function PersonDetailScreen() {
                     posterPath={credit.poster_path ?? null}
                     title={title}
                     width={KNOWN_FOR_W}
+                    badge={
+                      <LibraryBadge
+                        size={20}
+                        isInLibrary={isInLibrary(credit)}
+                        isPending={addingIds.current.has(credit.id) || removingIds.current.has(credit.id)}
+                        onToggle={() => handleToggleLibrary(credit)}
+                      />
+                    }
                     onPress={() => router.push(credit.media_type === 'tv' ? `/show/${credit.id}` : `/movie/${credit.id}`)}
                   />
                 )
