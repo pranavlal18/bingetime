@@ -165,7 +165,10 @@ function MoviesScreenContent() {
             { width: CARD_WIDTH },
             pressed && { opacity: 0.85, transform: [{ scale: 0.97 }] },
           ]}
-          onPress={() => router.push(`/movie/${movie.id}`)}
+          onPress={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
+            router.push(`/movie/${movie.id}`)
+          }}
           accessibilityRole="button"
           accessibilityLabel={`${movie.title}, ${year || 'unknown year'}`}
         >

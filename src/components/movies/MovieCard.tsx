@@ -105,6 +105,7 @@ const MovieCard = memo(function MovieCard({ movie, onMarkWatched }: MovieCardPro
 }), [colors])
 
   const handlePress = useCallback(() => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
     if (movie.tmdb_id != null) prefetchTitleDetails('movie', movie.tmdb_id, queryClient)
     router.push(`/movie/${movie.id}`)
   }, [movie.id, movie.tmdb_id, queryClient])
