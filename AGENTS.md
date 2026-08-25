@@ -1,7 +1,6 @@
 # BingeTime
 
 Expo SDK 57 / Expo Router (file-based) / TypeScript ~6.0
-NativeWind v4 (`className`, `darkMode: 'class'`)
 Zustand v5 (persisted: `bingetime-settings`) + TanStack React Query v5
 Supabase + TMDb API
 FlashList / expo-image / reanimated 4.5 / gesture-handler
@@ -52,7 +51,7 @@ All vars use `EXPO_PUBLIC_*` prefix (Expo convention for client-side env vars).
 - **React Query caching**: default `staleTime` 5m / `gcTime` 24h / `retry` 2. Overrides: 2m shows, 5m movies, 10m trending + genre titles, 1h TMDb details (prefetch matches), 24h people/credits/upcoming with `gcTime` 14d. Persisted cache `maxAge` 7d (`app/_layout.tsx`).
 - **Zustand selectors** are used inside list items (not React Context) for granular re-renders.
 - **Auth**: Supabase email/password via `src/contexts/AuthContext.tsx`; single account on one device. Auth redirects are declarative (`app/index.tsx` + `_layout.tsx` guards).
-- **Dark-first palette**: `surface (#1a1a2e)`, `accent (#e94560)`, `muted (#6b7280)` in `tailwind.config.js`.
+- **Dark-first palette**: all tokens in `src/theme.ts` (`surface #15121b`, `primary #d0bcff`); themes in `src/themes/`. Styling is plain `StyleSheet.create` — no Tailwind.
 
 ## Skills
 

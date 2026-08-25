@@ -13,7 +13,6 @@ A personal TV show and movie tracker built with Expo, React Native, Supabase, an
 [![TypeScript](https://img.shields.io/badge/TypeScript-6.0-3178C6?logo=typescript)](https://typescriptlang.org)
 [![Supabase](https://img.shields.io/badge/Supabase-PostgreSQL-3ECF8E?logo=supabase)](https://supabase.com)
 [![TMDb](https://img.shields.io/badge/TMDb-API-01D277?logo=themoviedatabase)](https://www.themoviedb.org)
-[![NativeWind](https://img.shields.io/badge/NativeWind-v4-06B6D4?logo=tailwindcss)](https://nativewind.dev)
 [![Zustand](https://img.shields.io/badge/Zustand-v5-FF6B6B)](https://zustand-demo.pmnd.rs)
 [![TanStack Query](https://img.shields.io/badge/TanStack%20Query-v5-FF4154)](https://tanstack.com/query)
 
@@ -91,7 +90,7 @@ npm run typecheck # tsc --noEmit
 | Layer | Technology |
 |-------|------------|
 | **Routing** | Expo Router (file-based, `app/`) |
-| **Styling** | NativeWind v4  |
+| **Styling** | Theme tokens + `StyleSheet.create` (dark-first) |
 | **State** | Zustand v5 (persisted to AsyncStorage) |
 | **Data Fetching** | TanStack React Query v5 (offline-first, persisted) |
 | **Database** | Supabase (PostgreSQL) + TMDb REST API |
