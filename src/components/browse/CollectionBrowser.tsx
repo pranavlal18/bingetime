@@ -419,6 +419,11 @@ export default function CollectionBrowser({
     if (hasNextPage && !isFetchingNextPage) void fetchNextPage()
   }, [hasNextPage, isFetchingNextPage, fetchNextPage])
 
+  const handleBack = useCallback(() => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
+    router.back()
+  }, [])
+
   // ── Invalid params ──
   if (!id) {
     return (
@@ -426,7 +431,7 @@ export default function CollectionBrowser({
         <Stack.Screen options={{ headerShown: false }} />
         <Ionicons name="alert-circle-outline" size={48} color={colors.onSurfaceVariant} />
         <Text style={styles.emptyText}>{invalidMessage ?? 'Could not load page'}</Text>
-        <Pressable onPress={() => router.back()}>
+        <Pressable onPress={handleBack}>
           <Text style={[styles.emptyText, { color: colors.primary }]}>Go back</Text>
         </Pressable>
       </View>
@@ -449,7 +454,7 @@ export default function CollectionBrowser({
     return (
       <View style={[styles.container, { paddingTop: insets.top }]}>
         <Stack.Screen options={{ headerShown: false }} />
-        <ErrorState title={`Failed to load ${name}`} onRetry={refetch} onGoBack={() => router.back()} />
+        <ErrorState title={`Failed to load ${name}`} onRetry={refetch} onGoBack={handleBack} />
       </View>
     )
   }
@@ -461,7 +466,7 @@ export default function CollectionBrowser({
       {/* Header */}
       <View style={styles.header}>
         <Pressable
-          onPress={() => router.back()}
+          onPress={handleBack}
           style={styles.backButton}
           hitSlop={8}
           accessibilityRole="button"

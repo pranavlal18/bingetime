@@ -774,6 +774,7 @@ export default function ShowDetailScreen() {
 
   // ── Callbacks ──
   const handleBack = useCallback(() => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
     router.back()
   }, [])
 

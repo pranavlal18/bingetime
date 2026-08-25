@@ -316,6 +316,7 @@ export default function MovieDetailScreen() {
   }, [movie, toggleWatchedMutation])
 
   const handleBack = useCallback(() => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
     router.back()
   }, [])
 

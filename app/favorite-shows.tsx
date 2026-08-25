@@ -495,7 +495,13 @@ export default function FavoriteShowsScreen() {
 
       {/* ── AppBar ── */}
       <View style={styles.appBar}>
-        <Pressable onPress={() => router.back()} style={styles.backBtn}>
+        <Pressable
+          onPress={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
+            router.back()
+          }}
+          style={styles.backBtn}
+        >
           <Ionicons name="arrow-back" size={24} color={colors.onSurface} />
         </Pressable>
         <Text style={styles.appBarTitle}>Favorite Shows</Text>

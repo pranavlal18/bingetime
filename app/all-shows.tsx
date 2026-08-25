@@ -14,6 +14,7 @@ import { FlashList } from '@shopify/flash-list'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import { router, Stack } from 'expo-router'
+import * as Haptics from 'expo-haptics'
 import { useShows } from '@/lib/queries/shows'
 import { useAppStore } from '@/stores/appStore'
 import { typography, spacing, borderRadius } from '@/theme'
@@ -328,7 +329,13 @@ export default function AllShowsScreen() {
 
       {/* ── AppBar ── */}
       <View style={styles.appBar}>
-        <Pressable onPress={() => router.back()} style={styles.backBtn}>
+        <Pressable
+          onPress={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
+            router.back()
+          }}
+          style={styles.backBtn}
+        >
           <Ionicons name="arrow-back" size={24} color={colors.onSurface} />
         </Pressable>
         <Text style={styles.appBarTitle}>All Shows</Text>

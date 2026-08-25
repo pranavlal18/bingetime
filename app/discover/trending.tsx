@@ -16,6 +16,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Image } from 'expo-image'
 import { Ionicons } from '@expo/vector-icons'
 import { router } from 'expo-router'
+import * as Haptics from 'expo-haptics'
 import {
   useTrending,
   useAddToLibrary,
@@ -360,7 +361,14 @@ export default function TrendingScreen() {
     <View style={[styles.container, { paddingTop: insets.top }]}>
       {/* Header */}
       <View style={styles.header}>
-        <Pressable onPress={() => router.back()} style={styles.backButton} hitSlop={8}>
+        <Pressable
+          onPress={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
+            router.back()
+          }}
+          style={styles.backButton}
+          hitSlop={8}
+        >
           <Ionicons name="chevron-back" size={24} color={colors.primary} />
         </Pressable>
         <Text style={styles.headerTitle}>Trending Now</Text>

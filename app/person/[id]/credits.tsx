@@ -294,7 +294,10 @@ export default function PersonCreditsScreen() {
     [isInLibrary, addMutation, removeMutation]
   )
 
-  const handleBack = useCallback(() => router.back(), [])
+  const handleBack = useCallback(() => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
+    router.back()
+  }, [])
 
   const renderItem = useCallback(
     ({ item }: { item: TMDbCombinedCredit }) => {

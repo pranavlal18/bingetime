@@ -6,6 +6,7 @@ import { useLocalSearchParams, router, Stack } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Image } from 'expo-image'
 import { Ionicons } from '@expo/vector-icons'
+import * as Haptics from 'expo-haptics'
 import { usePerson, topKnownFor } from '@/lib/queries/people'
 import { fetchLibraryStatus } from '@/lib/queries/libraryStatus'
 import { useAddToLibrary, useRemoveFromLibrary } from '@/lib/queries/discover'
@@ -327,7 +328,10 @@ export default function PersonDetailScreen() {
         <ErrorState
           title="Could not load person details"
           onRetry={refetch}
-          onGoBack={() => router.back()}
+          onGoBack={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
+            router.back()
+          }}
         />
       </View>
     )
@@ -352,7 +356,15 @@ export default function PersonDetailScreen() {
         contentContainerStyle={{ paddingBottom: insets.bottom + 40 }}
         showsVerticalScrollIndicator={false}
       >
-        <Pressable onPress={() => router.back()} style={styles.backButton} accessibilityRole="button" accessibilityLabel="Go back">
+          <Pressable
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
+              router.back()
+            }}
+            style={styles.backButton}
+            accessibilityRole="button"
+            accessibilityLabel="Go back"
+          >
           <Ionicons name="chevron-back" size={20} color="#fff" />
         </Pressable>
 
