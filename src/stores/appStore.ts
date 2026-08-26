@@ -18,6 +18,8 @@ interface AppState extends AppSettings {
   setStatsPeriod: (period: 'week' | 'month') => void
   hasRunReleaseDateSync: boolean
   setHasRunReleaseDateSync: (done: boolean) => void
+  onboardingPending: boolean
+  setOnboardingPending: (pending: boolean) => void
 }
 
 export const useAppStore = create<AppState>()(
@@ -32,6 +34,7 @@ export const useAppStore = create<AppState>()(
       displayName: null,
       statsPeriod: 'week',
       hasRunReleaseDateSync: false,
+      onboardingPending: false,
 
       setShowsViewMode: (mode) => set({ showsViewMode: mode }),
       setMoviesViewMode: (mode) => set({ moviesViewMode: mode }),
@@ -41,6 +44,7 @@ export const useAppStore = create<AppState>()(
       setDisplayName: (name) => set({ displayName: name }),
       setStatsPeriod: (period) => set({ statsPeriod: period }),
       setHasRunReleaseDateSync: (done) => set({ hasRunReleaseDateSync: done }),
+      setOnboardingPending: (pending) => set({ onboardingPending: pending }),
     }),
     {
       name: 'bingetime-settings',

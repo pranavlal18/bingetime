@@ -242,6 +242,7 @@ export interface AppSettings {
   notificationsEnabled: boolean
   hapticsEnabled: boolean
   displayName: string | null
+  onboardingPending: boolean
 }
 
 // Query key factories moved to src/lib/queries/keys.ts (single source of truth)
