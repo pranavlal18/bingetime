@@ -50,14 +50,8 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     supabaseAnonKey: process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY,
     tmdbApiKey: process.env.EXPO_PUBLIC_TMDB_API_KEY,
     router: {},
-    eas: {
-      projectId: 'a44b8f2a-fe30-404d-a637-df7b49487350',
-    },
   },
   runtimeVersion: {
     policy: 'appVersion',
-  },
-  updates: {
-    url: 'https://u.expo.dev/a44b8f2a-fe30-404d-a637-df7b49487350',
   },
 });
