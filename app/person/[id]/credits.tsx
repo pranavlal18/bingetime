@@ -1,7 +1,7 @@
 // ─── All Credits — dense 5-col grid (matches desired screenshot) ───
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { View, Text, Pressable, StyleSheet, ActivityIndicator } from 'react-native'
+import { View, Text, Pressable, StyleSheet, ActivityIndicator, TextInput } from 'react-native'
 import { FlashList } from '@shopify/flash-list'
 import { useLocalSearchParams, router, Stack } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -68,6 +68,16 @@ export default function PersonCreditsScreen() {
   const [sort, setSort] = useState<SortKey>('newest')
   const [sheetVisible, setSheetVisible] = useState(false)
   const sortLabel = useMemo(() => SORTS.find((s) => s.key === sort)?.label ?? 'Newest', [sort])
+
+  const [searchVisible, setSearchVisible] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
+  const toggleSearch = useCallback(() => {
+    hapticLight()
+    setSearchVisible((v) => {
+      if (v) setSearchQuery('') // leaving search resets the filter
+      return !v
+    })
+  }, [])
 
   const personId = useMemo(() => {
     const raw = String(id ?? '')
@@ -144,6 +154,42 @@ export default function PersonCreditsScreen() {
           flex: 1,
           paddingHorizontal: 48,
         },
+        // Right-side twin of headerBackButton — keeps the title centered
+        headerSearchButton: {
+          position: 'absolute',
+          right: spacing.marginMobile,
+          width: 32,
+          height: 32,
+          borderRadius: borderRadius.full,
+          backgroundColor: 'rgba(255,255,255,0.08)',
+          borderWidth: 0.5,
+          borderColor: 'rgba(255,255,255,0.12)',
+          justifyContent: 'center',
+          alignItems: 'center',
+          zIndex: 1,
+        },
+        headerSearchButtonActive: {
+          backgroundColor: 'rgba(208,188,255,0.16)',
+          borderColor: 'rgba(208,188,255,0.35)',
+        },
+        searchRow: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: 8,
+          marginHorizontal: spacing.marginMobile,
+          marginBottom: 10,
+          paddingHorizontal: 12,
+          paddingVertical: 9,
+          borderRadius: borderRadius.full,
+          backgroundColor: colors.surfaceContainerHighest,
+        },
+        searchInput: {
+          flex: 1,
+          fontFamily: 'Inter',
+          fontSize: typography.bodySm.fontSize,
+          color: colors.onSurface,
+          paddingVertical: 0,
+        },
         track: {
           flexDirection: 'row',
           marginHorizontal: spacing.marginMobile,
@@ -201,8 +247,18 @@ export default function PersonCreditsScreen() {
   const credits = useMemo(() => {
     const all = dedupeCredits(person).filter(isScriptedCredit)
     const filtered = filter === 'all' ? all : all.filter((c) => c.media_type === filter)
+    // Client-side search over title OR role (all credits are already loaded)
+    const query = searchQuery.trim().toLowerCase()
+    const searchable = query
+      ? filtered.filter(
+          (c) =>
+            (c.title ?? c.name ?? '').toLowerCase().includes(query) ||
+            (c.character ?? '').toLowerCase().includes(query) ||
+            (c.job ?? '').toLowerCase().includes(query)
+        )
+      : filtered
     const titleOf = (c: TMDbCombinedCredit) => (c.title ?? c.name ?? '').toLowerCase()
-    return [...filtered].sort((a, b) => {
+    return [...searchable].sort((a, b) => {
       const ya = a.release_date ?? a.first_air_date ?? ''
       const yb = b.release_date ?? b.first_air_date ?? ''
       switch (sort) {
@@ -217,7 +273,7 @@ export default function PersonCreditsScreen() {
           return yb.localeCompare(ya) || titleOf(a).localeCompare(titleOf(b))
       }
     })
-  }, [person, filter, sort])
+  }, [person, filter, sort, searchQuery])
 
   // ── Watchlist state (same batched-enrichment pattern as CollectionBrowser) ──
   const { user } = useAuth()
@@ -379,7 +435,36 @@ export default function PersonCreditsScreen() {
         <Text style={styles.headerTitle} numberOfLines={1}>
           All Credits
         </Text>
+        <Pressable
+          onPress={toggleSearch}
+          style={[styles.headerSearchButton, searchVisible && styles.headerSearchButtonActive]}
+          accessibilityRole="button"
+          accessibilityLabel="Search credits"
+        >
+          <Ionicons name="search-outline" size={18} color={searchVisible ? colors.primary : '#fff'} />
+        </Pressable>
       </View>
+
+      {/* Inline search — composes with the media filter + sort below */}
+      {searchVisible && (
+        <View style={styles.searchRow}>
+          <Ionicons name="search" size={16} color={colors.onSurfaceVariant} />
+          <TextInput
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            placeholder="Search titles or characters"
+            placeholderTextColor={colors.outlineVariant}
+            autoFocus
+            style={styles.searchInput}
+            returnKeyType="search"
+          />
+          {searchQuery.length > 0 && (
+            <Pressable hitSlop={8} onPress={() => setSearchQuery('')} accessibilityRole="button" accessibilityLabel="Clear search">
+              <Ionicons name="close-circle" size={16} color={colors.onSurfaceVariant} />
+            </Pressable>
+          )}
+        </View>
+      )}
 
       <View style={styles.track}>
         {FILTERS.map((f) => {
@@ -415,8 +500,14 @@ export default function PersonCreditsScreen() {
         showsVerticalScrollIndicator={false}
         ListEmptyComponent={
           <View>
-            <Text style={styles.emptyText}>No scripted credits</Text>
-            <Text style={styles.emptySub}>Reality, talk and news appearances are hidden.</Text>
+            <Text style={styles.emptyText}>
+              {searchQuery.trim() ? `No matches for “${searchQuery.trim()}”` : 'No scripted credits'}
+            </Text>
+            <Text style={styles.emptySub}>
+              {searchQuery.trim()
+                ? 'Try a different title or character.'
+                : 'Reality, talk and news appearances are hidden.'}
+            </Text>
           </View>
         }
         />
