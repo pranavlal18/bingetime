@@ -407,19 +407,6 @@ function MoviesScreenContent() {
               color={colors.onSurfaceVariant}
             />
           </Pressable>
-          {/* Refresh release dates — sync from TMDb */}
-          <Pressable
-            style={[styles.appBarBtn, refreshReleaseDates.isPending && styles.appBarBtnActive]}
-            onPress={() => refreshReleaseDates.mutate()}
-            disabled={refreshReleaseDates.isPending}
-            hitSlop={8}
-          >
-            <Ionicons
-              name="sync-outline"
-              size={20}
-              color={refreshReleaseDates.isPending ? colors.primary : colors.onSurfaceVariant}
-            />
-          </Pressable>
           <Pressable
             style={[styles.appBarBtn, isSearchVisible && styles.appBarBtnActive]}
             onPress={() => {
