@@ -12,8 +12,9 @@ import {
 } from 'react-native'
 import { FlashList } from '@shopify/flash-list'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import { useFocusEffect } from 'expo-router'
+import { useFocusEffect, router } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
+import { hapticLight } from '@/utils/haptics'
 import { useQueries } from '@tanstack/react-query'
 import { useShows, useMarkWatched, useNewSeasonIds, deriveWatchNextEpisodes, deriveHaventWatchedEpisodes } from '@/lib/queries/shows'
 import type { NextEpisodeInfo } from '@/lib/queries/shows'
@@ -438,21 +439,49 @@ export default function ShowsScreen() {
   const renderEmptyState = useCallback(() => {
     const isWatchList = activeTab === 'watchlist'
 
+    if (isWatchList) {
+      return (
+        <View style={styles.emptyWrap}>
+          <View style={styles.emptyCard}>
+            <View style={styles.emptyIconCircle}>
+              <Ionicons name="tv-outline" size={28} color={colors.primary} />
+            </View>
+            <Text style={styles.emptyTitle}>Your watchlist is empty</Text>
+            <Text style={styles.emptySubtitle}>Find shows you love and track every episode.</Text>
+            <Pressable
+              onPress={() => {
+                hapticLight()
+                router.replace('/(tabs)/discover')
+              }}
+              style={styles.emptyPrimaryBtn}
+              accessibilityRole="button"
+              accessibilityLabel="Find shows to add"
+            >
+              <Ionicons name="search-outline" size={18} color="#fff" />
+              <Text style={styles.emptyPrimaryBtnText}>Find shows to add</Text>
+            </Pressable>
+            <Pressable
+              onPress={() => {
+                hapticLight()
+                router.replace('/(tabs)/discover')
+              }}
+              style={styles.emptySecondaryBtn}
+              accessibilityRole="button"
+              accessibilityLabel="Browse trending"
+            >
+              <Text style={styles.emptySecondaryBtnText}>Browse Trending</Text>
+            </Pressable>
+          </View>
+          <Text style={styles.emptyHint}>Tip: add from Discover — trending, search & genres.</Text>
+        </View>
+      )
+    }
+
     return (
       <View style={styles.emptyState}>
-        <Ionicons
-          name={isWatchList ? 'tv-outline' : 'calendar-outline'}
-          size={48}
-          color={colors.outline}
-        />
-        <Text style={styles.emptyTitle}>
-          {isWatchList ? 'No shows yet' : 'No upcoming episodes'}
-        </Text>
-        <Text style={styles.emptySubtitle}>
-          {isWatchList
-            ? 'Import your TV Time data or start adding shows from Discover'
-            : 'Check back later for upcoming episodes'}
-        </Text>
+        <Ionicons name="calendar-outline" size={48} color={colors.outline} />
+        <Text style={styles.emptyTitle}>No upcoming episodes</Text>
+        <Text style={styles.emptySubtitle}>Check back later for upcoming episodes</Text>
       </View>
     )
   }, [activeTab, colors])
@@ -509,7 +538,64 @@ export default function ShowsScreen() {
           justifyContent: 'center',
         },
 
-        // Empty
+        // Empty — watchlist upgraded card
+        emptyWrap: {
+          alignItems: 'center',
+          paddingHorizontal: 20,
+          paddingTop: 8,
+        },
+        emptyCard: {
+          alignItems: 'center',
+          backgroundColor: colors.surfaceContainer,
+          borderRadius: 24,
+          padding: 32,
+          width: '100%',
+          borderWidth: 1,
+          borderColor: colors.outlineVariant,
+        },
+        emptyIconCircle: {
+          width: 64,
+          height: 64,
+          borderRadius: 32,
+          backgroundColor: colors.surfaceContainerHigh,
+          justifyContent: 'center',
+          alignItems: 'center',
+          marginBottom: 16,
+        },
+        emptyPrimaryBtn: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: 8,
+          backgroundColor: colors.accent,
+          borderRadius: 16,
+          height: 48,
+          paddingHorizontal: 20,
+          width: '100%',
+          marginTop: 20,
+        },
+        emptyPrimaryBtnText: { fontSize: 15, fontWeight: '700', color: '#fff' },
+        emptySecondaryBtn: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'center',
+          borderRadius: 16,
+          height: 44,
+          paddingHorizontal: 20,
+          width: '100%',
+          marginTop: 10,
+          borderWidth: 1,
+          borderColor: colors.outlineVariant,
+        },
+        emptySecondaryBtnText: { fontSize: 14, fontWeight: '600', color: colors.onSurfaceVariant },
+        emptyHint: {
+          fontSize: 12,
+          color: colors.outline,
+          textAlign: 'center',
+          marginTop: 12,
+          lineHeight: 16,
+        },
+        // Legacy upcoming empty
         emptyState: {
           alignItems: 'center',
           paddingHorizontal: 40,

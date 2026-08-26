@@ -366,7 +366,7 @@ async function removeMovieFromLibrary(movieId: string, userId: string) {
   if (error) throw new Error(`Failed to remove movie: ${error.message}`)
 }
 
-async function addShowToLibrary(item: DiscoverResult, userId: string): Promise<string> {
+export async function addShowToLibrary(item: DiscoverResult, userId: string): Promise<string> {
   // 1. Get TVDB ID + show details (number_of_episodes, episode_run_time) from TMDb
   const [external, details] = await Promise.all([
     tmdb.getExternalIds(item.tmdbId, 'tv'),
@@ -434,7 +434,7 @@ async function addShowToLibrary(item: DiscoverResult, userId: string): Promise<s
   return showId
 }
 
-async function addMovieToLibrary(item: DiscoverResult, userId: string): Promise<string> {
+export async function addMovieToLibrary(item: DiscoverResult, userId: string): Promise<string> {
   // 1. Resolve full release_date from TMDb (Discover only returns the year/heuristic date)
   let releaseDate: string | null = item.releaseDate ?? null
   if (!releaseDate) {

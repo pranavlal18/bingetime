@@ -101,7 +101,7 @@ export type DiscoverFilterKind = 'genre' | 'network' | 'company'
 export async function discoverTitles(
   mediaType: 'tv' | 'movie',
   kind: DiscoverFilterKind,
-  id: number,
+  id: number | string,
   page = 1,
   sortBy: GenreSortBy = 'popularity.desc'
 ) {

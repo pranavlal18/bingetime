@@ -339,8 +339,60 @@ function MoviesScreenContent() {
           paddingHorizontal: spacing.marginMobile,
           paddingBottom: 32,
         },
+        listContentEmpty: {
+          flexGrow: 1,
+          justifyContent: 'center',
+        },
 
         // ── Empty State ──
+        emptyWrap: {
+          alignItems: 'center',
+          paddingHorizontal: 20,
+          paddingTop: 8,
+        },
+        emptyCard: {
+          alignItems: 'center',
+          backgroundColor: colors.surfaceContainer,
+          borderRadius: 24,
+          padding: 32,
+          width: '100%',
+          borderWidth: 1,
+          borderColor: colors.outlineVariant,
+        },
+        emptyPrimaryBtn: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: 8,
+          backgroundColor: colors.accent,
+          borderRadius: 16,
+          height: 48,
+          paddingHorizontal: 20,
+          width: '100%',
+          marginTop: 20,
+        },
+        emptyPrimaryBtnText: { fontFamily: 'Inter', fontSize: 15, fontWeight: '700', color: '#fff' },
+        emptySecondaryBtn: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'center',
+          borderRadius: 16,
+          height: 44,
+          paddingHorizontal: 20,
+          width: '100%',
+          marginTop: 10,
+          borderWidth: 1,
+          borderColor: colors.outlineVariant,
+        },
+        emptySecondaryBtnText: { fontFamily: 'Inter', fontSize: 14, fontWeight: '600', color: colors.onSurfaceVariant },
+        emptyHint: {
+          fontFamily: 'Inter',
+          fontSize: 12,
+          color: colors.outline,
+          textAlign: 'center',
+          marginTop: 12,
+          lineHeight: 16,
+        },
         emptyState: {
           alignItems: 'center',
           paddingHorizontal: 48,
@@ -373,22 +425,53 @@ function MoviesScreenContent() {
     [colors]
   )
 
-  // Empty state
+  // Empty state — watchlist gets rich card with CTA, upcoming stays subtle
   const emptyState = useMemo(() => {
     if (isLoading) return null
+    if (activeSegment === 'watchlist') {
+      return (
+        <View style={styles.emptyWrap}>
+          <View style={styles.emptyCard}>
+            <View style={styles.emptyIconContainer}>
+              <Ionicons name="film-outline" size={28} color={colors.primary} />
+            </View>
+            <Text style={styles.emptyTitle}>Your watchlist is empty</Text>
+            <Text style={styles.emptySubtitle}>Find movies you love and keep your list fresh.</Text>
+            <Pressable
+              onPress={() => {
+                hapticLight()
+                router.replace('/(tabs)/discover')
+              }}
+              style={styles.emptyPrimaryBtn}
+              accessibilityRole="button"
+              accessibilityLabel="Find movies to add"
+            >
+              <Ionicons name="search-outline" size={18} color="#fff" />
+              <Text style={styles.emptyPrimaryBtnText}>Find movies to add</Text>
+            </Pressable>
+            <Pressable
+              onPress={() => {
+                hapticLight()
+                router.replace('/(tabs)/discover')
+              }}
+              style={styles.emptySecondaryBtn}
+              accessibilityRole="button"
+              accessibilityLabel="Browse trending"
+            >
+              <Text style={styles.emptySecondaryBtnText}>Browse Trending</Text>
+            </Pressable>
+          </View>
+          <Text style={styles.emptyHint}>Tip: add from Discover — trending, search & genres.</Text>
+        </View>
+      )
+    }
     return (
       <View style={styles.emptyState}>
         <View style={styles.emptyIconContainer}>
           <Ionicons name="film-outline" size={56} color={colors.outlineVariant} />
         </View>
-        <Text style={styles.emptyTitle}>
-          {activeSegment === 'watchlist' ? 'Nothing to watch' : 'No upcoming movies'}
-        </Text>
-        <Text style={styles.emptySubtitle}>
-          {activeSegment === 'watchlist'
-            ? 'Add movies from Discover to your watchlist'
-            : 'Movies you add that aren\'t released yet will appear here'}
-        </Text>
+        <Text style={styles.emptyTitle}>No upcoming movies</Text>
+        <Text style={styles.emptySubtitle}>Movies you add that aren&apos;t released yet will appear here</Text>
       </View>
     )
   }, [isLoading, activeSegment, colors, styles])
@@ -512,6 +595,7 @@ function MoviesScreenContent() {
           key={isGrid ? 'grid' : 'list'}
           contentContainerStyle={[
             styles.listContent,
+            filteredMovies.length === 0 && styles.listContentEmpty,
           ]}
           ListEmptyComponent={emptyState}
           refreshControl={
