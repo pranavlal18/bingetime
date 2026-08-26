@@ -70,10 +70,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   const signOut = async () => {
+    // Drop local session state FIRST so auth guards redirect to login
+    // immediately — the server-side token revocation below is best-effort
+    // (works offline) and must never block the sign-out experience.
+    setSession(null)
+    setUser(null)
+    setLoading(false)
+
     queryClient.clear()
     // mmkvAsyncStorage covers MMKV (native) and AsyncStorage (web/Expo Go)
-    await mmkvAsyncStorage.removeItem('REACT_QUERY_OFFLINE_CACHE')
-    await supabase.auth.signOut()
+    void mmkvAsyncStorage.removeItem('REACT_QUERY_OFFLINE_CACHE')
+
+    try {
+      await supabase.auth.signOut()
+    } catch {
+      // Slow/offline network — the local session is already gone; the stale
+      // refresh token expires server-side on its own schedule.
+    }
   }
 
   const resetPassword = async (email: string) => {
