@@ -4,6 +4,7 @@ import { useQuery, useInfiniteQuery, useMutation, useQueryClient } from '@tansta
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
 import * as tmdb from '@/lib/tmdb'
+import { hapticSuccess } from '@/utils/haptics'
 import { upcomingKeys } from './upcoming'
 
 // ── Unified result type for the Discover tab ──
@@ -288,7 +289,9 @@ export function useAddToLibrary() {
     },
     onSuccess: (libraryId, item) => {
       if (__DEV__) console.log('✅ [useAddToLibrary] Added to library:', libraryId)
-      
+      // Confirm the save with a buzz — fires only when the write succeeded
+      hapticSuccess()
+
       // Manually update the discover cache so it's not stale when switching tabs
       queryClient.setQueriesData<DiscoverResult[]>({ queryKey: ['discover'] }, (old) => {
         if (!Array.isArray(old)) return old

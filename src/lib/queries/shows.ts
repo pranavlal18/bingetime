@@ -1,7 +1,7 @@
 // ─── Shows Tab — React Query hooks ───
 
 import { useQuery, useMutation, useQueryClient, QueryClient } from '@tanstack/react-query'
-import { hapticLight } from '@/utils/haptics'
+import { hapticLight, hapticSuccess } from '@/utils/haptics'
 import { supabase } from '@/lib/supabase'
 import { getImageUrl, getShowBasicDetails } from '@/lib/tmdb'
 import { useAuth } from '@/contexts/AuthContext'
@@ -595,7 +595,7 @@ export function useMarkWatched() {
 
 // ── Toggle favorite ──
 
-async function toggleFavorite(showId: string, userId: string): Promise<void> {
+async function toggleFavorite(showId: string, userId: string): Promise<boolean> {
   const { data: us } = await supabase
     .from('user_shows')
     .select('is_favorited')
@@ -616,6 +616,7 @@ async function toggleFavorite(showId: string, userId: string): Promise<void> {
     .eq('user_id', userId)
 
   if (error) throw new Error(`Failed to toggle favorite: ${error.message}`)
+  return newValue
 }
 
 export function useToggleFavorite() {
@@ -624,7 +625,10 @@ export function useToggleFavorite() {
 
   return useMutation({
     mutationFn: (showId: string) => toggleFavorite(showId, user?.id ?? ''),
-    onSuccess: () => {
+    onSuccess: (newValue) => {
+      // Satisfying buzz when the heart fills; soft tick when it clears
+      if (newValue) hapticSuccess()
+      else hapticLight()
       queryClient.invalidateQueries({ queryKey: showKeys.all })
       if (user) {
         queryClient.invalidateQueries({ queryKey: profileKeys.favorites(user.id) })

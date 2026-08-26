@@ -1,7 +1,7 @@
 // ─── Movies Tab — React Query hooks ───
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { hapticLight } from '@/utils/haptics'
+import { hapticLight, hapticSuccess } from '@/utils/haptics'
 import { supabase } from '@/lib/supabase'
 import { getImageUrl, getMovieDetails, searchMovie } from '@/lib/tmdb'
 import { useAuth } from '@/contexts/AuthContext'
@@ -507,7 +507,7 @@ export function useRefreshMovieGenres() {
 
 // ── Toggle movie favorite ──
 
-async function toggleMovieFavorite(movieId: string, userId: string): Promise<void> {
+async function toggleMovieFavorite(movieId: string, userId: string): Promise<boolean> {
   const { data: um } = await supabase
     .from('user_movies')
     .select('is_favorited')
@@ -528,6 +528,7 @@ async function toggleMovieFavorite(movieId: string, userId: string): Promise<voi
     .eq('user_id', userId)
 
   if (error) throw new Error(`Failed to toggle movie favorite: ${error.message}`)
+  return newValue
 }
 
 export function useToggleMovieFavorite() {
@@ -536,7 +537,10 @@ export function useToggleMovieFavorite() {
 
   return useMutation({
     mutationFn: (movieId: string) => toggleMovieFavorite(movieId, user?.id ?? ''),
-    onSuccess: () => {
+    onSuccess: (newValue) => {
+      // Satisfying buzz when the heart fills; soft tick when it clears
+      if (newValue) hapticSuccess()
+      else hapticLight()
       queryClient.invalidateQueries({ queryKey: movieKeys.all })
     },
     onError: () => {
