@@ -17,6 +17,13 @@ import { router, Stack } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Image } from 'expo-image'
 import { Ionicons } from '@expo/vector-icons'
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withTiming,
+  Easing,
+  interpolate,
+} from 'react-native-reanimated'
 import { hapticLight } from '@/utils/haptics'
 import { useQueryClient } from '@tanstack/react-query'
 import {
@@ -24,6 +31,7 @@ import {
   useAddToLibrary,
   useRemoveFromLibrary,
   useGenres,
+  useMovieWatchProviders,
   BROWSE_SORT_OPTIONS,
   type DiscoverTitle,
 } from '@/lib/queries/discover'
@@ -50,11 +58,11 @@ const CONTENT_PAD = SIDE_OFFSET - COL_GAP / 2
 // Soft off-white backdrop used behind dark brand logos (see utils/logoLuminance)
 const LIGHT_LOGO_TILE = '#ECE9F1'
 
-// ── Genre media-type counterpart resolution ──
+// ── Media-type counterpart resolution ──
 // TMDb genre IDs differ between tv and movie (movie "Action" = 28, tv
 // "Action & Adventure" = 10759), so flipping a genre page's media type means
-// re-resolving the id by name. A small alias table covers the renamed pairs;
-// genres with no counterpart (Reality, Talk, Soap...) disable the other side.
+// re-resolving the id by name. A small alias table covers renamed pairs;
+// entries with no counterpart disable the other side.
 const GENRE_ALIASES: Record<string, string> = {
   'action & adventure': 'action',
   action: 'action & adventure',
@@ -62,6 +70,7 @@ const GENRE_ALIASES: Record<string, string> = {
   'science fiction': 'sci-fi & fantasy',
   'war & politics': 'war',
   war: 'war & politics',
+  'hbo max': 'max',
 }
 
 function normalizeGenreName(name: string): string {
@@ -229,7 +238,6 @@ export default function CollectionBrowser({
   logoPath,
   loadingLabel,
   invalidMessage,
-  emptyMessage,
 }: CollectionBrowserProps) {
   const insets = useSafeAreaInsets()
   const { colors } = useTheme()
@@ -238,13 +246,39 @@ export default function CollectionBrowser({
   const [sortBy, setSortBy] = useState<GenreSortBy>('popularity.desc')
   const [sheetVisible, setSheetVisible] = useState(false)
 
-  // ── Shows/Movies toggle (genre + company pages; networks are TV-only in TMDb) ──
-  const toggleable = kind !== 'network'
+  // ── Shows/Movies toggle ──
+  // Genre pages map ids via TMDb's genre lists; network pages resolve their
+  // movie side through watch providers (networks are TV-only in TMDb — same
+  // brands, different id space); company ids work on both endpoints as-is.
   const [activeType, setActiveType] = useState<'tv' | 'movie'>(mediaType)
 
+  // Animated toggle — sliding pill between Shows/Movies
+  const segProgress = useSharedValue(activeType === 'tv' ? 0 : 1)
+  const [segLayouts, setSegLayouts] = useState<Record<string, { x: number; width: number }>>({})
+
+  useEffect(() => {
+    segProgress.value = withTiming(activeType === 'tv' ? 0 : 1, {
+      duration: 260,
+      easing: Easing.out(Easing.cubic),
+    })
+  }, [activeType, segProgress])
+
+  const segIndicatorStyle = useAnimatedStyle(() => {
+    const tv = segLayouts['tv']
+    const movie = segLayouts['movie']
+    if (!tv || !movie) return { opacity: 0 }
+    const x = interpolate(segProgress.value, [0, 1], [tv.x, movie.x])
+    const w = interpolate(segProgress.value, [0, 1], [tv.width, movie.width])
+    return {
+      transform: [{ translateX: x }],
+      width: w,
+      opacity: 1,
+    }
+  })
+
   // Per-type discover ids. Company ids are valid on both /discover endpoints;
-  // genres need a per-side id — the origin side starts with the route id and
-  // the other resolves lazily from TMDb's genre lists.
+  // genre/network pages start with only the origin side and the other resolves
+  // lazily from TMDb lists.
   const [idsByType, setIdsByType] = useState<{ tv: number | null; movie: number | null }>(() =>
     kind === 'company'
       ? { tv: id, movie: id }
@@ -252,9 +286,17 @@ export default function CollectionBrowser({
   )
   const activeId = idsByType[activeType]
 
-  const needsGenreLists = toggleable && kind === 'genre'
+  const needsGenreLists = kind === 'genre'
   const tvGenresQuery = useGenres('tv', { enabled: needsGenreLists })
   const movieGenresQuery = useGenres('movie', { enabled: needsGenreLists })
+  const needsProviders = kind === 'network'
+  const providersQuery = useMovieWatchProviders({ enabled: needsProviders })
+
+  /** Provider list reshaped into the shared {id,name} form used by the resolver */
+  const providerOptions = useMemo(
+    () => providersQuery.data?.results.map((p) => ({ id: p.provider_id, name: p.provider_name })),
+    [providersQuery.data]
+  )
 
   const sortLabel = useMemo(
     () => BROWSE_SORT_OPTIONS[activeType].find((o) => o.value === sortBy)?.label ?? 'Popular',
@@ -323,25 +365,33 @@ export default function CollectionBrowser({
     removingIds.current.clear()
   }, [activeType])
 
-  // Eagerly resolve both genre-side ids as soon as the (cached) genre lists
-  // land — makes flipping instant instead of waiting per side.
+  // Eagerly resolve both sides as soon as the (cached) lists land — makes
+  // flipping instant instead of waiting per side.
   useEffect(() => {
-    if (!needsGenreLists) return
+    if (!needsGenreLists && !needsProviders) return
     const tvList = tvGenresQuery.data?.genres
     const movieList = movieGenresQuery.data?.genres
-    if (!tvList && !movieList) return
     setIdsByType((prev) => {
       let changed = false
       const next = { ...prev }
-      if (next.tv == null && tvList) {
-        const r = resolveCounterpartId(name, tvList)
-        if (r != null) {
-          next.tv = r
-          changed = true
+      if (needsGenreLists) {
+        if (next.tv == null && tvList) {
+          const r = resolveCounterpartId(name, tvList)
+          if (r != null) {
+            next.tv = r
+            changed = true
+          }
         }
-      }
-      if (next.movie == null && movieList) {
-        const r = resolveCounterpartId(name, movieList)
+        if (next.movie == null && movieList) {
+          const r = resolveCounterpartId(name, movieList)
+          if (r != null) {
+            next.movie = r
+            changed = true
+          }
+        }
+      } else if (next.movie == null && providerOptions) {
+        // Network page — the movie side maps to a watch-provider id
+        const r = resolveCounterpartId(name, providerOptions)
         if (r != null) {
           next.movie = r
           changed = true
@@ -349,17 +399,31 @@ export default function CollectionBrowser({
       }
       return changed ? next : prev
     })
-  }, [needsGenreLists, name, tvGenresQuery.data, movieGenresQuery.data])
+  }, [
+    needsGenreLists,
+    needsProviders,
+    name,
+    tvGenresQuery.data,
+    movieGenresQuery.data,
+    providerOptions,
+  ])
 
-  // Can the non-active segment be used? 'unknown' while genre lists load —
-  // keep it enabled and show a brief grid loading state if tapped early.
+  // Can the non-active segment be used? 'unknown' while lists load — keep it
+  // enabled and show a brief grid loading state if tapped early.
   const counterpartAvailable: boolean | 'unknown' = useMemo(() => {
-    if (kind !== 'genre') return true // company ids work on both endpoints
-    const list =
-      activeType === 'tv' ? movieGenresQuery.data?.genres : tvGenresQuery.data?.genres
-    if (!list) return 'unknown'
-    return resolveCounterpartId(name, list) != null
-  }, [kind, activeType, name, tvGenresQuery.data, movieGenresQuery.data])
+    if (kind === 'genre') {
+      const list =
+        activeType === 'tv' ? movieGenresQuery.data?.genres : tvGenresQuery.data?.genres
+      if (!list) return 'unknown'
+      return resolveCounterpartId(name, list) != null
+    }
+    if (kind === 'network') {
+      // Movie side exists only if this brand is also a watch provider in-region
+      if (!providerOptions) return 'unknown'
+      return resolveCounterpartId(name, providerOptions) != null
+    }
+    return true // company ids work on both endpoints
+  }, [kind, activeType, name, tvGenresQuery.data, movieGenresQuery.data, providerOptions])
 
   const handleSwitchType = useCallback(
     (t: 'tv' | 'movie') => {
@@ -504,11 +568,7 @@ export default function CollectionBrowser({
         footerLoader: {
           paddingVertical: 24,
         },
-        // Shows/Movies segmented control (sticky bar top row)
-        typeRow: {
-          flexDirection: 'row',
-          marginBottom: 10,
-        },
+        // Shows/Movies segmented control (sticky bar, left zone)
         segTrack: {
           flexDirection: 'row',
           backgroundColor: colors.surfaceContainer,
@@ -516,14 +576,25 @@ export default function CollectionBrowser({
           borderWidth: 1,
           borderColor: colors.outlineVariant,
           padding: 2,
+          position: 'relative',
+        },
+        segIndicator: {
+          position: 'absolute',
+          top: 2,
+          bottom: 2,
+          borderRadius: borderRadius.full,
+          backgroundColor: colors.primary,
+          zIndex: 0,
         },
         segBtn: {
           paddingHorizontal: 14,
           paddingVertical: 6,
           borderRadius: borderRadius.full,
+          zIndex: 1,
         },
         segBtnActive: {
-          backgroundColor: colors.primary,
+          // background now handled by animated indicator; kept for fallback before layout
+          backgroundColor: 'transparent',
         },
         segBtnDisabled: {
           opacity: 0.35,
@@ -541,10 +612,8 @@ export default function CollectionBrowser({
     [colors]
   )
 
-  // Type-aware empty copy when the browser has a Shows/Movies toggle
-  const emptyCopy = toggleable
-    ? `No ${activeType === 'tv' ? 'shows' : 'movies'} found in ${name}`
-    : emptyMessage ?? `No titles found in ${name}`
+  // Type-aware empty copy for the Shows/Movies toggle
+  const emptyCopy = `No ${activeType === 'tv' ? 'shows' : 'movies'} found in ${name}`
 
   const renderItem = useCallback(
     ({ item }: { item: DiscoverTitle }) => (
@@ -592,7 +661,8 @@ export default function CollectionBrowser({
   // ── Loading ──
   // Also covers the beat after flipping media type on a genre page while the
   // counterpart id resolves (disabled queries report isLoading=false)
-  const awaitingCounterpart = needsGenreLists && activeId == null && counterpartAvailable !== false
+  const awaitingCounterpart =
+    (needsGenreLists || needsProviders) && activeId == null && counterpartAvailable !== false
   if (isLoading || awaitingCounterpart) {
     return (
       <View style={[styles.container, styles.centered, { paddingTop: insets.top }]}>
@@ -678,8 +748,7 @@ export default function CollectionBrowser({
         // Horizontal padding lives ONLY in contentContainerStyle — per-item
         // half-gutter wrappers create the center gutter. Keeps cards flush at
         // 20dp from each screen edge with an 8dp center gutter.
-        // Extra bottom padding when the type-toggle row makes the sticky bar taller
-        contentContainerStyle={[styles.gridContent, { paddingHorizontal: CONTENT_PAD, paddingBottom: (toggleable ? 132 : 80) + insets.bottom }]}
+        contentContainerStyle={[styles.gridContent, { paddingHorizontal: CONTENT_PAD, paddingBottom: 80 + insets.bottom }]}
         showsVerticalScrollIndicator={false}
         onEndReached={handleEndReached}
         onEndReachedThreshold={0.5}
@@ -696,13 +765,16 @@ export default function CollectionBrowser({
         }
       />
 
-      {/* Sticky bottom bar — Spotify-style */}
+      {/* Sticky bottom bar — toggle left, count centered, sort right */}
       <View
         style={{
           position: 'absolute',
           bottom: 0,
           left: 0,
           right: 0,
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: 12,
           paddingHorizontal: spacing.marginMobile,
           paddingVertical: 12,
           paddingBottom: 12 + insets.bottom,
@@ -713,67 +785,84 @@ export default function CollectionBrowser({
           elevation: 8,
         }}
       >
-        {toggleable && (
-          <View style={styles.typeRow}>
-            <View style={styles.segTrack}>
-              {(['tv', 'movie'] as const).map((t) => {
-                const selected = activeType === t
-                const disabled = !selected && counterpartAvailable === false
-                return (
-                  <Pressable
-                    key={t}
-                    onPress={() => handleSwitchType(t)}
-                    disabled={disabled}
-                    style={[
-                      styles.segBtn,
-                      selected && styles.segBtnActive,
-                      disabled && styles.segBtnDisabled,
-                    ]}
-                    accessibilityRole="button"
-                    accessibilityState={{ selected, disabled }}
-                    accessibilityLabel={t === 'tv' ? `Shows in ${name}` : `Movies in ${name}`}
+        {/* Left zone — Shows/Movies segmented control (wrap, not flex) */}
+        <View style={{ flexShrink: 0 }}>
+          <View style={styles.segTrack}>
+            <Animated.View style={[styles.segIndicator, segIndicatorStyle]} />
+            {(['tv', 'movie'] as const).map((t) => {
+              const selected = activeType === t
+              const disabled = !selected && counterpartAvailable === false
+              return (
+                <Pressable
+                  key={t}
+                  onPress={() => handleSwitchType(t)}
+                  disabled={disabled}
+                  onLayout={(e) => {
+                    const { x, width } = e.nativeEvent.layout
+                    setSegLayouts((prev) => {
+                      const cur = prev[t]
+                      if (cur && cur.x === x && cur.width === width) return prev
+                      return { ...prev, [t]: { x, width } }
+                    })
+                  }}
+                  style={[styles.segBtn, disabled && styles.segBtnDisabled]}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected, disabled }}
+                  accessibilityLabel={t === 'tv' ? `Shows in ${name}` : `Movies in ${name}`}
+                >
+                  <Text
+                    style={[styles.segText, selected && styles.segTextActive]}
+                    numberOfLines={1}
                   >
-                    <Text
-                      style={[styles.segText, selected && styles.segTextActive]}
-                      numberOfLines={1}
-                    >
-                      {t === 'tv' ? 'Shows' : 'Movies'}
-                    </Text>
-                  </Pressable>
-                )
-              })}
-            </View>
+                    {t === 'tv' ? 'Shows' : 'Movies'}
+                  </Text>
+                </Pressable>
+              )
+            })}
           </View>
-        )}
-        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-        <Pressable
+        </View>
+
+        {/* Center zone — title count (flex:1 keeps it centered, gap handles spacing) */}
+        <Text
           style={{
-            flexDirection: 'row',
-            alignItems: 'center',
-            gap: 6,
-            backgroundColor: colors.surfaceContainerHigh,
-            paddingHorizontal: 14,
-            paddingVertical: 8,
-            borderRadius: borderRadius.full,
-            borderWidth: 1,
-            borderColor: colors.outlineVariant,
+            flex: 1,
+            fontFamily: 'Inter',
+            fontSize: 12,
+            color: colors.onSurfaceVariant,
+            textAlign: 'center',
           }}
-          onPress={() => {
-            hapticLight()
-            setSheetVisible(true)
-          }}
-          accessibilityRole="button"
-          accessibilityLabel={`Sort by ${sortLabel}`}
+          numberOfLines={1}
         >
-          <Ionicons name="swap-vertical" size={16} color={colors.onSurface} />
-          <Text style={{ fontFamily: 'Inter', fontSize: 13, fontWeight: '600', color: colors.onSurface }}>
-            {sortLabel}
-          </Text>
-          <Ionicons name="chevron-down" size={14} color={colors.onSurfaceVariant} />
-        </Pressable>
-        <Text style={{ fontFamily: 'Inter', fontSize: 12, color: colors.onSurfaceVariant }}>
           {titles.length} titles
         </Text>
+
+        {/* Right zone — sort pill (wrap, not flex) */}
+        <View style={{ flexShrink: 0 }}>
+          <Pressable
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: 6,
+              backgroundColor: colors.surfaceContainerHigh,
+              paddingHorizontal: 14,
+              paddingVertical: 8,
+              borderRadius: borderRadius.full,
+              borderWidth: 1,
+              borderColor: colors.outlineVariant,
+            }}
+            onPress={() => {
+              hapticLight()
+              setSheetVisible(true)
+            }}
+            accessibilityRole="button"
+            accessibilityLabel={`Sort by ${sortLabel}`}
+          >
+            <Ionicons name="swap-vertical" size={16} color={colors.onSurface} />
+            <Text style={{ fontFamily: 'Inter', fontSize: 13, fontWeight: '600', color: colors.onSurface }}>
+              {sortLabel}
+            </Text>
+            <Ionicons name="chevron-down" size={14} color={colors.onSurfaceVariant} />
+          </Pressable>
         </View>
       </View>
 

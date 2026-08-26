@@ -105,13 +105,25 @@ export async function discoverTitles(
   page = 1,
   sortBy: GenreSortBy = 'popularity.desc'
 ) {
+  // TMDb's with_networks filter only exists on /discover/tv — the movie side of
+  // a network page resolves through streaming watch providers instead (same
+  // brands, different id space), so `id` is then the provider id.
   const filterParam =
-    kind === 'genre' ? 'with_genres' : kind === 'network' ? 'with_networks' : 'with_companies'
+    kind === 'genre'
+      ? 'with_genres'
+      : kind === 'network' && mediaType === 'movie'
+        ? 'with_watch_providers'
+        : kind === 'network'
+          ? 'with_networks'
+          : 'with_companies'
   const params: Record<string, string> = {
     [filterParam]: String(id),
     sort_by: sortBy,
     include_adult: 'false',
     page: String(page),
+  }
+  if (kind === 'network' && mediaType === 'movie') {
+    params['watch_region'] = NETWORK_WATCH_REGION
   }
   // "Newest" should show already-released titles, not far-future (e.g. 2030) placeholders
   if (sortBy === 'primary_release_date.desc' || sortBy === 'first_air_date.desc') {
@@ -132,6 +144,26 @@ export const discoverByGenre = (
   page = 1,
   sortBy: GenreSortBy = 'popularity.desc'
 ) => discoverTitles(mediaType, 'genre', genreId, page, sortBy)
+
+/** Region used to resolve watch-provider availability for network movie sides */
+export const NETWORK_WATCH_REGION = 'US'
+
+/** A streaming watch provider (Netflix=8, Prime Video=119, Max=189...) */
+export interface TMDbWatchProvider {
+  provider_id: number
+  provider_name: string
+}
+
+/**
+ * Movie watch-provider list for a region — used to map a TV network's brand
+ * name onto its movie-side provider (networks are TV-only in TMDb).
+ */
+export async function getMovieWatchProviders(region: string = NETWORK_WATCH_REGION) {
+  return tmdbFetch<{ results: TMDbWatchProvider[] }>(
+    `/watch/providers/movie`,
+    { watch_region: region }
+  )
+}
 
 export interface TMDbGenre {
   id: number

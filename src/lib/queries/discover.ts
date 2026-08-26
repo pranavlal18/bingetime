@@ -171,6 +171,21 @@ export function useGenres(mediaType: 'tv' | 'movie', options?: { enabled?: boole
   })
 }
 
+/**
+ * Movie watch-provider list for the network region — lets a network page's
+ * movie side resolve its brand to a watch-provider id (networks are TV-only
+ * in TMDb; same brands live in the provider id space).
+ */
+export function useMovieWatchProviders(options?: { enabled?: boolean }) {
+  return useQuery({
+    queryKey: ['tmdb', 'watch-providers', 'movie', tmdb.NETWORK_WATCH_REGION],
+    queryFn: () => tmdb.getMovieWatchProviders(tmdb.NETWORK_WATCH_REGION),
+    staleTime: 1000 * 60 * 60 * 24,
+    gcTime: 1000 * 60 * 60 * 24 * 7,
+    enabled: options?.enabled,
+  })
+}
+
 export function useDiscoverTitles(
   mediaType: 'tv' | 'movie',
   kind: tmdb.DiscoverFilterKind,
