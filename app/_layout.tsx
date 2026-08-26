@@ -14,6 +14,7 @@ import {
 } from '@expo-google-fonts/inter'
 import { useAuth, AuthProvider } from '@/contexts/AuthContext'
 import { ThemeProvider, useTheme } from '@/contexts/ThemeContext'
+import { useAppStore } from '@/stores/appStore'
 import * as SystemUI from 'expo-system-ui'
 import { useSegments, useRouter } from 'expo-router'
 import { useNotificationScheduler } from '@/hooks/useNotificationScheduler'
@@ -41,6 +42,7 @@ function InnerLayout() {
   const router = useRouter()
   const { themeKey, colors } = useTheme()
   const isLightTheme = themeKey === 'luminescent'
+  const onboardingPending = useAppStore((s) => s.onboardingPending)
 
   // Paint the native window background with the theme color so OS-level surfaces
   // never flash white during screen transitions (especially Android back-nav).
@@ -53,6 +55,7 @@ function InnerLayout() {
     if (!loading) {
       const inAuthGroup = segments[0] === '(auth)'
       const inTabsGroup = segments[0] === '(tabs)'
+      const inOnboarding = segments[0] === 'onboarding'
 
       if (__DEV__) console.log('🔀 [InnerLayout] Redirect check:', {
         user: user?.email ?? null,
@@ -60,17 +63,26 @@ function InnerLayout() {
         segments: segments[0],
         inAuthGroup,
         inTabsGroup,
+        inOnboarding,
       })
 
       if (user && inAuthGroup) {
-        if (__DEV__) console.log('🔀 [InnerLayout] Redirecting to /(tabs)/shows')
-        router.replace('/(tabs)/shows')
-      } else if (!user && inTabsGroup) {
+        // Post-login: route through the wizard only when it was armed at signup
+        const target = onboardingPending ? '/onboarding' : '/(tabs)/shows'
+        if (__DEV__) console.log('🔀 [InnerLayout] Redirecting to', target)
+        router.replace(target)
+      } else if (!user && segments[0] && !inAuthGroup) {
+        // Any signed-out surface outside (auth) — tabs, profile/* sub-pages,
+        // onboarding, deep links — bounces to login immediately.
         if (__DEV__) console.log('🔀 [InnerLayout] Redirecting to /(auth)/login')
         router.replace('/(auth)/login')
+      } else if (user && segments[0] === 'onboarding' && !onboardingPending) {
+        // Defensive: wizard not armed → straight to tabs
+        if (__DEV__) console.log('🔀 [InnerLayout] Onboarding not armed, redirecting to /(tabs)/shows')
+        router.replace('/(tabs)/shows')
       }
     }
-  }, [user, loading, segments, router])
+  }, [user, loading, segments, router, onboardingPending])
 
   // Handle Supabase email verification deep links
   useEffect(() => {
@@ -212,6 +224,10 @@ function InnerLayout() {
           <Stack.Screen
             name="profile/settings"
             options={{ animation: 'slide_from_right' }}
+          />
+          <Stack.Screen
+            name="onboarding"
+            options={{ animation: 'slide_from_right', gestureEnabled: false }}
           />
         </Stack>
         <Toast />

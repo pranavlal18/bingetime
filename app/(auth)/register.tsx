@@ -15,6 +15,7 @@ import { router } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
 import { Image } from 'expo-image'
 import { useAuth } from '@/contexts/AuthContext'
+import { useAppStore } from '@/stores/appStore'
 import { typography, spacing, borderRadius } from '@/theme'
 import { useTheme } from '@/contexts/ThemeContext'
 
@@ -174,6 +175,7 @@ export default function RegisterScreen() {
   },
 }), [colors])
   const { signUp, loading: authLoading } = useAuth()
+  const setOnboardingPending = useAppStore((s) => s.setOnboardingPending)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
@@ -203,6 +205,8 @@ export default function RegisterScreen() {
       setError('An error occurred during registration. Please try again.')
     } else {
       if (__DEV__) console.log('✅ [RegisterScreen] Sign up success:', { user: data.user?.email })
+      // Arm the one-time onboarding wizard — consumed on first login after signup
+      setOnboardingPending(true)
       Alert.alert(
         'Account created!',
         'Please check your email to verify your account, then sign in.',
